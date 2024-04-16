@@ -103,6 +103,9 @@
     <ClCompile Include="ObjectMesh.cpp" />
     <ClCompile Include="ObjLoader.cpp" />
     <ClCompile Include="Visualizer.cpp" />
+    <None Include="fragment_shader.glsl" />
+    <None Include="geometry_shader.glsl" />
+    <None Include="vertex_shader.glsl" />
     <QtRcc Include="Knittee.qrc" />
     <QtUic Include="Knittee.ui" />
     <QtMoc Include="Knittee.h" />
@@ -112,6 +115,7 @@
     <ResourceCompile Include="Knittee.rc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Face.h" />
     <ClInclude Include="KnitGrapher.h" />
     <ClInclude Include="ObjectMesh.h" />
     <ClInclude Include="ObjLoader.h" />

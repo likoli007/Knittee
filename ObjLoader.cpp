@@ -61,7 +61,8 @@ void ObjLoader::parseLine(QString line)
 
 			QVector3D vertex3(list[1].toFloat(), list[2].toFloat(), list[3].toFloat());
 			qDebug() << list;
-			vertex_indices.push_back(vertex3);
+			//vertex3.normalize();
+			vertex_list.push_back(vertex3);
 		}
 
 		// vertex texture, currently being loaded but may not be necessary, as the final texture of the object will just be yarn-like
@@ -86,9 +87,9 @@ void ObjLoader::parseLine(QString line)
 			// most basic format, 'f a b c' where a,b,c is an index of the vertex in the file starting from 1
 			if (!line.contains("/")) {
 				list = line.split(" ");
-				face.vertices.push_back(list[1].toInt());
-				face.vertices.push_back(list[2].toInt());
-				face.vertices.push_back(list[3].toInt());
+				face.indices.push_back(list[1].toInt());
+				face.indices.push_back(list[2].toInt());
+				face.indices.push_back(list[3].toInt());
 				faces.push_back(face);
 			}
 		}
@@ -107,15 +108,26 @@ ObjectMesh ObjLoader::generateMesh()
 	ObjectMesh result;
 	unsigned int vertex_index;
 
+	//result.indices = faces;
+	result.vertices = vertex_list;
+	
 	for (Face f : faces) {
-		for (unsigned int i = 0; i < f.vertices.size(); i++)
+		for (unsigned int i = 0; i < f.indices.size(); i++)
 		{
-			vertex_index = f.vertices[i];
+			vertex_index = f.indices[i];
+			GLuint index = f.indices[i]-1;
 
-			QVector3D vertex = vertex_indices[vertex_index - 1];
-			result.vertices.push_back(vertex);
+			//qDebug() << index;
+
+			result.indices.push_back(index);
+
+			//QVector3D vertex = vertex_list[vertex_index - 1];
+			//result.vertices.push_back(vertex);
 		}
 	}
+
+	//qDebug() << result.vertices.size();
+	//qDebug() << result.indices.size();
 	return result;
 }
 
@@ -127,7 +139,7 @@ ObjectMesh ObjLoader::generateMesh()
 */
 void ObjLoader::flushArrays() {
 	normal_indices.clear();
-	vertex_indices.clear();
+	vertex_list.clear();
 	uv_indices.clear();
 	faces.clear();
 }

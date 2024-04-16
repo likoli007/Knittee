@@ -72,5 +72,13 @@
     <ClInclude Include="KnitGrapher.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Face.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="fragment_shader.glsl" />
+    <None Include="geometry_shader.glsl" />
+    <None Include="vertex_shader.glsl" />
   </ItemGroup>
 </Project>
