@@ -38,7 +38,7 @@ Knittee::Knittee(QWidget *parent)
     
 
     vis = new Visualizer(this); // Set the parent to be the main window
-    vis->setMinimumSize(400, 400); // Set a minimum size for the widget
+    //vis->setMinimumSize(400, 400); // Set a minimum size for the widget
     mainLayout->addWidget(vis);
 
     QWidget* centralWidget = new QWidget(this);

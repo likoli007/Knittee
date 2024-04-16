@@ -4,9 +4,12 @@
 //#include <QOpenGLFunctions>
 #include <QOpenGLExtraFunctions>
 #include <GL/gl.h>
+//#include <GL/glu.h>
 #include "ObjLoader.h"
 #include <QDebug>
-
+#include <QToolTip>
+#include <QApplication>
+#include <QScreen>
 /*
 *   Function: constructor, adds mouse tracking for the visualization subwindow
 */
@@ -14,7 +17,7 @@ Visualizer::Visualizer(QWidget* parent )
     : QOpenGLWidget(parent)
 {
     setMouseTracking(true);
-
+    //setFixedSize(800, 600); // Set the initial size
 }
 
 /*
@@ -37,6 +40,7 @@ void Visualizer::initializeGL()
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.0f, 0.0f, 1.0f, 1.0f); // Set the clear color to blue
     
+
     //face culling makes pipes too see through, so it is disabled
     //glEnable(GL_CULL_FACE);
    
@@ -69,26 +73,6 @@ void Visualizer::initializeGL()
 
     glBindVertexArray(0);
 
-
-    // create the duplicate frame buffer that will be used during picking of vertices
-    // trying it with QT methods...
-
-    //fbo = new  QOpenGLFramebufferObject(width(), height());
-    //fbo->release();
-    //fbo->bind();
-    /*
-    glGenFramebuffers(1, &fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-
-    glGenRenderbuffers(1, &colorBuffer);
-    glBindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width(), height());
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorBuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);*/
-
-
-
-
     // Load the shader program
     shaderProgram.addShaderFromSourceFile(QOpenGLShader::Vertex, "vertex_shader.glsl");
     shaderProgram.addShaderFromSourceFile(QOpenGLShader::Fragment, "fragment_shader.glsl");
@@ -109,26 +93,32 @@ void Visualizer::initializeGL()
 void Visualizer::resizeGL(int w, int h)
 {
     glViewport(0, 0, w, h);
-    //fbo = new QOpenGLFramebufferObject(w, h);
+    projectionMatrix.setToIdentity();
+    float aspectRatio = static_cast<float>(width()) / static_cast<float>(height());
+    projectionMatrix.perspective(45.0f, aspectRatio, 0.1f, 10000.0f);
+    //glViewport(0, 0, width, height);
 }
 
 //not working yet...
-void Visualizer::drawPickFrame(int mouseX, int mouseY) {
-    fbo->bind();
 
-    QImage image = fbo->toImage();
 
-    QPainter painter(&image);
-    painter.setRenderHint(QPainter::Antialiasing);
+template <typename T>
+T clamp(const T& value, const T& min, const T& max) {
+    return std::min(std::max(value, min), max);
+}
+
+void Visualizer::drawPickFrame() {
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
 
     for (size_t i = 0; i < mesh.indices.size(); i += 3) {
         GLuint id = i / 3; // ID corresponding to the triangle
         int red = (id >> 16) & 0xFF;
         int green = (id >> 8) & 0xFF;
         int blue = id & 0xFF;
-        qDebug() << "ID: " << id;
+        //qDebug() << "ID: " << id;
         QColor color(red, green, blue);
-        painter.setPen(color);
 
         QVector3D vertex1 = mesh.vertices[mesh.indices[i]];
         QVector3D vertex2 = mesh.vertices[mesh.indices[i + 1]];
@@ -138,32 +128,39 @@ void Visualizer::drawPickFrame(int mouseX, int mouseY) {
         vertex2 = mvpMatrix.map(vertex2);
         vertex3 = mvpMatrix.map(vertex3);
 
-        QPolygonF triangle;
-        triangle << QPointF(vertex1.x(), vertex1.y())
-            << QPointF(vertex2.x(), vertex2.y())
-            << QPointF(vertex3.x(), vertex3.y());
-        painter.drawPolygon(triangle);
+
+        float r = color.redF();
+        float g = color.greenF();
+        float b = color.blueF();
+
+
+        glBegin(GL_TRIANGLES);
+        glColor3f(r, g, b);
+        glVertex3f(vertex1.x(), vertex1.y(), vertex1.z());
+        glVertex3f(vertex2.x(), vertex2.y(), vertex2.z());
+        glVertex3f(vertex3.x(), vertex3.y(), vertex3.z());
+        glEnd();
     }
+    glFinish();
+    unsigned char pixel[3];
+    glReadPixels(mouseX, height() - mouseY, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &pixel);
+    glFinish();
 
-    painter.end();
-    fbo->release();
+    qDebug() << mouseX << mouseY;
 
-    image = fbo->toImage();
-    QString fileName = "rendered_image.jpg";
-    image.save(fileName, "JPEG");
 
-    QColor pixelColor = image.pixelColor(mouseX, mouseY);
+    
 
-    GLuint id = pixelColor.red() | (pixelColor.green() << 8) | (pixelColor.blue() << 16);
 
-    qDebug() << "ID: " << id;
+    GLuint id = (pixel[0] << 16) | (pixel[1] << 8) | pixel[2];
+
+    
+    qDebug() << "within ID: " << id;
+
+ 
+    selectedFace = id;
+    glFinish();
 }
-
-template <typename T>
-T clamp(const T& value, const T& min, const T& max) {
-    return std::min(std::max(value, min), max);
-}
-
 
 
 /*
@@ -175,42 +172,60 @@ T clamp(const T& value, const T& min, const T& max) {
 void Visualizer::paintGL()
 {
 
+
+    projectionMatrix.setToIdentity();
+    viewMatrix.setToIdentity();
+    modelMatrix.setToIdentity();
+    glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
     
+ 
 
-    viewMatrix.setToIdentity();
-    modelMatrix.setToIdentity();
 
-    viewMatrix.translate(translateX, translateY, translateZ);
+    float aspectRatio = static_cast<float>(width()) / static_cast<float>(height());
+    projectionMatrix.perspective(45, aspectRatio, 0.1f, 10000.0f);
+
+    viewMatrix.translate(0, 0, translateZ);
     viewMatrix.rotate(m_rotationAngleX, 1.0f, 0.0f, 0.0f);
     viewMatrix.rotate(m_rotationAngleY, 0.0f, 1.0f, 0.0f);
+    
+    modelMatrix.translate(translateX, translateY, 0.0f);
     modelMatrix.scale(1.0f / zoomLevel);
-    // Combine the matrices to form the MVP matrix
+
+    //combine the matrices to form mvp matrix
     mvpMatrix = projectionMatrix * viewMatrix * modelMatrix;
 
-    if (objectLoaded) {
-        //drawPickFrame();
 
+    QMatrix4x4 invViewMatrix = viewMatrix.inverted();
+    QVector3D cameraPosition = invViewMatrix.column(3).toVector3D();
+    //qDebug() << cameraPosition;
+
+
+    if (objectLoaded) {
+        drawPickFrame();
+        glFinish();
+        glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+        
 
         shaderProgram.bind();
         shaderProgram.setUniformValue("mvpMatrix", mvpMatrix);
 
-        // Calculate the camera position based on the view matrix
-        QVector3D cameraPosition = viewMatrix.inverted().column(3).toVector3D();
-        // Calculate the light direction relative to the camera
+        
+        //QVector3D cameraPosition = viewMatrix.inverted().column(3).toVector3D();
         QVector3D lightDirection = cameraPosition.normalized();
         shaderProgram.setUniformValue("lightDirection", lightDirection);
 
 
-        std::vector<QVector3D> faceNormals;
-        std::vector<float> shadingValues;
-
+        //std::vector<float> shadingValues;
         glBindVertexArray(vao);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+        glFinish();
         for (int i = 0; i < mesh.indices.size(); i += 3) {
-
+            
             QVector3D v0 = mesh.vertices[mesh.indices[i]].normalized();
             QVector3D v1 = mesh.vertices[mesh.indices[i + 1]].normalized();
             QVector3D v2 = mesh.vertices[mesh.indices[i + 2]].normalized();
@@ -218,9 +233,19 @@ void Visualizer::paintGL()
             QVector3D edge1 = (v1 - v0).normalized();
             QVector3D edge2 = (v2 - v0).normalized();
             QVector3D faceNormal = QVector3D::crossProduct(edge1, edge2).normalized();
-            float shading = qMax(0.0f, QVector3D::dotProduct(faceNormal, lightDirection /*QVector3D(0.0f, 0.0f, 1.0f)*/));
+            float shading = qMax(0.0f, QVector3D::dotProduct(faceNormal, lightDirection ));
+
+            int isSelected = 0;
+            if (i / 3 == selectedFace) {
+                isSelected = 1;
+
+
+			}
+
+            shaderProgram.setUniformValue("selectedFace", isSelected);
+
             //qDebug() << shading;
-            shadingValues.push_back(shading);
+            //shadingValues.push_back(shading);
             shaderProgram.setUniformValue("shadingValue", shading);
             glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, reinterpret_cast<void*>(sizeof(GLuint) * i));
         }
@@ -230,14 +255,56 @@ void Visualizer::paintGL()
     //update();
 }
 
+
+void Visualizer::computeRayFromMouse(QPoint currentPosition) {
+
+
+    viewMatrix.setToIdentity();
+    viewMatrix.translate(0,0,translateZ);
+    projectionMatrix.setToIdentity();
+    float aspectRatio = static_cast<float>(width()) / static_cast<float>(height());
+    projectionMatrix.perspective(45.0f, aspectRatio, 0.1f, 10000.0f);
+
+    viewMatrix.translate(translateX, translateY, translateZ);
+    viewMatrix.rotate(m_rotationAngleX, 1.0f, 0.0f, 0.0f);
+    viewMatrix.rotate(m_rotationAngleY, 0.0f, 1.0f, 0.0f);
+
+
+    float ndcX = (2.0f * static_cast<float>(currentPosition.x())) / width() - 1.0f;
+    float ndcY = 1.0f - (2.0f * static_cast<float>(currentPosition.y())) / height();
+
+    //qDebug() << ndcX << ndcY;
+
+    // Create near and far points in NDC
+    QVector4D rayNear(ndcX, ndcY, -1.0f, 1.0f);
+    QVector4D rayFar(ndcX, ndcY, 1.0f, 1.0f);
+
+    // Convert the points to world space
+
+
+    QMatrix4x4 invProjectionMatrix = projectionMatrix.inverted();
+    QVector4D rayEyeNear = invProjectionMatrix * rayNear;
+    QVector4D rayEyeFar = invProjectionMatrix * rayFar;
+    rayEyeNear = rayEyeNear.normalized();
+    rayEyeFar = rayEyeFar.normalized();
+
+    //qDebug() << rayEyeFar << rayEyeNear;
+
+    QMatrix4x4 invViewMatrix = viewMatrix.inverted();
+    QVector3D rayNearWorld = QVector3D(invViewMatrix * rayEyeNear);
+    QVector3D rayFarWorld = QVector3D(invViewMatrix * rayEyeFar);
+
+    // Calculate the ray direction
+    rayDir = (rayFarWorld - rayNearWorld).normalized();
+    //qDebug() << rayNear << rayFar << rayDir;
+    update();
+}
 /*
 *   Function: load the ObjectMesh object into the Visualizer module 
 *   Return: no return values
 *   TODO: a quad having object could set a flag for that in this function
 */
 void Visualizer::loadMesh(ObjectMesh object) {
-     // Bind the VAO and VBOs
-
     mesh = object;
 
     qDebug() << "start load " << mesh.vertices.size() << mesh.indices.size();
@@ -290,10 +357,20 @@ float loopAround(float val, float min, float max)
 */
 void Visualizer::mousePressEvent(QMouseEvent* event)
 {
+    QPoint currentPos = event->pos();
     // left button: rotate the model
     if (event->button() == Qt::LeftButton) {
         isRotating = true;
+
+        
         lastMousePos = event->pos();
+        mouseX = currentPos.x();
+        mouseY = currentPos.y();
+
+        wpos = event->windowPos();
+
+        update();
+
     }
     // right button: drag and move the object around
     if (event->button() == Qt::RightButton) {
@@ -317,9 +394,13 @@ void Visualizer::mouseMoveEvent(QMouseEvent* event)
 {
     QPoint currentPos = event->pos();
 
-    if (objectLoaded) {
-        //drawPickFrame(event->x(), event->y()); 
-    }
+    QString text;
+    text = QString("%1 X %2").arg(event->pos().x()).arg(event->pos().y());
+    // Global coordinate-system, but widget coord. position
+    // QToolTip::showText(event->pos(), text); 
+    // this should fix it
+    QToolTip::showText(this->mapToGlobal(event->pos()), text);
+
 
     if (isRotating) {
         // calculate the change in mouse position between previous and current positions
@@ -353,14 +434,14 @@ void Visualizer::mouseMoveEvent(QMouseEvent* event)
         float deltaY = currentPos.y() - lastMousePos.y();
 
         // Update the drag values based on the mouse movement
-        // TODO: currently doing two divisions by zoomLevel to get a good dragging speed, could use a variable and have the user set it
+        // TODO: currently doing divisions by zoomLevel to get a good dragging speed, could use a variable and have the user set it
         translateX += deltaX * 0.05f / zoomLevel; //* movementDirection.x();
         translateY -= deltaY * 0.05f / zoomLevel;//* movementDirection.y();
-        translateZ += deltaX * 0.05f / zoomLevel;//* movementDirection.z();
 
         lastMousePos = currentPos;
         update();
     }
+    update();
 }
 void Visualizer::wheelEvent(QWheelEvent* event)
 {

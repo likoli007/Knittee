@@ -19,6 +19,9 @@ public:
     void loadMesh(ObjectMesh loaded_mesh);
 
 protected:
+    int mouseX, mouseY;
+
+
     QPoint lastMousePos;
     ObjectMesh mesh;
     QVector3D focusPoint, cameraLocation, up;
@@ -31,15 +34,17 @@ protected:
 
     GLuint vao, vbo, indexBuffer, shadingBuffer;
 
-    QOpenGLFramebufferObject *fbo;
+    int selectedFace = -1;
 
+    QVector3D rayDir;
+    QPointF wpos;
 
     std::vector<QVector3D> origins;
     std::vector<QVector3D> directions;
     QVector3D rayOrigin;
     QVector3D rayDirection;
     bool rayDebug = false;
-
+    bool getFace = false;
     bool objectLoaded = false;
     bool isRotating = false;
     bool isZooming = false;
@@ -59,6 +64,7 @@ protected:
     void mouseMoveEvent(QMouseEvent* event);
     void wheelEvent(QWheelEvent* event);
     void computeRayFromMouse(QPoint currentPosition);
-    void drawPickFrame(int, int);
+    void drawPickFrame();
+    void drawFBO();
 };
 
