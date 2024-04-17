@@ -6,12 +6,13 @@
 #include <QString>
 #include "ObjectMesh.h"
 #include "Face.h"
+#include <QFile>
 
 
-
-class ObjLoader
+class ObjHandler
 {
-	std::string file_path;
+	QString path;
+	QFile file;
 
 	std::vector<QVector3D> normal_indices;
 	std::vector<QVector3D> vertex_list;
@@ -19,9 +20,11 @@ class ObjLoader
 	std::vector<Face> faces;
 
 public:
-	ObjectMesh loadFile(QString path);
+	ObjectMesh loadFile();
 	void loadFileContents();
 	void parseLine(QString line);
+	void setFilePath(QString path);
+	void copyObjFileToProject(QString projectName);
 	ObjectMesh generateMesh();
 private:
 	void flushArrays();

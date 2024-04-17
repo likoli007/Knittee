@@ -49,7 +49,7 @@
     <ClCompile Include="Visualizer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ObjLoader.cpp">
+    <ClCompile Include="ObjHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ObjectMesh.cpp">
@@ -63,7 +63,7 @@
     <ClInclude Include="Visualizer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ObjLoader.h">
+    <ClInclude Include="ObjHandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ObjectMesh.h">

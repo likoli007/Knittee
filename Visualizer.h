@@ -4,7 +4,7 @@
 #include <QOpenGLWidget>
 #include <QOpenGLExtraFunctions>
 #include <QOpenGLFunctions>
-#include "ObjLoader.h"
+#include "ObjHandler.h"
 
 
 

@@ -1,4 +1,4 @@
-#include "ObjLoader.h"
+#include "ObjHandler.h"
 
 #include<string>
 #include<fstream>
@@ -10,16 +10,59 @@
 #include <QMessageBox>
 #include "ObjectMesh.h"
 
-
+#include <QCoreApplication>
 
 /* 
 *	Function: open an.obj file, read each line and process it using parseLine(),
 *		and generate an ObjectMesh object after parsing using generateMesh()
 *	Return: an ObjectMesh object that includes the vertex, normals etc. information of the loaded object
 */
-ObjectMesh ObjLoader::loadFile(QString path)
-{
+
+
+void ObjHandler::copyObjFileToProject(QString projectName) {
+
+	
+	QString destinationFolderPath = QCoreApplication::applicationDirPath() + "/Projects/" + projectName;
+	qDebug() << destinationFolderPath;
+	//QDir().mkpath(destinationFolderPath);
 	QFile file(path);
+	QFile newFile(destinationFolderPath+ "/mesh.obj");
+	
+	
+	if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+		QMessageBox::information(0, "error", file.errorString());
+		return;
+	}
+
+	if (!newFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+		QMessageBox::information(0, "error", newFile.errorString());
+		return;
+	}
+
+	QTextStream in(&file);
+	QTextStream out(&newFile);
+
+	while (!in.atEnd()) {
+		QString line = in.readLine();
+		out << line << "\n";
+	}
+
+	file.close();
+	newFile.close();
+
+	
+	
+
+	//newFile.close();
+}
+void ObjHandler::setFilePath(QString path) {
+	this->path = path;
+	file.setFileName(path);
+}
+
+ObjectMesh ObjHandler::loadFile()
+{
+	//QFile file(path);
 	QString line;
 	ObjectMesh result;
 
@@ -48,7 +91,7 @@ ObjectMesh ObjLoader::loadFile(QString path)
 *	TODO: currently only triangle faces are supported, add support for quads, normals for shading purposes?
 *		maybe texture information is not needed?
 */
-void ObjLoader::parseLine(QString line)
+void ObjHandler::parseLine(QString line)
 {
 	QStringList list;
 	std::string type;
@@ -102,7 +145,7 @@ void ObjLoader::parseLine(QString line)
 	Return: ObjectMesh object that holds all the information of the loaded .obj file
 	TODO: quad support
 */
-ObjectMesh ObjLoader::generateMesh()
+ObjectMesh ObjHandler::generateMesh()
 {
 	//iterate through the faces and construct a final representation
 	ObjectMesh result;
@@ -137,7 +180,7 @@ ObjectMesh ObjLoader::generateMesh()
 *		done so that loading a new object does not result in a mishmash of the previous and new object
 *   Return: no return value
 */
-void ObjLoader::flushArrays() {
+void ObjHandler::flushArrays() {
 	normal_indices.clear();
 	vertex_list.clear();
 	uv_indices.clear();

@@ -101,7 +101,7 @@
   <ItemGroup>
     <ClCompile Include="KnitGrapher.cpp" />
     <ClCompile Include="ObjectMesh.cpp" />
-    <ClCompile Include="ObjLoader.cpp" />
+    <ClCompile Include="ObjHandler.cpp" />
     <ClCompile Include="Visualizer.cpp" />
     <None Include="fragment_shader.glsl" />
     <None Include="geometry_shader.glsl" />
@@ -118,7 +118,7 @@
     <ClInclude Include="Face.h" />
     <ClInclude Include="KnitGrapher.h" />
     <ClInclude Include="ObjectMesh.h" />
-    <ClInclude Include="ObjLoader.h" />
+    <ClInclude Include="ObjHandler.h" />
     <ClInclude Include="Visualizer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

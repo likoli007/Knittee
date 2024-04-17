@@ -5,7 +5,7 @@
 #include <QOpenGLExtraFunctions>
 #include <GL/gl.h>
 //#include <GL/glu.h>
-#include "ObjLoader.h"
+//#include "ObjLoader.h"
 #include <QDebug>
 #include <QToolTip>
 #include <QApplication>
@@ -40,9 +40,6 @@ void Visualizer::initializeGL()
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.0f, 0.0f, 1.0f, 1.0f); // Set the clear color to blue
     
-
-    //face culling makes pipes too see through, so it is disabled
-    //glEnable(GL_CULL_FACE);
    
     // Create and bind the VAO, VBO 
     glGenVertexArrays(1, &vao);
@@ -84,7 +81,7 @@ void Visualizer::initializeGL()
     projectionMatrix.setToIdentity();
     modelMatrix.setToIdentity();
     float aspectRatio = static_cast<float>(width()) / static_cast<float>(height());
-    projectionMatrix.perspective(45.0f, aspectRatio, 0.1f, 10000.0f); // Adjust the perspective parameters as needed
+    projectionMatrix.perspective(45.0f, aspectRatio, 0.1f, 10000.0f); // fov?
 }
 
 /*
@@ -93,10 +90,10 @@ void Visualizer::initializeGL()
 void Visualizer::resizeGL(int w, int h)
 {
     glViewport(0, 0, w, h);
+
     projectionMatrix.setToIdentity();
     float aspectRatio = static_cast<float>(width()) / static_cast<float>(height());
     projectionMatrix.perspective(45.0f, aspectRatio, 0.1f, 10000.0f);
-    //glViewport(0, 0, width, height);
 }
 
 //not working yet...
@@ -144,20 +141,12 @@ void Visualizer::drawPickFrame() {
     glFinish();
     unsigned char pixel[3];
     glReadPixels(mouseX, height() - mouseY, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &pixel);
-    glFinish();
-
-    qDebug() << mouseX << mouseY;
 
 
-    
-
+    //qDebug() << mouseX << mouseY;
 
     GLuint id = (pixel[0] << 16) | (pixel[1] << 8) | pixel[2];
-
-    
     qDebug() << "within ID: " << id;
-
- 
     selectedFace = id;
     glFinish();
 }
@@ -171,18 +160,9 @@ void Visualizer::drawPickFrame() {
 */
 void Visualizer::paintGL()
 {
-
-
     projectionMatrix.setToIdentity();
     viewMatrix.setToIdentity();
     modelMatrix.setToIdentity();
-    glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
-
-    
- 
-
 
     float aspectRatio = static_cast<float>(width()) / static_cast<float>(height());
     projectionMatrix.perspective(45, aspectRatio, 0.1f, 10000.0f);
@@ -203,6 +183,10 @@ void Visualizer::paintGL()
     //qDebug() << cameraPosition;
 
 
+    glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+
     if (objectLoaded) {
         drawPickFrame();
         glFinish();
@@ -219,8 +203,6 @@ void Visualizer::paintGL()
         QVector3D lightDirection = cameraPosition.normalized();
         shaderProgram.setUniformValue("lightDirection", lightDirection);
 
-
-        //std::vector<float> shadingValues;
         glBindVertexArray(vao);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
         glFinish();
@@ -245,7 +227,6 @@ void Visualizer::paintGL()
             shaderProgram.setUniformValue("selectedFace", isSelected);
 
             //qDebug() << shading;
-            //shadingValues.push_back(shading);
             shaderProgram.setUniformValue("shadingValue", shading);
             glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, reinterpret_cast<void*>(sizeof(GLuint) * i));
         }
@@ -361,14 +342,11 @@ void Visualizer::mousePressEvent(QMouseEvent* event)
     // left button: rotate the model
     if (event->button() == Qt::LeftButton) {
         isRotating = true;
-
-        
         lastMousePos = event->pos();
+
+
         mouseX = currentPos.x();
         mouseY = currentPos.y();
-
-        wpos = event->windowPos();
-
         update();
 
     }
@@ -394,12 +372,12 @@ void Visualizer::mouseMoveEvent(QMouseEvent* event)
 {
     QPoint currentPos = event->pos();
 
-    QString text;
-    text = QString("%1 X %2").arg(event->pos().x()).arg(event->pos().y());
+    //QString text;
+   // text = QString("%1 X %2").arg(event->pos().x()).arg(event->pos().y());
     // Global coordinate-system, but widget coord. position
     // QToolTip::showText(event->pos(), text); 
     // this should fix it
-    QToolTip::showText(this->mapToGlobal(event->pos()), text);
+    //QToolTip::showText(this->mapToGlobal(event->pos()), text);
 
 
     if (isRotating) {
