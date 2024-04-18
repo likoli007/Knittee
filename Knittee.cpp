@@ -123,6 +123,8 @@ void Knittee::start3DProject(ProjectInfo context)
     ObjectMesh mesh = object_loader.loadFile();
     vis->loadMesh(mesh);
     toolsWidget = new MeshToolBar(this);
+
+    visualizerLayout->removeItem(visualizerLayout->itemAt(0));
     visualizerLayout->insertWidget(0, toolsWidget);
 	// Handle selected options
 	// context.type, context.file, etc. contain the selected values
@@ -199,7 +201,7 @@ void Knittee::setUpNew3DProject(ProjectInfo context)
 	//store the project information in the new folder
     QString projectFolderPath = QCoreApplication::applicationDirPath() + "/Projects/" + context.projectName;
     QDir().mkpath(projectFolderPath);
-    QFile file(projectFolderPath+"/projectinfo.knittee");
+    QFile file(projectFolderPath+"/" + context.projectName + ".knittee");
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
 		qDebug() << "Error opening project file!";
 		return;

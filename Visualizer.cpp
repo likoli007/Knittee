@@ -140,7 +140,7 @@ void Visualizer::drawPickFrame() {
     }
     glFinish();
     unsigned char pixel[3];
-    glReadPixels(mouseX, height() - mouseY, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &pixel);
+    glReadPixels(mouseX, mouseY, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &pixel);
 
 
     //qDebug() << mouseX << mouseY;
@@ -345,8 +345,9 @@ void Visualizer::mousePressEvent(QMouseEvent* event)
         lastMousePos = event->pos();
 
 
-        mouseX = currentPos.x();
-        mouseY = currentPos.y();
+        mouseX = event->pos().x() * devicePixelRatio();
+        mouseY = (height() - event->pos().y() - 1) * devicePixelRatio();
+
         update();
 
     }
