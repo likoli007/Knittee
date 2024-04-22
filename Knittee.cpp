@@ -43,6 +43,9 @@ Knittee::Knittee(QWidget *parent)
 
     //aboutAction->setTitle("About");
 
+    toolsWidget = new MeshToolBar(this);
+
+
     topMenu->addMenu(projectMenu);
     topMenu->addMenu(optionsMenu);
     topMenu->addAction(helpAction);
@@ -56,6 +59,9 @@ Knittee::Knittee(QWidget *parent)
     QObject::connect(optionsMenu, &QMenu::triggered, this, &Knittee::openOptionsWindow);
     QObject::connect(helpAction, &QAction::triggered, this, &Knittee::openHelpWindow);
     QObject::connect(aboutAction, &QAction::triggered, this, &Knittee::openAboutWindow);
+    //connect(sub, &SubClass::buttonClicked, this, &MainClass::buttonClicked);
+    QObject::connect(toolsWidget, SIGNAL(constraintsButtonClicked()), this, SLOT(setConstraintsMode()));
+    QObject::connect(toolsWidget, SIGNAL(doneButtonClicked()), this, SLOT(handleToolbarDone()));
 
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
     
@@ -77,7 +83,14 @@ Knittee::Knittee(QWidget *parent)
     visualizerLayout->addLayout(optionsLayout);
     visualizerLayout->addWidget(vis);
 
+
+    messageTextEdit = new QTextEdit(this);
+    messageTextEdit->setReadOnly(true);
+    messageTextEdit->setMinimumSize(800, 100);
+    messageTextEdit->setText("Welcome to Knittee! Please open a project to get started.");
+
     mainLayout->addLayout(visualizerLayout);
+    mainLayout->addWidget(messageTextEdit);
 
     QWidget* centralWidget = new QWidget(this);
     centralWidget->setLayout(mainLayout);
@@ -86,7 +99,47 @@ Knittee::Knittee(QWidget *parent)
 
 void Knittee::selectProject() {
     QString filePath = QFileDialog::getOpenFileName(this, "Open Knittee Project File", "", "Custom Files (*.knittee)");
+    QFileInfo fileInfo(filePath);
+    projectPath = fileInfo.absolutePath();
     loadProject(filePath);
+}
+
+
+
+void Knittee::saveConstraints()
+{
+    std::vector<Constraint*> constraints = vis->getConstraints();
+    
+    QString filePath = projectPath + "/constraints";
+    QFile file(filePath);
+    if (file.open(QIODevice::WriteOnly)) {
+        QTextStream out(&file);
+        for (Constraint* c : constraints) {
+            int size = c->vertices.size();
+            if (size > 0) {
+                for (int i = 0; i < size - 1; i++) {
+                    out << c->vertices[i] << ";";
+                }
+                out << c->vertices[size-1] << ";";
+            }
+            out << "\n";
+            
+        }
+        file.close();
+    }
+    else {
+        qDebug() << "Constraints file open error!";
+        return;
+    }
+
+}
+
+void Knittee::handleToolbarDone() {
+    //currently nothing but constraints to handle, but later on user clicking done may mean done constraints,
+    //done interpolation, done editing etc..
+    
+    saveConstraints();
+
 }
 
 void Knittee::loadProject(QString filePath) {
@@ -103,6 +156,8 @@ void Knittee::loadProject(QString filePath) {
     QString projFolder = projFileInfo.absolutePath(); // Get the folder containing the .proj file
     QString meshFilePath;
     
+
+    
     if (projectType == 0)
     {
         meshFilePath = projFolder + "/mesh.obj"; // Construct the file path for mesh.obj
@@ -116,13 +171,48 @@ void Knittee::loadProject(QString filePath) {
 	
 }
 
+void Knittee::loadConstraints(){
+    std::vector<Constraint*> constraints;
+
+    QString filePath = projectPath + "/constraints";
+    QFile file(filePath);
+    if (file.exists()) {
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QTextStream in(&file);
+            while (!in.atEnd()) {
+                Constraint* constraintPointer = new Constraint();
+                QString line = in.readLine();
+                QStringList indices = line.split(';');
+                if (!indices.isEmpty())
+                {
+                    for (const QString& index : indices) {
+                        constraintPointer->vertices.push_back(index.toInt());
+                    }
+                    constraints.push_back(constraintPointer);
+                }
+            }
+            file.close();
+        }
+        else {
+            qDebug() << "Constraints file open error!";
+        }
+    }
+    else {
+        qDebug() << "Constraints file does not exist error!";
+    }
+    vis->setConstraints(constraints);
+}
+
 void Knittee::start3DProject(ProjectInfo context)
 {
 	qDebug() << "starting 3D project: " << context.objectFilePath;
     object_loader.setFilePath(context.objectFilePath);
     ObjectMesh mesh = object_loader.loadFile();
+
+    loadConstraints();
+
     vis->loadMesh(mesh);
-    toolsWidget = new MeshToolBar(this);
+    
 
     visualizerLayout->removeItem(visualizerLayout->itemAt(0));
     visualizerLayout->insertWidget(0, toolsWidget);
@@ -219,6 +309,8 @@ void Knittee::setUpNew3DProject(ProjectInfo context)
     object_loader.copyObjFileToProject(context.projectName);
 
     context.objectFilePath = projectFolderPath + "/mesh.obj";
+    
+    
     start3DProject(context);
 }
 
@@ -235,6 +327,12 @@ void Knittee::handleNewProject(ProjectInfo options)
 
     // Handle selected options
     // options.type, options.file, etc. contain the selected values
+}
+
+void Knittee::setConstraintsMode()
+{
+	vis->setConstraintsMode();
+    messageTextEdit->setText("Constraints mode enabled. Press 'C' while hovering over the mesh to add a constraint.\nOnce done, press 'ENTER' to finish");
 }
 
 
@@ -422,10 +520,27 @@ MeshToolBar::MeshToolBar(QWidget *parent) {
     heightSlider->setValue(5);  // Set the initial value
     heightLayout->addWidget(heightSlider);
 
+
+    constraintsModeButton = new QPushButton("Add Constraints", this);
+    QPushButton* interpolateButton = new QPushButton("Interpolate", this);
+    //interpolateButton->setEnabled(false);
+    doneButton = new QPushButton("Done", this);
+
+
+    
+    //QObject::connect(constraintsModeButton, SIGNAL(clicked()), parent, SLOT(setConstraintsMode()));
+    //connect(button, &QPushButton::clicked, this, &SubClass::onButtonClicked);
+    QObject::connect(constraintsModeButton, &QPushButton::clicked, this, &MeshToolBar::onConstraintsButtonClicked);
+    QObject::connect(doneButton, &QPushButton::clicked, this, &MeshToolBar::onDoneButtonClicked);
+
+
     QLabel* label3 = new QLabel("Further Options...", this);
 
     mainLayout->addLayout(widthLayout);
     mainLayout->addLayout(heightLayout);
+    mainLayout->addWidget(constraintsModeButton);
+    mainLayout->addWidget(interpolateButton);
+    mainLayout->addWidget(doneButton);
     mainLayout->addWidget(label3);
     setLayout(mainLayout);
     setMinimumSize(300,100);

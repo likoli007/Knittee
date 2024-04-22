@@ -21,6 +21,7 @@
 #include <QOpenGLFunctions>
 #include <QFileDialog>
 #include <QPushButton>
+#include <QTextEdit>
 
 
 /*
@@ -37,9 +38,24 @@ class MeshToolBar : public QWidget {
 
     public:
         MeshToolBar(QWidget* parent = nullptr);
+signals:
+    void constraintsButtonClicked();
+    void doneButtonClicked();
+
+private slots:
+    void onConstraintsButtonClicked() {
+        qDebug() << "Constraints button clicked";
+        emit constraintsButtonClicked();
+    }
+    void onDoneButtonClicked() {
+        qDebug() << "Done button clicked";
+        emit doneButtonClicked();
+    }
+
 private:
     // Will have a slew of functions that pass the user specified options to the visualizer/algorithm program
-
+    QPushButton* constraintsModeButton;
+    QPushButton* doneButton;
 };
 
 
@@ -85,6 +101,9 @@ private:
     QLabel* sheetSizeSeparator;
     QLineEdit* widthLineEdit;
     QLineEdit* heightLineEdit;
+
+
+
 };
 
 
@@ -100,10 +119,14 @@ public:
     Knittee(QWidget *parent = nullptr);
     ~Knittee();
     //void openFile(QString filePath);
+    
+
+    private slots:
+        void setConstraintsMode();
+        void handleToolbarDone();
 
 private:
     int modellingType = 0; //is the user operating on a 3D model (0) or a 2D sheet? (1), perhaps could be an enum?
-
 
     Ui::KnitteeClass ui;
     ObjHandler object_loader;
@@ -112,14 +135,24 @@ private:
     //QVBoxLayout* mainLayout;
     QHBoxLayout* visualizerLayout;
 
-    void loadProject(QString filePath);
+    QString projectPath;
+
+    //bottom textedit for messages to user
+    QTextEdit* messageTextEdit;
+
+
+
+    void loadProject(QString);
     void openOptionsWindow();
     void openHelpWindow();
     void openAboutWindow();
     void openNewProjectWindow();
     void handleNewProject(ProjectInfo options);
-    void openFile(QString filePath);
+    //void openFile(QString filePath);
     void setUpNew3DProject(ProjectInfo options);
     void start3DProject(ProjectInfo context);
     void selectProject();
+
+    void saveConstraints();
+    void loadConstraints();
 };
