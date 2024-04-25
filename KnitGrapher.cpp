@@ -5,6 +5,7 @@
 #include <vector>
 #include <QSet>
 #include <QPair>
+#include <set>
 
 KnitGrapher::KnitGrapher(QObject* parent) : QObject(parent)
 {
@@ -556,11 +557,161 @@ void KnitGrapher::remesh()
 	//assert(embedded_chains.size() == constraints.size());
 	qDebug() << "embedded chains size" << embedded_chains.size() << " constraints size (with empty dummy):" << constraints.size();
 
-	//EmbeddedPlanarMap< float, SameValue< float >, ReplaceValue< float > > epm;
+	
+	EmbeddedPlanarMap< float, SameValue< float >, ReplaceValue< float > > epm;
+	qDebug() << "EmbeddedPlanarMap created!";
+
+	uint32_t total_chain_edges = 0;
+	for (uint32_t c = 0; c < embedded_chains.size(); ++c) {
+		uint32_t first = 0;
+		uint32_t last = 0;
+		for (uint32_t i = 0; i + 1 < embedded_chains[c].size(); ++i) {
+			uint32_t a = epm.add_vertex(embedded_chains[c][i]);
+			uint32_t b = epm.add_vertex(embedded_chains[c][i+1]);
+			epm.add_edge(a,b,constraints[c]->timeValue);
+			++total_chain_edges;
+			if (i == 0) first = a;
+			if (i + 2 == embedded_chains[c].size()) last = b;
+		}
+		if (first != last) qDebug() << "NOTE: have open chain.";
+	}
+	uint32_t total_simplex_edges = 0;
+	for (const auto &edges : epm.simplex_edges) {
+		total_simplex_edges += edges.second.size();
+	}
+	qDebug() << "EPM has " << epm.vertices.size() << " vertices." ;
+	qDebug() << "EPM has " << epm.simplex_vertices.size() << " simplices with vertices.";
+	qDebug() << "EPM has " << epm.simplex_edges.size() << " simplices with edges (" << total_simplex_edges << " edges from " << total_chain_edges << " chain edges).";
 
 
+	//Build a mesh that is split at the embedded edges:
+		std::vector< EmbeddedVertex > split_evs;
+		std::vector< glm::uvec3 > split_tris;
+		std::vector< uint32_t > epm_to_split;
+
+		epm.split_triangles(newVerts, newTris, &split_evs, &split_tris, &epm_to_split);
+
+		std::vector< QVector3D > split_verts;
+
+		qDebug() << "populating split_verts...";
+		split_verts.reserve(split_evs.size());
+		for (auto const& ev : split_evs) {
+			split_verts.emplace_back(ev.interpolate(newVerts));
+		}
+
+		qDebug() << "record constrained edges in terms of split_verts";
+		//record constrained edges in terms of split_verts:
+		std::unordered_map< glm::uvec2, float > constrained_edges;
+		std::vector< float > split_values(split_verts.size(), std::numeric_limits< float >::quiet_NaN());
+		for (const auto& se : epm.simplex_edges) {
+			for (auto const& e : se.second) {
+				glm::uvec2 ab = glm::uvec2(epm_to_split[e.first], epm_to_split[e.second]);
+				if (ab.x > ab.y) std::swap(ab.x, ab.y);
+				constrained_edges.insert(std::make_pair(ab, e.value));
+				//also grab vertex values:
+				split_values[epm_to_split[e.first]] = e.value;
+				split_values[epm_to_split[e.second]] = e.value;
+			}
+		}
+		qDebug() << constrained_edges.size() << " constrained edges.";
 
 
+		std::vector< uint32_t > tri_component(split_tris.size(), -1U);
+		std::vector< bool > component_keep;
+		{ //mark connected components + delete the "wrong" ones
+			std::unordered_map< glm::uvec2, uint32_t > over;
+			for (const auto& tri : split_tris) {
+				uint32_t ti = &tri - &split_tris[0];
+				auto res = over.insert(std::make_pair(glm::uvec2(tri.x, tri.y), ti));
+				assert(res.second);
+				res = over.insert(std::make_pair(glm::uvec2(tri.y, tri.z), ti));
+				assert(res.second);
+				res = over.insert(std::make_pair(glm::uvec2(tri.z, tri.x), ti));
+				assert(res.second);
+			}
+			for (uint32_t seed = 0; seed < split_tris.size(); ++seed) {
+				if (tri_component[seed] != -1U) continue;
+				//std::cout << "Doing CC with seed " << seed << std::endl; //DEBUG
+				uint32_t component = component_keep.size();
+				tri_component[seed] = component;
+				std::set< float > values;
+				std::vector< uint32_t > todo;
+				todo.emplace_back(seed);
+				auto do_edge = [&](uint32_t a, uint32_t b) {
+					{ //if edge is constrained, don't traverse over:
+						glm::uvec2 e(a, b);
+						if (e.x > e.y) std::swap(e.x, e.y);
+						auto v = constrained_edges.find(e);
+						if (v != constrained_edges.end()) {
+							values.insert(v->second);
+							return;
+						}
+					}
+					//otherwise, traverse over:
+					auto f = over.find(glm::uvec2(b, a));
+					if (f != over.end()) {
+						if (tri_component[f->second] != component) {
+							assert(tri_component[f->second] == -1U);
+							tri_component[f->second] = component;
+							todo.emplace_back(f->second);
+						}
+					}
+				};
+				while (!todo.empty()) {
+					uint32_t at = todo.back();
+					todo.pop_back();
+					assert(tri_component[at] == component);
+					do_edge(split_tris[at].x, split_tris[at].y);
+					do_edge(split_tris[at].y, split_tris[at].z);
+					do_edge(split_tris[at].z, split_tris[at].x);
+				}
+				component_keep.emplace_back(values.size() > 1);
+			}
+			qDebug() << "Have " << component_keep.size() << " connected components.";
+		}
+
+
+		//remove any split_verts that aren't used:
+		std::vector< QVector3D > compressed_verts;
+		std::vector< float > compressed_values;
+		std::vector< glm::uvec3 > compressed_tris;
+		for (uint32_t ti = 0; ti < split_tris.size(); ++ti) {
+			if (component_keep[tri_component[ti]]) {
+				compressed_tris.emplace_back(split_tris[ti]);
+			}
+		}
+		compressed_verts.reserve(split_verts.size());
+		std::vector< uint32_t > to_compressed(split_verts.size(), -1U);
+		auto add_vert = [&](uint32_t vi) {
+			if (to_compressed[vi] == -1U) {
+				to_compressed[vi] = compressed_verts.size();
+				compressed_verts.emplace_back(split_verts[vi]);
+				compressed_values.emplace_back(split_values[vi]);
+			}
+			return to_compressed[vi];
+		};
+		for (auto& tri : compressed_tris) {
+			tri.x = add_vert(tri.x);
+			tri.y = add_vert(tri.y);
+			tri.z = add_vert(tri.z);
+		}
+
+		qDebug() << "Went from " << newTris.size() << " to (via split) " << split_tris.size() << " to (via discard) " << compressed_tris.size() << " triangles."; //DEBUG
+
+		newMesh.vertices = compressed_verts;
+		newMesh.indices = toIntArray(compressed_tris);
+
+		constrained_values = &compressed_values;
+}
+std::vector<GLuint> KnitGrapher::toIntArray(std::vector<glm::uvec3> triangles) {
+	std::vector<GLuint> result;
+
+	for (auto t : triangles) {
+		result.push_back(t.x);
+		result.push_back(t.y);
+		result.push_back(t.z);
+	}
+	return result;
 }
 
 bool KnitGrapher::degenerateCheck(std::vector<glm::uvec3> tris) {
@@ -590,6 +741,11 @@ void KnitGrapher::constructKnitGraph(std::vector<Constraint*> constraints)
 	qDebug() << "Constraints:" << constraints.size();
 
 	this->constraints = constraints;
+
+	stitchWidth = 3.66f;
+	stitchHeight = 1.73f;
+	modelUnitLength = 1.0f;
+	this->constraints[2]->timeValue = 0.5f;
 
 	generateTriangles();
 	remesh();

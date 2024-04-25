@@ -41,6 +41,8 @@ private:
 	float getMaxEdgeLength();
 	bool degenerateCheck(std::vector<glm::uvec3> tris);
 
+	std::vector<GLuint> toIntArray(std::vector<glm::uvec3>);
+
 	void generateTriangles();
 
 	//so. much. passing. by. reference. need to make some variables class members.... TODO!!!

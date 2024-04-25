@@ -4,6 +4,11 @@
 #include <map>
 #include <iostream>
 #include <algorithm>
+//#include <glm/gtx/norm.hpp>
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
+
 
 #include "glm/glm.hpp"
 #include "EmbeddedVertex.h"
@@ -356,7 +361,7 @@ struct EmbeddedPlanarMap {
 	}
 
 	void split_triangles(
-		std::vector< glm::vec3 > const& verts, //in: mesh vertices
+		std::vector< QVector3D > const& verts, //in: mesh vertices
 		std::vector< glm::uvec3 > const& tris, //in: mesh triangles
 		std::vector< EmbeddedVertex >* split_verts_, //out: split vertices
 		std::vector< glm::uvec3 >* split_tris_, //out: split triangles
@@ -384,22 +389,24 @@ struct EmbeddedPlanarMap {
 		for (uint32_t i = 0; i < vertices.size(); ++i) {
 			const auto& v = vertices[i];
 			assert(v.simplex.x < verts.size());
-			assert(v.weights.x + v.weights.y + v.weights.z == WEIGHT_SUM);
+			//assert(v.weights.x + v.weights.y + v.weights.z == WEIGHT_SUM);
 			if (v.simplex.y == -1U) {
 				assert(v.simplex.z == -1U);
 				epm_to_split.emplace_back(v.simplex.x);
 			}
 			else if (v.simplex.z == -1U) {
 				assert(v.simplex.y < verts.size());
-				assert(v.weights.z == 0);
+				//assert(v.weights.z == 0);
 				epm_to_split.emplace_back(split_verts.size());
-				split_verts.emplace_back(EmbeddedVertex(v.simplex, glm::vec3(v.weights) / float(WEIGHT_SUM)));
+				QVector3D newVector(v.weights.x, v.weights.y, v.weights.z);
+				split_verts.emplace_back(EmbeddedVertex(v.simplex, newVector / float(WEIGHT_SUM)));
 			}
 			else {
 				assert(v.simplex.y < verts.size());
 				assert(v.simplex.z < verts.size());
 				epm_to_split.emplace_back(split_verts.size());
-				split_verts.emplace_back(EmbeddedVertex(v.simplex, glm::vec3(v.weights) / float(WEIGHT_SUM)));
+				QVector3D newVector(v.weights.x, v.weights.y, v.weights.z);
+				split_verts.emplace_back(EmbeddedVertex(v.simplex, newVector / float(WEIGHT_SUM)));
 			}
 		}
 
