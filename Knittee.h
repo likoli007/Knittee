@@ -4,6 +4,8 @@
 #include "ui_Knittee.h"
 #include "ObjHandler.h"
 #include "Visualizer.h"
+#include "MeshToolBar.h"
+#include "KnitGrapher.h"
 
 #include <QtWidgets/QMainWindow>
 #include <QDialog>
@@ -24,6 +26,8 @@
 #include <QTextEdit>
 
 
+
+
 /*
 * This is the main class that will be used to create the GUI for the program
 * It also includes helper classes that will be shown at some stages of the program
@@ -32,31 +36,7 @@
 */
 
 
-// This class will be called to be shown when the user selects a 3D mesh project
-class MeshToolBar : public QWidget {
-	Q_OBJECT
 
-    public:
-        MeshToolBar(QWidget* parent = nullptr);
-signals:
-    void constraintsButtonClicked();
-    void doneButtonClicked();
-
-private slots:
-    void onConstraintsButtonClicked() {
-        qDebug() << "Constraints button clicked";
-        emit constraintsButtonClicked();
-    }
-    void onDoneButtonClicked() {
-        qDebug() << "Done button clicked";
-        emit doneButtonClicked();
-    }
-
-private:
-    // Will have a slew of functions that pass the user specified options to the visualizer/algorithm program
-    QPushButton* constraintsModeButton;
-    QPushButton* doneButton;
-};
 
 
 struct ProjectInfo {
@@ -116,14 +96,15 @@ class Knittee : public QMainWindow
 
 
 public:
-    Knittee(QWidget *parent = nullptr);
+    Knittee(QWidget* parent = nullptr);
     ~Knittee();
     //void openFile(QString filePath);
-    
 
-    private slots:
-        void setConstraintsMode();
-        void handleToolbarDone();
+
+private slots:
+    void setConstraintsMode();
+    void handleToolbarDone();
+    void startRemeshing();
 
 private:
     int modellingType = 0; //is the user operating on a 3D model (0) or a 2D sheet? (1), perhaps could be an enum?
@@ -131,7 +112,9 @@ private:
     Ui::KnitteeClass ui;
     ObjHandler object_loader;
     Visualizer* vis;
-    QWidget* toolsWidget;
+    KnitGrapher knitGrapher;
+
+    MeshToolBar* toolsWidget;
     //QVBoxLayout* mainLayout;
     QHBoxLayout* visualizerLayout;
 

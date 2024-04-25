@@ -58,6 +58,9 @@
     <ClCompile Include="KnitGrapher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="MeshToolBar.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Visualizer.h">
@@ -69,9 +72,6 @@
     <ClInclude Include="ObjectMesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="KnitGrapher.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Face.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -80,5 +80,13 @@
     <None Include="fragment_shader.glsl" />
     <None Include="geometry_shader.glsl" />
     <None Include="vertex_shader.glsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="MeshToolBar.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="KnitGrapher.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
   </ItemGroup>
 </Project>

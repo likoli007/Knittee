@@ -12,6 +12,7 @@
 struct Constraint
 {
     std::vector<int> vertices;
+    float timeValue = 0.0f;
 };
 
 class Visualizer :
@@ -30,7 +31,7 @@ protected:
     int mouseX, mouseY;
 
     std::vector<Constraint*> constraints;
-    Constraint *currentConstraint ;
+    Constraint* currentConstraint;
 
     QPoint lastMousePos;
     ObjectMesh mesh;
@@ -71,14 +72,15 @@ protected:
     float rotationAngle = 0.0f;
     void initializeGL();
     void resizeGL(int w, int h);
-    
-    
+
+
     void paintGL();
     void paintConstraints();
     void paintPickFrame();
     void paintConstraintHighlight(QVector3D, QVector3D);
     void paintPickedFace(int);
     void paintMesh();
+
 
 
     void buildmvpMatrix();
@@ -88,14 +90,14 @@ protected:
     void wheelEvent(QWheelEvent* event);
     void keyPressEvent(QKeyEvent* event);
     void computeRayFromMouse(QPoint currentPosition);
-    
+
     QVector3D getMouseCoordinatesInWorld();
     void addConstraintVertex();
-    
+
     void pushConstraints();
     void pickFromMesh();
 
 
-    
+
 };
 

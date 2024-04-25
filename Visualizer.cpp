@@ -14,7 +14,7 @@
 /*
 *   Function: constructor, adds mouse tracking for the visualization subwindow
 */
-Visualizer::Visualizer(QWidget* parent )
+Visualizer::Visualizer(QWidget* parent)
     : QOpenGLWidget(parent)
 {
     setMouseTracking(true);
@@ -43,9 +43,9 @@ void Visualizer::initializeGL()
 
     glEnable(GL_DEPTH_TEST);
     // Set the clear color to blue
-    glClearColor(0.0f, 0.0f, 1.0f, 1.0f); 
-    
-   
+    glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+
+
     // Create and bind the VAO, VBO 
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
@@ -129,7 +129,7 @@ void Visualizer::buildmvpMatrix() {
 /*
 * Function: helper function that only draws the triangle currently under the cursor.
 *   done for color picking of vertex, each vertex of the triangle emits an RGB value,
-*   the pixel under cursor will have an rgb value with the closest vertex having the 
+*   the pixel under cursor will have an rgb value with the closest vertex having the
 *   highest value, which will be used to find it
 */
 void Visualizer::paintPickedFace(int faceID) {
@@ -162,7 +162,7 @@ void Visualizer::paintPickedFace(int faceID) {
 /*
 *   Function: after the color picking mesh is drawn, this function gets the id of the face under the cursor,
 *       also gets the closest vertex, both the face and vertex info is stored in Visualizer member variables
-*/      
+*/
 void Visualizer::pickFromMesh() {
     unsigned char pixel[3];
 
@@ -173,9 +173,9 @@ void Visualizer::pickFromMesh() {
     // If the id is valid (the pixel value does not correspond to the white background)
     if (id >= 0 && id != 16777215 && addingConstraints)
     {
-        paintPickedFace(id);   
+        paintPickedFace(id);
         glReadPixels(mouseX, mouseY, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &pixel);
-        
+
         // Get the maximum value in the RGB composition of the pixel, vertex1 is R, 2 is G, 3 is B...
         // The highest value corresponds to the closest vertex as it is linearly interpolated through the triangle
         int max = 0;
@@ -239,37 +239,37 @@ void Visualizer::paintPickFrame() {
 void Visualizer::paintConstraintHighlight(QVector3D start, QVector3D end) {
     // Set up
     glLineWidth(5.0f);
-    glColor3f(0.0f, 1.0f, 0.0f); 
-    
-    glBegin(GL_LINES); 
+    glColor3f(0.0f, 1.0f, 0.0f);
+
+    glBegin(GL_LINES);
     glVertex3f(start.x(), start.y(), start.z());
     glVertex3f(end.x(), end.y(), end.z());
-    
-    glEnd(); 
+
+    glEnd();
 }
 
 /*
 *   Function: paints all the constraints of different constraint sets iteratively
 */
 void Visualizer::paintConstraints() {
-    
+
     for (Constraint* c : constraints) {
         if (c->vertices.size() > 1) {
             for (int i = 0; i < c->vertices.size() - 1; i++) {
                 // Get the 2 vertices of the constraint and perform the mvp matrix transformations on them
                 QVector3D vertex1 = mesh.vertices[c->vertices[i]];
                 vertex1 = mvpMatrix.map(vertex1);
-                QVector3D vertex2 = mesh.vertices[c->vertices[i+1]];
+                QVector3D vertex2 = mesh.vertices[c->vertices[i + 1]];
                 vertex2 = mvpMatrix.map(vertex2);
 
                 paintConstraintHighlight(vertex1, vertex2);
             }
-		}
-	}
+        }
+    }
 }
 
 /*
-*   Function: allow the user to set constraints in the visualizer, in the future 
+*   Function: allow the user to set constraints in the visualizer, in the future
 *       will disable a different mode selected by the user previously
 */
 void Visualizer::setConstraintsMode() {
@@ -354,7 +354,7 @@ void Visualizer::paintGL()
     }
 }
 /*
-*   Function: load the ObjectMesh object into the Visualizer module 
+*   Function: load the ObjectMesh object into the Visualizer module
 *   Return: no return values
 *   TODO: a quad having object could set a flag for that in this function
 */
@@ -409,20 +409,20 @@ float loopAround(float val, float min, float max)
 *   Return: no return values
 */
 //TODO: more valid constraint checking
-void Visualizer::addConstraintVertex(){
+void Visualizer::addConstraintVertex() {
     if (chosenVertex != -1) {
-		QVector3D vertex = mesh.vertices[chosenVertex];             //should constraints be vertices or indices?
-		qDebug() << "Vertex: " << chosenVertex << ": " << vertex;
-        
+        QVector3D vertex = mesh.vertices[chosenVertex];             //should constraints be vertices or indices?
+        qDebug() << "Vertex: " << chosenVertex << ": " << vertex;
+
         int cnt = std::count(currentConstraint->vertices.begin(), currentConstraint->vertices.end(), chosenVertex);
-        
+
         if (cnt > 0) {
-			qDebug() << "Vertex already in constraint...";
-		}
+            qDebug() << "Vertex already in constraint...";
+        }
         currentConstraint->vertices.push_back(chosenVertex);
         qDebug() << "pushed back, size: " << currentConstraint->vertices.size();
-	}
-    else{
+    }
+    else {
         qDebug() << "No vertex in selection...";
     }
 }
@@ -466,10 +466,18 @@ void Visualizer::keyPressEvent(QKeyEvent* event)
     if (event->key() == Qt::Key_C && addingConstraints) {
         qDebug() << "Adding constraint vertex..";
         addConstraintVertex();
-	}
+    }
     if (event->key() == Qt::Key_Return && addingConstraints) {
         qDebug() << "Pushing constraints..";
         pushConstraints();
+    }
+    if (event->modifiers() == Qt::ControlModifier && event->key() == Qt::Key_Z)
+    {
+        qDebug() << "Ctrl+Z pressed";
+        // in the future will backtrack many options, for now only constraints
+        if (currentConstraint->vertices.size() > 0) {
+            currentConstraint->vertices.pop_back();
+        }
     }
 }
 
@@ -511,7 +519,7 @@ void Visualizer::mouseMoveEvent(QMouseEvent* event)
         // make sure the rotation angles are within the 360 degrees range
         m_rotationAngleX = loopAround(m_rotationAngleX, 0.0f, 359.999f);
         m_rotationAngleY = loopAround(m_rotationAngleY, 0.0f, 359.999f);
-      
+
         lastMousePos = currentPos;
         update();
     }

@@ -37,7 +37,7 @@
     <Import Project="$(QtMsBuild)\qt_defaults.props" />
   </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="QtSettings">
-    <QtInstall>QT 6.7.0</QtInstall>
+    <QtInstall>QT_6.7.0</QtInstall>
     <QtModules>core;gui;widgets;3dcore;3danimation;3dextras;3dinput;3dlogic;3drender;openglwidgets</QtModules>
     <QtBuildConfig>debug</QtBuildConfig>
   </PropertyGroup>
@@ -100,6 +100,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="KnitGrapher.cpp" />
+    <ClCompile Include="MeshToolBar.cpp" />
     <ClCompile Include="ObjectMesh.cpp" />
     <ClCompile Include="ObjHandler.cpp" />
     <ClCompile Include="Visualizer.cpp" />
@@ -116,7 +117,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Face.h" />
-    <ClInclude Include="KnitGrapher.h" />
+    <QtMoc Include="KnitGrapher.h" />
+    <QtMoc Include="MeshToolBar.h" />
     <ClInclude Include="ObjectMesh.h" />
     <ClInclude Include="ObjHandler.h" />
     <ClInclude Include="Visualizer.h" />

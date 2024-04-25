@@ -1,19 +1,19 @@
 #include "Knittee.h"
 
 
-Knittee::Knittee(QWidget *parent)
+Knittee::Knittee(QWidget* parent)
     : QMainWindow(parent)
 {
-  
+
     ui.setupUi(this);
 
     auto topMenu = this->menuBar();//new QMenuBar(this);
-    
+
     auto projectMenu = new QMenu(topMenu); //project menu: user can open a new project (2D or 3D), load an existing one etc.
     auto optionsMenu = new QMenu(topMenu); //options menu: will be able to select some basic options regarding the whole app
     auto helpAction = new QAction("&Help");    //help menu: get the current working context (2D or 3D modelling), and display related help
     auto aboutAction = new QAction("&About");   //about menu: display some basic information about the project
-    
+
 
 
 
@@ -53,6 +53,10 @@ Knittee::Knittee(QWidget *parent)
 
     setMenuBar(topMenu);
 
+
+
+
+
     QObject::connect(newProjectAction, &QAction::triggered, this, &Knittee::openNewProjectWindow);
     QObject::connect(loadAction, &QAction::triggered, this, &Knittee::selectProject);
     QObject::connect(exitAction, &QAction::triggered, this, &QApplication::quit);
@@ -63,8 +67,19 @@ Knittee::Knittee(QWidget *parent)
     QObject::connect(toolsWidget, SIGNAL(constraintsButtonClicked()), this, SLOT(setConstraintsMode()));
     QObject::connect(toolsWidget, SIGNAL(doneButtonClicked()), this, SLOT(handleToolbarDone()));
 
+    //QObject::connect(toolsWidget, SIGNAL(widthChanged()), &knitGrapher, SLOT(setStitchWidth()));
+    //QObject::connect(toolsWidget, SIGNAL(doneButtonClicked()), this, SLOT(handleToolbarDone()));
+    //QObject::connect(toolsWidget, SIGNAL(widthChanged()), &knitGrapher, SLOT( &KnitGrapher::setStitchWidth));
+    //QObject::connect(toolsWidget, SIGNAL(heightChanges()), &knitGrapher, SLOT(&KnitGrapher::setStitchHeight));
+    //QObject::connect(toolsWidget, SIGNAL(unitChanged()), &knitGrapher, SLOT(&KnitGrapher::setModelUnitLength));
+    QObject::connect(toolsWidget, SIGNAL(remeshButtonClicked()), this, SLOT(startRemeshing()));
+    //QObject::connect(toolsWidget, SIGNAL(&MeshToolBar::widthChanged), &knitGrapher, SLOT(&KnitGrapher::setStitchWidth));
+    QObject::connect(toolsWidget, SIGNAL(widthChanged(float)), &knitGrapher, SLOT(setStitchWidth(float)));
+    QObject::connect(toolsWidget, SIGNAL(heightChanged(float)), &knitGrapher, SLOT(setStitchHeight(float)));
+    QObject::connect(toolsWidget, SIGNAL(unitChanged(float)), &knitGrapher, SLOT(setModelUnitLength(float)));
+
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    
+
     visualizerLayout = new QHBoxLayout(this);
     QVBoxLayout* optionsLayout = new QVBoxLayout(this);
 
@@ -75,8 +90,8 @@ Knittee::Knittee(QWidget *parent)
     // Add the label and spacer to the layout
     //optionsLayout->addWidget(toolsWidget);
     //optionsLayout->addWidget(spacer);
-    
-    
+
+
 
     vis = new Visualizer(this); // Set the parent to be the main window
     vis->setMinimumSize(800, 600); // Set a minimum size for the widget
@@ -104,12 +119,18 @@ void Knittee::selectProject() {
     loadProject(filePath);
 }
 
+void Knittee::startRemeshing() {
+    messageTextEdit->setText("Remeshing caught...");
+    std::vector<Constraint*> constraints = vis->getConstraints();
+
+    knitGrapher.constructKnitGraph(constraints);
+}
 
 
 void Knittee::saveConstraints()
 {
     std::vector<Constraint*> constraints = vis->getConstraints();
-    
+
     QString filePath = projectPath + "/constraints";
     QFile file(filePath);
     if (file.open(QIODevice::WriteOnly)) {
@@ -120,10 +141,10 @@ void Knittee::saveConstraints()
                 for (int i = 0; i < size - 1; i++) {
                     out << c->vertices[i] << ";";
                 }
-                out << c->vertices[size-1] << ";";
+                out << c->vertices[size - 1] << ";";
             }
             out << "\n";
-            
+
         }
         file.close();
     }
@@ -137,7 +158,7 @@ void Knittee::saveConstraints()
 void Knittee::handleToolbarDone() {
     //currently nothing but constraints to handle, but later on user clicking done may mean done constraints,
     //done interpolation, done editing etc..
-    
+
     saveConstraints();
 
 }
@@ -145,19 +166,19 @@ void Knittee::handleToolbarDone() {
 void Knittee::loadProject(QString filePath) {
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-		qDebug() << "Error opening project file!";
-		return;
-	}
+        qDebug() << "Error opening project file!";
+        return;
+    }
     QTextStream in(&file);
-	QString projectName = in.readLine();
-	int projectType = in.readLine().toInt();
-	file.close();
+    QString projectName = in.readLine();
+    int projectType = in.readLine().toInt();
+    file.close();
     QFileInfo projFileInfo(filePath); // Get the file info for the .proj file
     QString projFolder = projFileInfo.absolutePath(); // Get the folder containing the .proj file
     QString meshFilePath;
-    
 
-    
+
+
     if (projectType == 0)
     {
         meshFilePath = projFolder + "/mesh.obj"; // Construct the file path for mesh.obj
@@ -168,10 +189,10 @@ void Knittee::loadProject(QString filePath) {
         start3DProject(projectInfo);
     }
 
-	
+
 }
 
-void Knittee::loadConstraints(){
+void Knittee::loadConstraints() {
     std::vector<Constraint*> constraints;
 
     QString filePath = projectPath + "/constraints";
@@ -205,19 +226,19 @@ void Knittee::loadConstraints(){
 
 void Knittee::start3DProject(ProjectInfo context)
 {
-	qDebug() << "starting 3D project: " << context.objectFilePath;
+    qDebug() << "starting 3D project: " << context.objectFilePath;
     object_loader.setFilePath(context.objectFilePath);
     ObjectMesh mesh = object_loader.loadFile();
 
     loadConstraints();
 
     vis->loadMesh(mesh);
-    
+    knitGrapher.setOriginalMesh(mesh);
 
     visualizerLayout->removeItem(visualizerLayout->itemAt(0));
     visualizerLayout->insertWidget(0, toolsWidget);
-	// Handle selected options
-	// context.type, context.file, etc. contain the selected values
+    // Handle selected options
+    // context.type, context.file, etc. contain the selected values
 }
 
 void Knittee::openOptionsWindow()
@@ -233,9 +254,9 @@ void Knittee::openAboutWindow()
     QDialog* aboutDialog = new QDialog(this); //needs to have 'this'?
     QString aboutText;
 
-    aboutText = QString("Knittee is a 2D sheet and 3D object to Knit instruction CAD software \n") + 
+    aboutText = QString("Knittee is a 2D sheet and 3D object to Knit instruction CAD software \n") +
         QString("designed by Alojz Holubek as part of his bachelor's thesis at Zhejiang University\n");
-    
+
 
     aboutDialog->setWindowTitle("About This Software");
     QLabel* label = new QLabel(aboutText, aboutDialog);
@@ -252,7 +273,7 @@ void Knittee::openHelpWindow()
     QDialog* helpDialog = new QDialog(this); //needs to have 'this'?
     QString helpText;
 
-    if (modellingType == 0) 
+    if (modellingType == 0)
     {
         helpText = "Welcome to Knittee 2D/3D knitted objects modelling software!\n",
             "Instructions for 3D modelling: to be written here!";
@@ -277,7 +298,7 @@ void Knittee::openHelpWindow()
 }
 
 
-void Knittee::openNewProjectWindow() 
+void Knittee::openNewProjectWindow()
 {
     NewProjectDialog dialog;
     QObject::connect(&dialog, &NewProjectDialog::projectConfigurationsSelected, this, &Knittee::handleNewProject);
@@ -288,20 +309,20 @@ void Knittee::openNewProjectWindow()
 void Knittee::setUpNew3DProject(ProjectInfo context)
 {
     qDebug() << "Setting up 3D project with file: " << context.objectFilePath;
-	//store the project information in the new folder
+    //store the project information in the new folder
     QString projectFolderPath = QCoreApplication::applicationDirPath() + "/Projects/" + context.projectName;
     QDir().mkpath(projectFolderPath);
-    QFile file(projectFolderPath+"/" + context.projectName + ".knittee");
+    QFile file(projectFolderPath + "/" + context.projectName + ".knittee");
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-		qDebug() << "Error opening project file!";
-		return;
-	}
+        qDebug() << "Error opening project file!";
+        return;
+    }
     file.write(context.projectName.toUtf8());
     file.write("\n");
     file.write(QString::number(context.type).toUtf8());
     file.write("\n");
     file.close();
-    
+
 
 
     //copy the obj file to the project folder
@@ -309,8 +330,8 @@ void Knittee::setUpNew3DProject(ProjectInfo context)
     object_loader.copyObjFileToProject(context.projectName);
 
     context.objectFilePath = projectFolderPath + "/mesh.obj";
-    
-    
+
+
     start3DProject(context);
 }
 
@@ -331,7 +352,7 @@ void Knittee::handleNewProject(ProjectInfo options)
 
 void Knittee::setConstraintsMode()
 {
-	vis->setConstraintsMode();
+    vis->setConstraintsMode();
     messageTextEdit->setText("Constraints mode enabled. Press 'C' while hovering over the mesh to add a constraint.\nOnce done, press 'ENTER' to finish");
 }
 
@@ -352,7 +373,7 @@ NewProjectDialog::NewProjectDialog(QWidget* parent) : QDialog(parent)
     QString projectNameLabelText = "Project Name:";
     QLabel* projectNameLabel = new QLabel(projectNameLabelText, this);
     projectNameLineEdit = new QLineEdit(this);
-    
+
     QString projectTypeLabelText = "Select Your Project Type:";
     QLabel* projectTypeLabel = new QLabel(projectTypeLabelText, this);
 
@@ -360,16 +381,16 @@ NewProjectDialog::NewProjectDialog(QWidget* parent) : QDialog(parent)
     QHBoxLayout* projectTypeRadioLayout = new QHBoxLayout(this);
     meshRadio = new QRadioButton("3D Mesh editing", this);
     sheetRadio = new QRadioButton("2D Sheet editing", this);
-    
+
     projectTypeRadioLayout->addWidget(meshRadio);
     projectTypeRadioLayout->addWidget(sheetRadio);
 
     QObject::connect(meshRadio, &QRadioButton::clicked, this, &NewProjectDialog::onMeshRadioClicked);
     QObject::connect(sheetRadio, &QRadioButton::clicked, this, &NewProjectDialog::onSheetRadioClicked);
-    
 
 
-    
+
+
     QHBoxLayout* projectConfirmDenyLayout = new QHBoxLayout(this);
 
     QPushButton* okButton = new QPushButton("OK", this);
@@ -394,7 +415,7 @@ NewProjectDialog::NewProjectDialog(QWidget* parent) : QDialog(parent)
     meshSelectionButton = new QPushButton("Browse", this);
     meshSelectionLabel->setVisible(false);
     meshSelectionLineEdit->setVisible(false);
-    
+
     meshSelectionLayout = new QHBoxLayout(this);
     meshSelectionLayout->addWidget(meshSelectionLineEdit);
     meshSelectionLayout->addWidget(meshSelectionButton);
@@ -410,8 +431,8 @@ NewProjectDialog::NewProjectDialog(QWidget* parent) : QDialog(parent)
     sheetSizeSeparator = new QLabel("/");
     widthLineEdit = new QLineEdit(this);
     heightLineEdit = new QLineEdit(this);
-    
-    
+
+
 
     QIntValidator* validator = new QIntValidator(this);
     widthLineEdit->setValidator(validator);
@@ -440,17 +461,17 @@ NewProjectDialog::NewProjectDialog(QWidget* parent) : QDialog(parent)
     setLayout(mainLayout);
     meshRadio->setChecked(true);
     onMeshRadioClicked();
-    
+
     qDebug() << "Shown Help Menu...";
 }
 
 void NewProjectDialog::openUserFile()
 {
-	QString file_path = QFileDialog::getOpenFileName(this, "Open OBJ File", "", "OBJ Files (*.obj)");
-	meshSelectionLineEdit->setText(file_path);
+    QString file_path = QFileDialog::getOpenFileName(this, "Open OBJ File", "", "OBJ Files (*.obj)");
+    meshSelectionLineEdit->setText(file_path);
 }
 
-void NewProjectDialog::onConfirm() 
+void NewProjectDialog::onConfirm()
 {
 
     ProjectInfo projectInfo;
@@ -466,7 +487,7 @@ void NewProjectDialog::onConfirm()
     }
     close();
     emit projectConfigurationsSelected(projectInfo);
-    
+
 }
 
 void NewProjectDialog::onCancel()
@@ -497,51 +518,3 @@ void NewProjectDialog::onSheetRadioClicked()
 }
 
 
-MeshToolBar::MeshToolBar(QWidget *parent) {
-    QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    QHBoxLayout* widthLayout = new QHBoxLayout(this);
-    QHBoxLayout* heightLayout = new QHBoxLayout(this);
-
-    QLabel* label = new QLabel("Stitch Width:", this);
-    widthLayout->addWidget(label);
-
-    QSlider* widthSlider = new QSlider(Qt::Horizontal);
-    widthSlider->setMinimum(1);  // Set the minimum value
-    widthSlider->setMaximum(10);  // Set the maximum value
-    widthSlider->setValue(5);  // Set the initial value
-    widthLayout->addWidget(widthSlider);
-
-    QLabel* label2 = new QLabel("Stitch Height:", this);
-    heightLayout->addWidget(label2);
-
-    QSlider* heightSlider = new QSlider(Qt::Horizontal);
-    heightSlider->setMinimum(1);  // Set the minimum value
-    heightSlider->setMaximum(10);  // Set the maximum value
-    heightSlider->setValue(5);  // Set the initial value
-    heightLayout->addWidget(heightSlider);
-
-
-    constraintsModeButton = new QPushButton("Add Constraints", this);
-    QPushButton* interpolateButton = new QPushButton("Interpolate", this);
-    //interpolateButton->setEnabled(false);
-    doneButton = new QPushButton("Done", this);
-
-
-    
-    //QObject::connect(constraintsModeButton, SIGNAL(clicked()), parent, SLOT(setConstraintsMode()));
-    //connect(button, &QPushButton::clicked, this, &SubClass::onButtonClicked);
-    QObject::connect(constraintsModeButton, &QPushButton::clicked, this, &MeshToolBar::onConstraintsButtonClicked);
-    QObject::connect(doneButton, &QPushButton::clicked, this, &MeshToolBar::onDoneButtonClicked);
-
-
-    QLabel* label3 = new QLabel("Further Options...", this);
-
-    mainLayout->addLayout(widthLayout);
-    mainLayout->addLayout(heightLayout);
-    mainLayout->addWidget(constraintsModeButton);
-    mainLayout->addWidget(interpolateButton);
-    mainLayout->addWidget(doneButton);
-    mainLayout->addWidget(label3);
-    setLayout(mainLayout);
-    setMinimumSize(300,100);
-}
