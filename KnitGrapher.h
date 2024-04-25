@@ -2,6 +2,10 @@
 
 #include "ObjectMesh.h"
 #include "Visualizer.h"
+//#include "myQVectors.h"
+
+#include <glm/glm.hpp>
+
 /*
 * This class will be used to construct the KnitGraph from the parameters given by the user
 * A lot of this code will be implemented by refering to the algorithms described by AUTOKNIT
@@ -12,7 +16,7 @@ class KnitGrapher : public QObject
 
 
 private:
-	ObjectMesh originalMesh;
+	ObjectMesh originalMesh, newMesh;
 	float stitchWidth;
 	float stitchHeight;		//both float values in mm
 	float modelUnitLength;	//the length of a unit in the model in mm
@@ -20,12 +24,24 @@ private:
 	const float minEdgeRatio = 0.3f; //'smallest allowed smallest-to-largest edge ratio in a triangle' 
 	const float minEdgeRatioSquared = minEdgeRatio * minEdgeRatio;
 	//maybe let them be set by the user?
-	/*
-	void quad(std::vector<GLuint>& new_tris, std::vector<QVector3D>& verts, uint32_t a, uint32_t b, uint32_t c, uint32_t d);
-	void divide(QSet<QPoint>& marked, std::vector<QVector3D>& verts, std::vector<std::vector<int>>& paths, std::vector<GLuint>& tris);
-	ObjectMesh remesh(std::vector<Constraint*> constraints);
+
+	std::vector<Constraint*> constraints;
+	std::vector<float>* constrained_values;
+
+	std::vector<glm::uvec3> oldTriangles;
+	std::vector<glm::uvec3> newTriangles;
+
+
+	void quad(std::vector<glm::uvec3>& new_tris, std::vector<QVector3D>& verts, GLuint a, GLuint b, GLuint c, GLuint d);
+	void divide(QSet<QPoint>& marked,
+		std::vector<QVector3D>& verts,
+		std::vector<std::vector<GLuint>>& paths,
+		std::vector<glm::uvec3>& tris);
+	void remesh();
 	float getMaxEdgeLength();
-	bool degenerateCheck();
+	bool degenerateCheck(std::vector<glm::uvec3> tris);
+
+	void generateTriangles();
 
 	//so. much. passing. by. reference. need to make some variables class members.... TODO!!!
 	void unfold(GLuint depth, GLuint root, QVector2D const& flat_root,
@@ -34,7 +50,7 @@ private:
 		QVector2D const& limit_a, QVector2D const& limit_b, QHash< QPoint, GLuint > const& opposite,
 		std::vector<QVector3D> const& newVertices, QHash< QPoint, float >& min_dis);
 
-	int lookup(int a, int b, QHash<QPoint, int> &marked_verts);*/
+	GLuint lookup(GLuint a, GLuint b, QHash<QPoint, GLuint>& marked_verts);
 public:
 	KnitGrapher(QObject* parent = nullptr);
 	void constructKnitGraph(std::vector<Constraint*> constraints);

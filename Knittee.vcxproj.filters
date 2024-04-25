@@ -61,6 +61,12 @@
     <ClCompile Include="MeshToolBar.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="EmbeddedVertex.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="EmbeddedPlanarMap.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Visualizer.h">
@@ -73,6 +79,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Face.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="EmbeddedVertex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="EmbeddedPlanarMap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

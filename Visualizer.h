@@ -11,7 +11,7 @@
 
 struct Constraint
 {
-    std::vector<int> vertices;
+    std::vector<GLuint> vertices;
     float timeValue = 0.0f;
 };
 

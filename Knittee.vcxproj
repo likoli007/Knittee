@@ -61,6 +61,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <IncludePath>D:\Projects\Knittee\include\;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
   </PropertyGroup>
@@ -68,6 +69,9 @@
     <Link>
       <AdditionalDependencies>opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\Projects\Knittee\include\glm;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Link>
@@ -99,6 +103,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="EmbeddedPlanarMap.cpp" />
+    <ClCompile Include="EmbeddedVertex.cpp" />
     <ClCompile Include="KnitGrapher.cpp" />
     <ClCompile Include="MeshToolBar.cpp" />
     <ClCompile Include="ObjectMesh.cpp" />
@@ -116,6 +122,8 @@
     <ResourceCompile Include="Knittee.rc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="EmbeddedPlanarMap.h" />
+    <ClInclude Include="EmbeddedVertex.h" />
     <ClInclude Include="Face.h" />
     <QtMoc Include="KnitGrapher.h" />
     <QtMoc Include="MeshToolBar.h" />
