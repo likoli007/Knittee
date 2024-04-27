@@ -26,7 +26,7 @@ private:
 	//maybe let them be set by the user?
 
 	std::vector<Constraint*> constraints;
-	std::vector<float>* constrained_values;
+	std::vector<float> constrained_values;
 
 	std::vector<glm::uvec3> oldTriangles;
 	std::vector<glm::uvec3> newTriangles;
@@ -44,6 +44,9 @@ private:
 	std::vector<GLuint> toIntArray(std::vector<glm::uvec3>);
 
 	void generateTriangles();
+	void interpolateValues();
+	void printConstrainedValues();
+
 
 	//so. much. passing. by. reference. need to make some variables class members.... TODO!!!
 	void unfold(GLuint depth, GLuint root, QVector2D const& flat_root,
@@ -61,6 +64,8 @@ public slots:
 	void setStitchHeight(float height);
 	void setModelUnitLength(float length);
 	void setOriginalMesh(ObjectMesh mesh);
+signals:
+	void knitGraphInterpolated(ObjectMesh mesh, std::vector<float> values);
 
 };
 

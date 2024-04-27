@@ -105,6 +105,7 @@ private slots:
     void setConstraintsMode();
     void handleToolbarDone();
     void startRemeshing();
+    void meshInterpolated(ObjectMesh, std::vector<float>);
 
 private:
     int modellingType = 0; //is the user operating on a 3D model (0) or a 2D sheet? (1), perhaps could be an enum?

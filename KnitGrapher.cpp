@@ -625,11 +625,11 @@ void KnitGrapher::remesh()
 			for (const auto& tri : split_tris) {
 				uint32_t ti = &tri - &split_tris[0];
 				auto res = over.insert(std::make_pair(glm::uvec2(tri.x, tri.y), ti));
-				assert(res.second);
+				//assert(res.second);
 				res = over.insert(std::make_pair(glm::uvec2(tri.y, tri.z), ti));
-				assert(res.second);
+				//assert(res.second);
 				res = over.insert(std::make_pair(glm::uvec2(tri.z, tri.x), ti));
-				assert(res.second);
+				//assert(res.second);
 			}
 			for (uint32_t seed = 0; seed < split_tris.size(); ++seed) {
 				if (tri_component[seed] != -1U) continue;
@@ -703,8 +703,115 @@ void KnitGrapher::remesh()
 		newMesh.vertices = compressed_verts;
 		newMesh.indices = toIntArray(compressed_tris);
 
-		constrained_values = &compressed_values;
+		qDebug() << compressed_values.size() << " constrained vertices.";
+
+
+		constrained_values = compressed_values;
 }
+
+void KnitGrapher::interpolateValues() {
+	//assert(constraints.size() == model.vertices.size());
+	//assert(values_);
+	if (constrained_values.size() != originalMesh.vertices.size()) {
+		qDebug() << "Constraints size does not match model vertices size" << constrained_values.size() << originalMesh.vertices.size();
+		return;
+	}
+	qDebug() << "Interpolating values...";
+	auto& values = constrained_values;
+
+	std::vector< uint32_t > dofs;
+	dofs.reserve(constrained_values.size());
+	uint32_t total_dofs = 0;
+	for (auto c : constrained_values) {
+		if (c == c) dofs.emplace_back(-1U);
+		else dofs.emplace_back(total_dofs++);
+	}
+
+	std::cout << "Have " << total_dofs << " degrees of freedom and " << (constrained_values.size() - total_dofs) << " constraints." << std::endl;
+
+	if (total_dofs == constrained_values.size()) {
+		qDebug() << "Cannot interpolate from no constraints.";
+	}
+
+	std::map< std::pair< uint32_t, uint32_t >, float > edge_weights;
+
+	for (const auto& tri : oldTriangles) {
+		const QVector3D& a = originalMesh.vertices[tri.x];
+		const QVector3D& b = originalMesh.vertices[tri.y];
+		const QVector3D& c = originalMesh.vertices[tri.z];
+
+		float weight_ab = QVector3D::dotProduct(c - a, b - a) / QVector3D::crossProduct(c - a, b - a).length();
+		float weight_bc = QVector3D::dotProduct(a - b, c - b) / QVector3D::crossProduct(a - b, c - b).length();
+		float weight_ca = QVector3D::dotProduct(b - c, a - c) / QVector3D::crossProduct(b - c, a - c).length();
+
+		edge_weights.insert(std::make_pair(std::minmax(tri.x, tri.y), 0.0f)).first->second += weight_ab;
+		edge_weights.insert(std::make_pair(std::minmax(tri.y, tri.z), 0.0f)).first->second += weight_bc;
+		edge_weights.insert(std::make_pair(std::minmax(tri.z, tri.x), 0.0f)).first->second += weight_ca;
+	}
+
+	//turn edge weights vector into adjacency lists:
+	std::vector< std::vector< std::pair< uint32_t, float > > > adj(originalMesh.vertices.size());
+	for (const auto& ew : edge_weights) {
+		adj[ew.first.first].emplace_back(ew.first.second, ew.second);
+		adj[ew.first.second].emplace_back(ew.first.first, ew.second);
+	}
+
+
+	std::vector< Eigen::Triplet< double > > coefficients;
+	coefficients.reserve(originalMesh.indices.size() * 3); //more than is needed
+	Eigen::VectorXd rhs(total_dofs);
+
+	for (uint32_t i = 0; i < dofs.size(); ++i) {
+		if (dofs[i] == -1U) continue;
+		//sum adj[x] + one * 1 - c * x = 0.0f
+		float sum = 0.0f;
+		float one = 0.0f;
+		for (auto a : adj[i]) {
+			if (dofs[a.first] == -1U) {
+				one += a.second * constrained_values[a.first];
+			}
+			else {
+				coefficients.emplace_back(dofs[i], dofs[a.first], a.second);
+			}
+			sum += a.second;
+		}
+		coefficients.emplace_back(dofs[i], dofs[i], -sum);
+		rhs[dofs[i]] = -one;
+	}
+
+	Eigen::SparseMatrix< double > A(total_dofs, total_dofs);
+	A.setFromTriplets(coefficients.begin(), coefficients.end());
+	//A = A * A.transpose();
+	A.makeCompressed(); //redundant?
+
+	//Eigen::SparseLU< Eigen::SparseMatrix< double > > solver;
+	//Eigen::SparseQR< Eigen::SparseMatrix< double >, Eigen::COLAMDOrdering< int > > solver;
+	Eigen::SimplicialLDLT< Eigen::SparseMatrix< double > > solver;
+	//Eigen::ConjugateGradient< Eigen::SparseMatrix< double > > solver;
+	solver.compute(A);
+	if (solver.info() != Eigen::Success) {
+		qDebug() << "Decomposition failed.";
+		return;
+	}
+	Eigen::VectorXd x = solver.solve(rhs);
+	if (solver.info() != Eigen::Success) {
+		qDebug() << "Solving failed.";
+		return;
+	}
+	//std::cout << solver.iterations() << " interations later..." << std::endl; //DEBUG
+	//std::cout << solver.error() << " (estimated error)..." << std::endl; //DEBUG
+
+	values = constrained_values;
+	for (uint32_t i = 0; i < dofs.size(); ++i) {
+		if (dofs[i] != -1U) values[i] = x[dofs[i]];
+	}
+
+	qDebug() << "Interpolation complete!";
+	for (float val : values) {
+		qDebug() << val;
+	}
+}
+
 std::vector<GLuint> KnitGrapher::toIntArray(std::vector<glm::uvec3> triangles) {
 	std::vector<GLuint> result;
 
@@ -736,6 +843,15 @@ bool KnitGrapher::degenerateCheck(std::vector<glm::uvec3> tris) {
 	return false;
 }
 
+void KnitGrapher::printConstrainedValues()
+{
+	for (float val : constrained_values) {
+		qDebug() << val;
+	}
+	// get size of constrained values
+	qDebug() << "Constrained Values Size:" << constrained_values.size();
+}
+
 void KnitGrapher::constructKnitGraph(std::vector<Constraint*> constraints)
 {
 	qDebug() << "Constructing Knit Graph, sizes:" << stitchWidth << stitchHeight << modelUnitLength;
@@ -751,7 +867,10 @@ void KnitGrapher::constructKnitGraph(std::vector<Constraint*> constraints)
 
 	generateTriangles();
 	remesh();
-
+	//printConstrainedValues();
+	interpolateValues();
+	qDebug() << "interpolation done!, emitting...";
+	emit knitGraphInterpolated(newMesh, constrained_values);
 }
 void KnitGrapher::setStitchWidth(float width)
 {

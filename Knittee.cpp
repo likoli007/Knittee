@@ -78,6 +78,8 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(toolsWidget, SIGNAL(heightChanged(float)), &knitGrapher, SLOT(setStitchHeight(float)));
     QObject::connect(toolsWidget, SIGNAL(unitChanged(float)), &knitGrapher, SLOT(setModelUnitLength(float)));
 
+
+
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
     visualizerLayout = new QHBoxLayout(this);
@@ -98,6 +100,10 @@ Knittee::Knittee(QWidget* parent)
     visualizerLayout->addLayout(optionsLayout);
     visualizerLayout->addWidget(vis);
 
+    QObject::connect(&knitGrapher, SIGNAL(knitGraphInterpolated(ObjectMesh, std::vector<float>)), this, SLOT(meshInterpolated(ObjectMesh, std::vector<float>)));
+
+
+
 
     messageTextEdit = new QTextEdit(this);
     messageTextEdit->setReadOnly(true);
@@ -110,6 +116,10 @@ Knittee::Knittee(QWidget* parent)
     QWidget* centralWidget = new QWidget(this);
     centralWidget->setLayout(mainLayout);
     setCentralWidget(centralWidget);
+}
+
+void Knittee::meshInterpolated(ObjectMesh mesh, std::vector<float> values) {
+	vis->meshInterpolated(mesh, values);
 }
 
 void Knittee::selectProject() {
@@ -138,10 +148,11 @@ void Knittee::saveConstraints()
         for (Constraint* c : constraints) {
             int size = c->vertices.size();
             if (size > 0) {
+                out << c->timeValue << "\n";
                 for (int i = 0; i < size - 1; i++) {
                     out << c->vertices[i] << ";";
                 }
-                out << c->vertices[size - 1] << ";";
+                out << c->vertices[size - 1];
             }
             out << "\n";
 
@@ -158,7 +169,7 @@ void Knittee::saveConstraints()
 void Knittee::handleToolbarDone() {
     //currently nothing but constraints to handle, but later on user clicking done may mean done constraints,
     //done interpolation, done editing etc..
-
+    qDebug() << "handling toolbar done!";
     saveConstraints();
 
 }
@@ -193,6 +204,8 @@ void Knittee::loadProject(QString filePath) {
 }
 
 void Knittee::loadConstraints() {
+
+    qDebug() << "loading constraints";
     std::vector<Constraint*> constraints;
 
     QString filePath = projectPath + "/constraints";
@@ -203,6 +216,8 @@ void Knittee::loadConstraints() {
             while (!in.atEnd()) {
                 Constraint* constraintPointer = new Constraint();
                 QString line = in.readLine();
+                constraintPointer->timeValue = line.toFloat();
+                line = in.readLine();
                 QStringList indices = line.split(';');
                 if (!indices.isEmpty())
                 {
@@ -221,6 +236,7 @@ void Knittee::loadConstraints() {
     else {
         qDebug() << "Constraints file does not exist error!";
     }
+
     vis->setConstraints(constraints);
 }
 

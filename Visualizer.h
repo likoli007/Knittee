@@ -26,12 +26,19 @@ public:
     void setConstraintsMode();
     std::vector<Constraint*> getConstraints();
     void setConstraints(std::vector<Constraint*>);
+public slots:
+    void meshInterpolated(ObjectMesh mesh, std::vector<float> values);
 
 protected:
     int mouseX, mouseY;
 
     std::vector<Constraint*> constraints;
     Constraint* currentConstraint;
+
+    ObjectMesh interpolatedMesh;
+    std::vector<float> interpolatedValues;
+
+    std::vector<std::array<float, 3>> colors;
 
     QPoint lastMousePos;
     ObjectMesh mesh;
@@ -43,13 +50,20 @@ protected:
     QMatrix4x4 mvpMatrix;
 
     QOpenGLShaderProgram shaderProgram;
+    QOpenGLShaderProgram timeShaderProgram;
+    QOpenGLTexture* timeTexture;
 
     GLuint vao, vbo, indexBuffer, shadingBuffer;
+    GLuint colorBuffer;
+    GLuint coordsBuffer;
 
     int selectedFace = -1;
     int chosenVertex = -1;
     QVector3D rayDir;
     QPointF wpos;
+
+
+    QImage timeTexImage;
 
     std::vector<QVector3D> origins;
     std::vector<QVector3D> directions;
@@ -63,6 +77,9 @@ protected:
     bool isDragging = false;
     bool addingConstraints = false;
     bool showConstraints = false;            //both of these values should be set from the toolbar inside Knittee
+    
+    bool interpolatedLoaded = false;
+    
     float translateX = 0.0f;
     float translateY = 0.0f;
     float translateZ = -5.0f;
@@ -77,9 +94,10 @@ protected:
     void paintGL();
     void paintConstraints();
     void paintPickFrame();
-    void paintConstraintHighlight(QVector3D, QVector3D);
+    void paintConstraintHighlight(QVector3D, QVector3D, float, float);
     void paintPickedFace(int);
     void paintMesh();
+    void paintInterpolatedMesh();
 
 
 
@@ -91,13 +109,18 @@ protected:
     void keyPressEvent(QKeyEvent* event);
     void computeRayFromMouse(QPoint currentPosition);
 
+    void computeColors();
+
+    void generateTimeTexture();
+
     QVector3D getMouseCoordinatesInWorld();
     void addConstraintVertex();
 
     void pushConstraints();
     void pickFromMesh();
 
-
-
+    void increaseConstraintValue();
+    void decreaseConstraintValue();
+    int getClosestConstraint();
 };
 

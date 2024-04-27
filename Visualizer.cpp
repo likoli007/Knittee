@@ -10,6 +10,7 @@
 #include <QDebug>
 #include <QToolTip>
 #include <QApplication>
+#include <QPair>
 #include <QScreen>
 /*
 *   Function: constructor, adds mouse tracking for the visualization subwindow
@@ -32,6 +33,51 @@ Visualizer::~Visualizer()
 
 }
 
+
+QColor timeColor(float time) {
+    constexpr int size = 3;
+    static const QColor grad[size] = {
+        QColor(51, 51, 255),   // Blue
+        QColor(204, 204, 204), // Gray
+        QColor(204, 51, 51)    // Red
+    };
+
+    time *= (size - 1);
+    int i = qBound(0, qFloor(time), size - 2);
+    qreal f = qBound(0.0, time - i, 1.0);
+
+    float r = grad[i].redF() * (1 - f) + grad[i + 1].redF() * f;
+    float g = grad[i].greenF() * (1 - f) + grad[i + 1].greenF() * f;
+    float b = grad[i].blueF() * (1 - f) + grad[i + 1].blueF() * f;
+
+    int red = static_cast<int>(r * 255.0f);
+    int green = static_cast<int>(g * 255.0f);
+    int blue = static_cast<int>(b * 255.0f);
+
+    // Interpolate between colors
+    QColor color(red, green, blue);
+
+    return color;
+}
+const uint TimeTexSize = 16;
+
+void Visualizer::generateTimeTexture() {
+    timeTexImage = QImage(TimeTexSize, 1, QImage::Format_RGB888);
+    for (int i = 0; i < TimeTexSize; ++i) {
+        QColor color = timeColor(i / float(TimeTexSize - 1));
+        //QColor qColor = QColor::fromRgbF(color.r, color.g, color.b);
+        timeTexImage.setPixel(i, 0, color.rgb());
+    }
+
+    timeTexture = new QOpenGLTexture(timeTexImage);
+
+    timeTexture->setWrapMode(QOpenGLTexture::ClampToEdge);
+    timeTexture->setMinificationFilter(QOpenGLTexture::Nearest);
+    timeTexture->setMagnificationFilter(QOpenGLTexture::Linear);
+
+    timeTexImage.save("stuffensie.jpg");
+
+}
 
 /*
 *   Function: initialize the OpenGL graphics API, set some default parameters
@@ -67,10 +113,10 @@ void Visualizer::initializeGL()
 
 
     // Create and bind the  buffer
-    glGenBuffers(1, &shadingBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, shadingBuffer);
+    glGenBuffers(1, &coordsBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, coordsBuffer);
     glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_STATIC_DRAW);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), nullptr);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(float)*2, nullptr);
     glEnableVertexAttribArray(1);
 
     glBindVertexArray(0);
@@ -80,6 +126,11 @@ void Visualizer::initializeGL()
     shaderProgram.addShaderFromSourceFile(QOpenGLShader::Fragment, "fragment_shader.glsl");
     //shaderProgram.addShaderFromSourceFile(QOpenGLShader::Geometry, "geometry_shader.glsl"); //unneeded?
     shaderProgram.link();
+
+    timeShaderProgram.addShaderFromSourceFile(QOpenGLShader::Vertex, "time_vertex_shader.glsl");
+    timeShaderProgram.addShaderFromSourceFile(QOpenGLShader::Fragment, "time_fragment_shader.glsl");
+    timeShaderProgram.link();
+
 
     // Set the default matrices
     viewMatrix.setToIdentity();
@@ -159,6 +210,70 @@ void Visualizer::paintPickedFace(int faceID) {
     glFinish();
 }
 
+
+
+void Visualizer::meshInterpolated(ObjectMesh mesh, std::vector<float> values) {
+    qDebug() << "visualizer loaded interpolated mesh!";
+    objectLoaded = false;
+
+
+
+
+    interpolatedMesh = mesh;
+    interpolatedValues = values;
+    qDebug() << "interpolatedvalues size: " << interpolatedValues.size();
+
+    generateTimeTexture();
+
+    float min = -1.0f;
+    float max = 1.0f;
+
+    for (auto v : interpolatedValues) {
+        min = std::min(min, v);
+        max = std::max(max, v);
+    }
+
+
+    std::vector< float > texcoords;
+    for (auto v : interpolatedValues) {
+        texcoords.emplace_back(
+            (((v - min) / (max - min)) * (TimeTexSize - 1) + 0.5f) / float(TimeTexSize));
+        texcoords.emplace_back(0.5f);
+    }
+
+
+    qDebug() << texcoords.size() << interpolatedMesh.vertices.size() << interpolatedMesh.indices.size();
+
+    qDebug() << "original mesh tris: " << mesh.indices.size() / 3 << " interpolated mesh tris: " << interpolatedMesh.indices.size() / 3;
+
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+    // Set up the vertex buffer data
+    glBufferData(GL_ARRAY_BUFFER, interpolatedMesh.vertices.size() * sizeof(QVector3D), interpolatedMesh.vertices.data(), GL_STATIC_DRAW);
+
+    // Create and bind the index buffer
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, interpolatedMesh.indices.size() * sizeof(GLuint), interpolatedMesh.indices.data(), GL_STATIC_DRAW);
+    GLenum error;
+    while ((error = glGetError()) != GL_NO_ERROR) {
+        qDebug() << "OpenGL error: " << error;
+    }
+    // Specify the format of the vertex data (position only)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), nullptr);
+
+
+    glBindBuffer(GL_ARRAY_BUFFER, coordsBuffer);
+    glBufferData(GL_ARRAY_BUFFER, texcoords.size() * sizeof(float), texcoords.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glFinish();
+
+    interpolatedLoaded = true;
+}
+
+
 /*
 *   Function: after the color picking mesh is drawn, this function gets the id of the face under the cursor,
 *       also gets the closest vertex, both the face and vertex info is stored in Visualizer member variables
@@ -189,6 +304,8 @@ void Visualizer::pickFromMesh() {
         chosenVertex = mesh.indices[id * 3 + max];
     }
     selectedFace = id;
+    qDebug() << "Selected face: " << selectedFace;
+    qDebug() << "Chosen vertex: " << chosenVertex;
 }
 
 
@@ -236,10 +353,17 @@ void Visualizer::paintPickFrame() {
 /*
 *   Function: paint the constraint set by the user, currently a thick line running from the selected constrained vertices
 */
-void Visualizer::paintConstraintHighlight(QVector3D start, QVector3D end) {
+void Visualizer::paintConstraintHighlight(QVector3D start, QVector3D end, float r, float b) {
     // Set up
     glLineWidth(5.0f);
-    glColor3f(0.0f, 1.0f, 0.0f);
+
+    if (r == 0.0f && b == 0.0f) {
+        glColor3f(1.0f, 1.0f, 1.0f);
+    }
+    else {
+		glColor3f(r, 0.0f, b);
+	}
+    
 
     glBegin(GL_LINES);
     glVertex3f(start.x(), start.y(), start.z());
@@ -255,6 +379,9 @@ void Visualizer::paintConstraints() {
 
     for (Constraint* c : constraints) {
         if (c->vertices.size() > 1) {
+            qDebug() << c->timeValue;
+            float r = c->timeValue > 0.0 ? c->timeValue : 0.0;
+            float b = c->timeValue < 0.0 ? c->timeValue : 0.0;
             for (int i = 0; i < c->vertices.size() - 1; i++) {
                 // Get the 2 vertices of the constraint and perform the mvp matrix transformations on them
                 QVector3D vertex1 = mesh.vertices[c->vertices[i]];
@@ -262,7 +389,7 @@ void Visualizer::paintConstraints() {
                 QVector3D vertex2 = mesh.vertices[c->vertices[i + 1]];
                 vertex2 = mvpMatrix.map(vertex2);
 
-                paintConstraintHighlight(vertex1, vertex2);
+                paintConstraintHighlight(vertex1, vertex2, r, b);
             }
         }
     }
@@ -284,7 +411,7 @@ void Visualizer::setConstraintsMode() {
 void Visualizer::paintMesh()
 {
     // General OpenGL set up
-    glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.5451f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
@@ -329,6 +456,43 @@ void Visualizer::paintMesh()
     glBindVertexArray(0);
 }
 
+void Visualizer::paintInterpolatedMesh() {
+    glClearColor(0.0f, 0.0f, 0.5451f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+
+   
+    //print out 2 texcord values per line in qdebug
+    /*
+    for (int i = 0; i < texcoords.size(); i += 2) {
+		qDebug() << texcoords[i] << " " << texcoords[i + 1];
+	}*/
+    
+    // For each face, draw the triangle with a different color
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glFinish();
+
+
+    qDebug() << "1";
+    // Set the texture unit in the shader program
+    timeShaderProgram.bind();
+    timeTexture->bind(1);
+    timeShaderProgram.setUniformValue("tex", 1);
+
+    buildmvpMatrix();
+    timeShaderProgram.setUniformValue("mvpMatrix", mvpMatrix);
+    qDebug() << "2";
+    glDrawElements(GL_TRIANGLES, interpolatedMesh.indices.size(), GL_UNSIGNED_INT, nullptr);
+
+    glFinish();
+    qDebug() << "3";
+    timeShaderProgram.release();
+    timeTexture->release();
+    glBindVertexArray(0);
+
+}
+
 /*
 *   Function: paint the OpenGL scene, including mesh, pick mesh, constraints etc.
 *   Return: no return values
@@ -345,12 +509,18 @@ void Visualizer::paintGL()
 
     if (objectLoaded) {
         // Reset the chosen vertex so that it is not added to the constraints twice
-        chosenVertex = -1;         // 0 for first in indexed face, 1 for 2nd etc..
+        
+        //WILL IT BREAK? WHO KNOWS? I DON'T
+        //chosenVertex = -1;         // 0 for first in indexed face, 1 for 2nd etc..
         paintPickFrame();
         pickFromMesh();
         glFinish();
         paintMesh();
         paintConstraints();
+    }
+    if (interpolatedLoaded) {
+        qDebug() << "drawing interpolatedmesh";
+        paintInterpolatedMesh();
     }
 }
 /*
@@ -460,6 +630,41 @@ void Visualizer::pushConstraints() {
     constraints.push_back(currentConstraint);
 }
 
+int Visualizer::getClosestConstraint() {
+    if (chosenVertex != -1) {
+        for (int i = 0; i < constraints.size(); i++) {
+            if (constraints[i]->vertices.size() > 0) {
+                for (int j = 0; j < constraints[i]->vertices.size(); j++) {
+                    if (constraints[i]->vertices[j] == chosenVertex) {
+                        return i;
+                    }
+                }
+            }
+		}
+	}
+	return -1;
+}
+
+void Visualizer::increaseConstraintValue() {
+
+    qDebug() << "getting closest constraint, chosenVertex == " << chosenVertex;
+    int closestConstraint = getClosestConstraint();
+
+    qDebug() << "Closest constraint: " << closestConstraint;
+    if (closestConstraint != -1 && constraints[closestConstraint]->timeValue < 1.0) {
+		constraints[closestConstraint]->timeValue += 0.1f;
+	}
+    qDebug() << "Constraint value: " << constraints[closestConstraint]->timeValue;
+}
+
+void Visualizer::decreaseConstraintValue() {
+	int closestConstraint = getClosestConstraint();
+    if (closestConstraint != -1 && constraints[closestConstraint]->timeValue > -1.0) {
+		constraints[closestConstraint]->timeValue -= 0.1f;
+	}
+    qDebug() << "Constraint value: " << constraints[closestConstraint]->timeValue;
+}
+
 void Visualizer::keyPressEvent(QKeyEvent* event)
 {
     qDebug() << "Key pressed: " << event->key();
@@ -471,6 +676,17 @@ void Visualizer::keyPressEvent(QKeyEvent* event)
         qDebug() << "Pushing constraints..";
         pushConstraints();
     }
+    //if '+', call increaseConstraintValue()
+    if (event->key() == Qt::Key_Plus ) {
+		qDebug() << "Increasing constraint value..";
+		increaseConstraintValue();
+	}
+    //if '-', call decreaseConstraintValue()
+    if (event->key() == Qt::Key_Minus) {
+        qDebug() << "Decreasing constraint value..";
+        decreaseConstraintValue();
+    }
+
     if (event->modifiers() == Qt::ControlModifier && event->key() == Qt::Key_Z)
     {
         qDebug() << "Ctrl+Z pressed";

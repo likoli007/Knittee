@@ -7,6 +7,8 @@ out vec4 fragColor;
 
 uniform mat4 mvpMatrix;
 uniform int selectedFace;
+//uniform int meshType; //1 for normal mesh, 2 for interpolated
+
 
 void main()
 {
@@ -16,7 +18,7 @@ void main()
         fragColor = vec4(0.0, 1.0, 0, 1.0);
     }
     else{
-        fragColor = vec4(0.5450, 0, 0, 1.0);
+        fragColor = vec4(0.5450, 0.5450, 0.5450, 1.0);
     }
 
 

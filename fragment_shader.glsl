@@ -9,6 +9,8 @@ uniform float shadingValue;
 
 void main()
 {
+    
+
     resultColor = fragColor*(shadingValue+0.4);
     
 
