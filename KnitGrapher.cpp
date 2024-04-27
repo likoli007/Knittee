@@ -6,6 +6,8 @@
 #include <QSet>
 #include <QPair>
 #include <set>
+#include <Eigen/SparseCholesky>
+
 
 KnitGrapher::KnitGrapher(QObject* parent) : QObject(parent)
 {
