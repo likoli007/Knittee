@@ -473,6 +473,7 @@ void Visualizer::paintInterpolatedMesh() {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
     glFinish();
 
+    qDebug() << "painting interpolated mesh with (verts, tris) = " << interpolatedMesh.vertices.size() << ", " << interpolatedMesh.indices.size()/3;
 
     qDebug() << "1";
     // Set the texture unit in the shader program

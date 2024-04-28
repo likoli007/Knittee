@@ -419,11 +419,15 @@ void KnitGrapher::remesh()
 			float len_ab2 = QVector3D(newVerts[tri.y] - newVerts[tri.x]).lengthSquared();
 			float len_bc2 = QVector3D(newVerts[tri.z] - newVerts[tri.y]).lengthSquared();
 			float len_ca2 = QVector3D(newVerts[tri.x] - newVerts[tri.z]).lengthSquared();
+
+			//qDebug() << "Lengths: " << len_ab2 << len_bc2 << len_ca2;
+
 			if (len_ab2 > maxEdgeLengthSquared) mark(tri.x, tri.y);
 			if (len_bc2 > maxEdgeLengthSquared) mark(tri.y, tri.z);
 			if (len_ca2 > maxEdgeLengthSquared) mark(tri.z, tri.x);
 		}
 		if (marked.empty()) {
+			qDebug() << "No marked edges found, breaking...";
 			break;
 		}
 		divide(marked, newVerts, paths, newTris);
@@ -432,10 +436,10 @@ void KnitGrapher::remesh()
 
 	//after this while cycle, have newTriangles variable equal to divides newTris...
 	//once again the degenerate triangle check in original algortihm
-	if (degenerateCheck(newTris)) {
-		qDebug() << "Degenerate triangle found after remesh! skipping...";
-		return;
-	}
+	//if (degenerateCheck(newTris)) {
+		//qDebug() << "Degenerate triangle found after remesh! skipping...";
+		//return;
+	//}
 
 
 	//extract edges from subdivided model:
@@ -702,8 +706,9 @@ void KnitGrapher::remesh()
 
 		newMesh.vertices = compressed_verts;
 		newMesh.indices = toIntArray(compressed_tris);
+		newTriangles = compressed_tris;
 
-		qDebug() << compressed_values.size() << " constrained vertices.";
+		qDebug() << compressed_values.size() << " constrained values and " << compressed_verts.size() << " vertices";
 
 
 		constrained_values = compressed_values;
@@ -712,11 +717,13 @@ void KnitGrapher::remesh()
 void KnitGrapher::interpolateValues() {
 	//assert(constraints.size() == model.vertices.size());
 	//assert(values_);
-	if (constrained_values.size() != originalMesh.vertices.size()) {
-		qDebug() << "Constraints size does not match model vertices size" << constrained_values.size() << originalMesh.vertices.size();
+	if (constrained_values.size() != newMesh.vertices.size()) {
+		qDebug() << "Constraints size does not match model vertices size" << constrained_values.size() << newMesh.vertices.size();
 		return;
 	}
 	qDebug() << "Interpolating values...";
+
+	qDebug() << newMesh.vertices.size() << " vertices and " << newMesh.indices.size() << " triangles.";
 	auto& values = constrained_values;
 
 	std::vector< uint32_t > dofs;
@@ -727,7 +734,7 @@ void KnitGrapher::interpolateValues() {
 		else dofs.emplace_back(total_dofs++);
 	}
 
-	std::cout << "Have " << total_dofs << " degrees of freedom and " << (constrained_values.size() - total_dofs) << " constraints." << std::endl;
+	qDebug() << "Have " << total_dofs << " degrees of freedom and " << (constrained_values.size() - total_dofs) << " constraints.";
 
 	if (total_dofs == constrained_values.size()) {
 		qDebug() << "Cannot interpolate from no constraints.";
@@ -735,10 +742,12 @@ void KnitGrapher::interpolateValues() {
 
 	std::map< std::pair< uint32_t, uint32_t >, float > edge_weights;
 
-	for (const auto& tri : oldTriangles) {
-		const QVector3D& a = originalMesh.vertices[tri.x];
-		const QVector3D& b = originalMesh.vertices[tri.y];
-		const QVector3D& c = originalMesh.vertices[tri.z];
+
+
+	for (const auto& tri : newTriangles) {
+		const QVector3D& a = newMesh.vertices[tri.x];
+		const QVector3D& b = newMesh.vertices[tri.y];
+		const QVector3D& c = newMesh.vertices[tri.z];
 
 		float weight_ab = QVector3D::dotProduct(c - a, b - a) / QVector3D::crossProduct(c - a, b - a).length();
 		float weight_bc = QVector3D::dotProduct(a - b, c - b) / QVector3D::crossProduct(a - b, c - b).length();
@@ -750,7 +759,7 @@ void KnitGrapher::interpolateValues() {
 	}
 
 	//turn edge weights vector into adjacency lists:
-	std::vector< std::vector< std::pair< uint32_t, float > > > adj(originalMesh.vertices.size());
+	std::vector< std::vector< std::pair< uint32_t, float > > > adj(newMesh.vertices.size());
 	for (const auto& ew : edge_weights) {
 		adj[ew.first.first].emplace_back(ew.first.second, ew.second);
 		adj[ew.first.second].emplace_back(ew.first.first, ew.second);
@@ -758,7 +767,7 @@ void KnitGrapher::interpolateValues() {
 
 
 	std::vector< Eigen::Triplet< double > > coefficients;
-	coefficients.reserve(originalMesh.indices.size() * 3); //more than is needed
+	coefficients.reserve(newMesh.indices.size() * 3); //more than is needed
 	Eigen::VectorXd rhs(total_dofs);
 
 	for (uint32_t i = 0; i < dofs.size(); ++i) {
@@ -862,8 +871,8 @@ void KnitGrapher::constructKnitGraph(std::vector<Constraint*> constraints)
 
 	stitchWidth = 3.66f;
 	stitchHeight = 1.73f;
-	modelUnitLength = 1.0f;
-	this->constraints[2]->timeValue = 0.5f;
+	modelUnitLength = 10.0f;
+	//this->constraints[2]->timeValue = 0.5f;
 
 	generateTriangles();
 	remesh();
