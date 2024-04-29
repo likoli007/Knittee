@@ -5,6 +5,15 @@
 //#include "myQVectors.h"
 
 #include <glm/glm.hpp>
+#include <QVector3D>
+#include "Stitch.h"
+#include "RowColGraph.h"
+#include "EmbeddedVertex.h"
+//#include "Constraint.h"
+#include "EmbeddedPlanarMap.h"
+#include "RowColGraph.h"
+
+
 
 /*
 * This class will be used to construct the KnitGraph from the parameters given by the user
@@ -32,6 +41,34 @@ private:
 	std::vector<glm::uvec3> newTriangles;
 
 
+	//////////////////////class member variables used in peeling///////////////////////////////
+	std::vector< std::vector< EmbeddedVertex > >activeChains;
+	std::vector< std::vector< Stitch > >activeStitches;
+	RowColGraph graph;
+	std::vector<EmbeddedVertex> sampledChain;
+
+	ObjectMesh slice;
+	std::vector< EmbeddedVertex > sliceOnModel;
+	std::vector< std::vector< uint32_t > > sliceActiveChains;
+	std::vector< std::vector< uint32_t > > sliceNextChains;
+	std::vector< bool > usedBoundary;
+
+
+
+	float getChainSampleSpacing() const {
+		return 0.25f * stitchWidth / modelUnitLength;
+	}
+
+	void sampleChain(
+		float spacing,
+		std::vector< EmbeddedVertex > const& chain //in: chain to be sampled
+		);
+
+
+	void peelSlice();
+
+	int stepCount = 0;
+
 	void quad(std::vector<glm::uvec3>& new_tris, std::vector<QVector3D>& verts, GLuint a, GLuint b, GLuint c, GLuint d);
 	void divide(QSet<QPoint>& marked,
 		std::vector<QVector3D>& verts,
@@ -47,6 +84,7 @@ private:
 	void interpolateValues();
 	void printConstrainedValues();
 
+	void findFirstActiveChains();
 
 	//so. much. passing. by. reference. need to make some variables class members.... TODO!!!
 	void unfold(GLuint depth, GLuint root, QVector2D const& flat_root,
@@ -64,6 +102,7 @@ public slots:
 	void setStitchHeight(float height);
 	void setModelUnitLength(float length);
 	void setOriginalMesh(ObjectMesh mesh);
+	void stepButtonClicked();
 signals:
 	void knitGraphInterpolated(ObjectMesh mesh, std::vector<float> values);
 

@@ -1,9 +1,12 @@
 #pragma once
+#include "EmbeddedVertex.h"
 #include <unordered_map>
 #include <unordered_set>
 #include <map>
 #include <iostream>
 #include <algorithm>
+#include <QOpenGLExtraFunctions>
+#include <GL/gl.h>
 //#include <glm/gtx/norm.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -11,8 +14,8 @@
 
 
 #include "glm/glm.hpp"
-#include "EmbeddedVertex.h"
-#include "KnitGrapher.h"
+
+
 
 #define WEIGHT_SUM  (1024U)
 struct IntegerEmbeddedVertex {
@@ -38,7 +41,7 @@ struct IntegerEmbeddedVertex {
 		return ret;
 	}
 
-	IntegerEmbeddedVertex(const EmbeddedVertex& src) : simplex(src.simplex) {
+	IntegerEmbeddedVertex(EmbeddedVertex& src) : simplex(src.simplex) {
 		assert(simplex.x != -1U);
 		assert(simplex.x < simplex.y);
 		assert((simplex.y == -1U && simplex.z == -1U) || simplex.y < simplex.z);
@@ -354,7 +357,7 @@ struct EmbeddedPlanarMap {
 		//if got to this point, no intersections:
 		edges.emplace_back(ai, bi, value);
 	}
-	void add_edge(const EmbeddedVertex& a, const EmbeddedVertex& b, VALUE const& value) {
+	void add_edge(EmbeddedVertex& a, EmbeddedVertex& b, VALUE& value) {
 		uint32_t ai = add_vertex(a);
 		uint32_t bi = add_vertex(b);
 		add_edge(ai, bi, value);

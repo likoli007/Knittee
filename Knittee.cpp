@@ -77,6 +77,7 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(toolsWidget, SIGNAL(widthChanged(float)), &knitGrapher, SLOT(setStitchWidth(float)));
     QObject::connect(toolsWidget, SIGNAL(heightChanged(float)), &knitGrapher, SLOT(setStitchHeight(float)));
     QObject::connect(toolsWidget, SIGNAL(unitChanged(float)), &knitGrapher, SLOT(setModelUnitLength(float)));
+    QObject::connect(toolsWidget, SIGNAL(stepButtonClicked()), &knitGrapher, SLOT(stepButtonClicked()));
 
 
 

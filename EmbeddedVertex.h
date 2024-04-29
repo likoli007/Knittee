@@ -1,7 +1,8 @@
 #pragma once
 #include <QVector3D>
-#include "KnitGrapher.h"
 #include <glm/glm.hpp>
+#include <QOpenGLExtraFunctions>
+#include <GL/gl.h>
 
 struct EmbeddedVertex {
 	glm::uvec3 simplex;

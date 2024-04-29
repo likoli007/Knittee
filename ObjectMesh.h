@@ -18,6 +18,6 @@ public:
     //std::vector<QVector3D> normal_indices;
     //std::vector<QVector2D> uv_indices;
 public:
-    
+    void clear();
 };
 

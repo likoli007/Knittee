@@ -51,6 +51,8 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     remeshButton = new QPushButton("Remesh", this);
 
 
+    stepButton = new QPushButton("Step", this);
+
 
     //QObject::connect(constraintsModeButton, SIGNAL(clicked()), parent, SLOT(setConstraintsMode()));
     //connect(button, &QPushButton::clicked, this, &SubClass::onButtonClicked);
@@ -60,7 +62,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     QObject::connect(heightSlider, &QSlider::sliderReleased, this, &MeshToolBar::onHeightSliderReleased);
     QObject::connect(unitSlider, &QSlider::sliderReleased, this, &MeshToolBar::onUnitSliderReleased);
     QObject::connect(remeshButton, &QPushButton::clicked, this, &MeshToolBar::onRemeshButtonClicked);
-
+    QObject::connect(stepButton, &QPushButton::clicked, this, &MeshToolBar::onStepButtonClicked);
 
     QLabel* label3 = new QLabel("Further Options...", this);
 
@@ -70,6 +72,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     mainLayout->addWidget(interpolateButton);
     mainLayout->addWidget(doneButton);
     mainLayout->addWidget(remeshButton);
+    mainLayout->addWidget(stepButton);
     mainLayout->addWidget(label3);
     setLayout(mainLayout);
     setMinimumSize(300, 100);

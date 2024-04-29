@@ -109,6 +109,8 @@
     <ClCompile Include="MeshToolBar.cpp" />
     <ClCompile Include="ObjectMesh.cpp" />
     <ClCompile Include="ObjHandler.cpp" />
+    <ClCompile Include="RowColGraph.cpp" />
+    <ClCompile Include="Stitch.cpp" />
     <ClCompile Include="Visualizer.cpp" />
     <None Include="fragment_shader.glsl" />
     <None Include="geometry_shader.glsl" />
@@ -131,6 +133,8 @@
     <QtMoc Include="MeshToolBar.h" />
     <ClInclude Include="ObjectMesh.h" />
     <ClInclude Include="ObjHandler.h" />
+    <ClInclude Include="RowColGraph.h" />
+    <ClInclude Include="Stitch.h" />
     <ClInclude Include="Visualizer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

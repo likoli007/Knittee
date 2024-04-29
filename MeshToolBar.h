@@ -20,7 +20,13 @@ signals:
     void heightChanged(float height);
     void unitChanged(float unit);
     void remeshButtonClicked();
+    void stepButtonClicked();
 private slots:
+    void onStepButtonClicked() {
+        qDebug() << "Step button clicked";
+        emit stepButtonClicked();
+    }
+    
     void onConstraintsButtonClicked() {
         qDebug() << "Constraints button clicked";
         emit constraintsButtonClicked();
@@ -67,6 +73,7 @@ private slots:
 private:
     // Will have a slew of functions that pass the user specified options to the visualizer/algorithm program
     QPushButton* constraintsModeButton;
+    QPushButton* stepButton;
     QPushButton* doneButton;
     QSlider* widthSlider;
     QSlider* heightSlider;
