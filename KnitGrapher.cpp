@@ -6,8 +6,10 @@
 #include <QSet>
 #include <QPair>
 #include <set>
+#include <deque>
 #include <Eigen/SparseCholesky>
 
+std::vector<KnitGrapher::Edge> KnitGrapher::globedges;
 
 KnitGrapher::KnitGrapher(QObject* parent) : QObject(parent)
 {
@@ -1080,7 +1082,669 @@ std::vector<glm::uvec3> KnitGrapher::getTriangles(ObjectMesh const& mesh) {
 	return result;
 
 }
-void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > const& active_chains,
+
+void KnitGrapher::extractLevelChains(
+	ObjectMesh const& model, //in: model on which to embed vertices
+	std::vector< float > const& values, //in: values at vertices
+	float const level, //in: level at which to extract chains
+	std::vector< std::vector< EmbeddedVertex > >* chains_ //chains of edges at given level
+) {
+	assert(chains_);
+	auto& chains = *chains_;
+	chains.clear();
+
+	//embed points along all edges that start below level and end at or above it:
+	std::vector<glm::uvec3> modelTriangles = getTriangles(model);
+	std::vector< QVector3D > const& verts = model.vertices;
+	std::vector< glm::uvec3 > const& tris = modelTriangles;
+
+	std::unordered_map< glm::uvec2, EmbeddedVertex > embedded_pts;
+	std::unordered_map< glm::uvec2, QVector3D > pts;
+	auto add = [&](uint32_t a, uint32_t b) {
+		assert(values[a] < level && values[b] >= level);
+		float vmix = (level - values[a]) / (values[b] - values[a]);
+		pts[glm::uvec2(a, b)] = mix(verts[a], verts[b], vmix);
+		embedded_pts[glm::uvec2(a, b)] = EmbeddedVertex::on_edge(a, b, vmix);
+		return glm::uvec2(a, b);
+	};
+	std::unordered_map< glm::uvec2, glm::uvec2 > links;
+	std::unordered_map< glm::uvec2, glm::uvec2 > back_links;
+	auto link = [&links, &back_links](glm::uvec2 f, glm::uvec2 t) {
+		auto res = links.insert(std::make_pair(f, t));
+		assert(res.second);
+		auto res2 = back_links.insert(std::make_pair(t, f));
+		assert(res2.second);
+	};
+	for (auto const& tri : tris) {
+		uint32_t a = tri.x;
+		uint32_t b = tri.y;
+		uint32_t c = tri.z;
+		//spin triangle until 'a' is the minimum distance value:
+		for (uint32_t i = 0; i < 3; ++i) {
+			if (values[a] <= values[b] && values[a] <= values[c]) break;
+			uint32_t t = a; a = b; b = c; c = t;
+		}
+		//NOTE: we treat level as "level + epsilon"
+		if (values[a] >= level) continue; //all above border
+		assert(values[a] < level);
+		//NOTE: if values increase along +y, chains should be oriented in the +x direction
+		//assuming ccw oriented triangles, this means:
+
+		if (values[b] >= level && values[c] >= level) {
+			//edge is from ca to ab
+			link(add(a, c), add(a, b));
+		}
+		else if (values[b] >= level && values[c] < level) {
+			//edge is from bc to ab
+			link(add(c, b), add(a, b));
+		}
+		else if (values[b] < level && values[c] >= level) {
+			//edge is from ca to bc
+			link(add(a, c), add(b, c));
+		}
+		else {
+			assert(values[b] < level && values[c] < level);
+			//all below border, nothing to do.
+		}
+	}
+
+	uint32_t found_chains = 0;
+	uint32_t found_loops = 0;
+
+	//read back path from links:
+	while (!links.empty()) {
+		std::deque< glm::uvec2 > loop;
+		loop.emplace_back(links.begin()->first);
+		loop.emplace_back(links.begin()->second);
+
+		//remove seed link:
+		links.erase(links.begin());
+		{
+			auto b = back_links.find(loop.back());
+			assert(b != back_links.end());
+			assert(b->second == loop[0]);
+			back_links.erase(b);
+		}
+
+		//extend forward:
+		while (true) {
+			auto f = links.find(loop.back());
+			if (f == links.end()) break;
+			loop.emplace_back(f->second);
+			//remove link:
+			auto b = back_links.find(loop.back());
+			assert(b != back_links.end());
+			assert(b->second == loop[loop.size() - 2]);
+			links.erase(f);
+			back_links.erase(b);
+		}
+		//extend backward:
+		while (true) {
+			auto b = back_links.find(loop[0]);
+			if (b == back_links.end()) break;
+			loop.emplace_front(b->second);
+			//remove link:
+			auto f = links.find(loop.front());
+			assert(f != links.end());
+			assert(f->second == loop[1]);
+			back_links.erase(b);
+			links.erase(f);
+		}
+
+		if (loop.front() == loop.back()) ++found_loops;
+		else ++found_chains;
+
+		chains.emplace_back();
+		chains.back().reserve(loop.size());
+		for (glm::uvec2 e : loop) {
+			auto f = embedded_pts.find(e);
+			assert(f != embedded_pts.end());
+			chains.back().emplace_back(f->second);
+		}
+	}
+
+	qDebug() << "extract_level_chains found " << found_loops << " loops and " << found_chains << " chains." ;
+
+}
+
+void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_of,
+	std::vector< std::vector< EmbeddedVertex > >& right_of,
+	ObjectMesh* clipped_,
+	std::vector< EmbeddedVertex >* clipped_vertices_,
+	std::vector< std::vector< uint32_t > >* left_of_vertices_, //out (optional): indices of vertices corresponding to left_of chains [may be some rounding]
+	std::vector< std::vector< uint32_t > >* right_of_vertices_ //out (optional): indices of vertices corresponding to right_of chains [may be some rounding]
+) {
+
+	qDebug() << "trimModel() asserts and paranoias...";
+
+	assert(clipped_);
+	auto& clipped = *clipped_;
+	clipped.clear();
+
+	assert(clipped_vertices_);
+	auto& clipped_vertices = *clipped_vertices_;
+	clipped_vertices.clear();
+
+
+	newTriangles = getTriangles(newMesh);
+	{ //PARANOIA: make sure all chains are loops or edge-to-edge:
+		std::unordered_set< glm::uvec2 > edges;
+		for (auto const& tri : newTriangles) {
+			auto do_edge = [&edges](uint32_t a, uint32_t b) {
+				if (a > b) std::swap(a, b);
+				auto ret = edges.insert(glm::uvec2(a, b));
+				if (!ret.second) edges.erase(ret.first);
+			};
+			do_edge(tri.x, tri.y);
+			do_edge(tri.y, tri.z);
+			do_edge(tri.z, tri.x);
+		}
+		std::unordered_set< uint32_t > edge_verts;
+		for (auto const& e : edges) {
+			edge_verts.insert(e.x);
+			edge_verts.insert(e.y);
+		}
+
+		auto on_edge = [&edges, &edge_verts](EmbeddedVertex const& ev) -> bool {
+			if (ev.simplex.z != -1U) {
+				return false;
+			}
+			else if (ev.simplex.y != -1U) {
+				return edges.count(glm::uvec2(ev.simplex.x, ev.simplex.y)) != 0;
+			}
+			else {
+				return edge_verts.count(ev.simplex.x) != 0;
+			}
+		};
+
+		for (auto const& chain : left_of) {
+			assert(chain.size() >= 2);
+			if (chain[0] == chain.back()) continue;
+			assert(on_edge(chain[0]));
+			assert(on_edge(chain.back()));
+		}
+
+		for (auto const& chain : right_of) {
+			assert(chain.size() >= 2);
+			if (chain[0] == chain.back()) continue;
+			assert(on_edge(chain[0]));
+			assert(on_edge(chain.back()));
+		}
+	}
+
+	qDebug() << "embedding chains using planar map...";
+
+	globedges.clear(); //global list used for edge tracking in epm; awkward but should work.
+	EmbeddedPlanarMap< Value, Value::Reverse, Value::Combine, Value::Split > epm;
+	std::unordered_set< glm::uvec2 > empty_edges; //when it's the same vertex after rounding
+	uint32_t total_chain_edges = 0;
+	uint32_t fresh_id = 0;
+	for (auto & chain : left_of) {
+		uint32_t prev = epm.add_vertex(chain[0]);
+		uint32_t prev_id = fresh_id++;
+		for (uint32_t i = 1; i < chain.size(); ++i) {
+			uint32_t cur = epm.add_vertex(chain[i]);
+			uint32_t cur_id = fresh_id++;
+			if (prev == cur) {
+				//std::cout << "NOTE: vertex " << chain[i - 1] << " and " << chain[i] << " (in a left_of chain) round to the same value." << std::endl; //DEBUG
+				empty_edges.insert(glm::uvec2(prev_id, cur_id));
+			}
+			Value value;
+			value.sum = 1;
+			globedges.emplace_back(Edge::Initial, prev_id, cur_id);
+			value.edge = globedges.size() - 1;
+			epm.add_edge(prev, cur, value);
+			prev = cur;
+			prev_id = cur_id;
+			++total_chain_edges;
+		}
+	}
+
+	qDebug() << "left_of chains have " << total_chain_edges << " edges.";
+
+	for (auto & chain : right_of) {
+		uint32_t prev = epm.add_vertex(chain[0]);
+		uint32_t prev_id = fresh_id++;
+		for (uint32_t i = 1; i < chain.size(); ++i) {
+			uint32_t cur = epm.add_vertex(chain[i]);
+			uint32_t cur_id = fresh_id++;
+			if (prev == cur) {
+				//std::cout << "NOTE: vertex " << chain[i - 1] << " and " << chain[i] << " (in a right_of chain) round to the same value." << std::endl; //DEBUG
+				empty_edges.insert(glm::uvec2(prev_id, cur_id));
+			}
+			Value value;
+			value.sum = (1 << 8);
+			globedges.emplace_back(Edge::Initial, cur_id, prev_id);
+			value.edge = globedges.size() - 1;
+			epm.add_edge(cur, prev, value);
+			prev = cur;
+			prev_id = cur_id;
+			++total_chain_edges;
+		}
+	}
+
+	uint32_t total_simplex_edges = 0;
+	for (const auto& edges : epm.simplex_edges) {
+		total_simplex_edges += edges.second.size();
+	}
+	qDebug() << "EPM has " << epm.vertices.size() << " vertices.";
+	qDebug() << "EPM has " << epm.simplex_vertices.size() << " simplices with vertices.";
+	qDebug() << "EPM has " << epm.simplex_edges.size() << " simplices with edges (" << total_simplex_edges << " edges from " << total_chain_edges << " chain edges).";
+
+	qDebug() << "read out left_of_vertices and right_of_vertices from edge information";
+	std::vector< std::vector< uint32_t > > left_of_epm, right_of_epm;
+	{
+		//for each original id->id edge, extract the chain of vertices that it expands to:
+		struct Source {
+			Source(uint32_t a_, uint32_t b_, uint32_t num_, uint32_t den_) : a(a_), b(b_), num(num_), den(den_) { }
+			uint32_t a, b; //a / b vertices
+			uint32_t num, den; //position along (subdivided?) edge
+		};
+		std::vector< std::vector< Source > > sources;
+		sources.reserve(globedges.size());
+		for (uint32_t e = 0; e < globedges.size(); ++e) {
+			assert(e == sources.size());
+			sources.emplace_back();
+			if (globedges[e].type == Edge::Initial) {
+				assert(globedges[e].a != globedges[e].b);
+				sources.back().emplace_back(globedges[e].a, globedges[e].b, 1, 2);
+			}
+			else if (globedges[e].type == Edge::Reverse) {
+				assert(globedges[e].a == globedges[e].b);
+				assert(globedges[e].a < e);
+				for (auto const& s : sources[globedges[e].a]) {
+					sources.back().emplace_back(s.b, s.a, s.den - s.num, s.den);
+				}
+			}
+			else if (globedges[e].type == Edge::Combine) {
+				assert(globedges[e].a < e);
+				assert(globedges[e].b < e);
+				for (auto const& s : sources[globedges[e].a]) {
+					sources.back().emplace_back(s.a, s.b, s.num, s.den);
+				}
+				for (auto const& s : sources[globedges[e].b]) {
+					sources.back().emplace_back(s.a, s.b, s.num, s.den);
+				}
+			}
+			else if (globedges[e].type == Edge::SplitFirst) {
+				assert(globedges[e].a == globedges[e].b);
+				assert(globedges[e].a < e);
+				for (auto const& s : sources[globedges[e].a]) {
+					sources.back().emplace_back(s.a, s.b, s.num * 2 - 1, s.den * 2);
+				}
+			}
+			else if (globedges[e].type == Edge::SplitSecond) {
+				assert(globedges[e].a == globedges[e].b);
+				assert(globedges[e].a < e);
+				for (auto const& s : sources[globedges[e].a]) {
+					assert(uint32_t(s.den * 2) > s.den); //make sure we're not overflowing
+					sources.back().emplace_back(s.a, s.b, s.num * 2 + 1, s.den * 2);
+				}
+			}
+			else {
+				assert(false);
+			}
+		}
+
+		struct SubEdge {
+			SubEdge(uint32_t a_, uint32_t b_, uint32_t num_, uint32_t den_) : a(a_), b(b_), num(num_), den(den_) { }
+			uint32_t a, b; //a / b vertices (epm indices)
+			uint32_t num, den; //position of center
+		};
+
+		//now iterate actual epm edges and check where they end up mapping.
+		std::unordered_map< glm::uvec2, std::vector< SubEdge > > edge_subedges; //<-- indexed by 'vertex_id' values, contains epm.vertices indices
+		for (auto const& se : epm.simplex_edges) {
+			for (auto const& ee : se.second) {
+				assert(ee.value.edge < sources.size());
+				assert(!sources[ee.value.edge].empty());
+				//copy subedge(s) corresponding to this edge to their source edges:
+				for (auto const& s : sources[ee.value.edge]) {
+					assert(s.a != s.b);
+					if (s.a < s.b) {
+						//if (s.den > 2) std::cout << s.a << "/" << s.b << " -> [" << ee.first << "-" << ee.second << "] (non-flipped)" << std::endl; //DEBUG
+						edge_subedges[glm::uvec2(s.a, s.b)].emplace_back(ee.first, ee.second, s.num, s.den);
+					}
+					else {
+						//if (s.den > 2) std::cout << s.b << "/" << s.a << " -> [" << ee.second << "-" << ee.first << "] (flipped)" << std::endl; //DEBUG
+						edge_subedges[glm::uvec2(s.b, s.a)].emplace_back(ee.second, ee.first, s.den - s.num, s.den);
+					}
+				}
+			}
+		}
+		//make sure subedge chains are logically sorted:
+		for (auto& ese : edge_subedges) {
+			std::vector< SubEdge >& subedges = ese.second;
+			assert(!subedges.empty());
+			std::stable_sort(subedges.begin(), subedges.end(), [](SubEdge const& a, SubEdge const& b) {
+				//    a.num / a.den < b.num / b.den
+				// => a.num * b.den < b.num * a.den
+				return uint64_t(a.num) * uint64_t(b.den) < uint64_t(b.num) * uint64_t(a.den);
+				});
+			/*if (subedges.size() > 1) {
+				//DEBUG:
+				for (auto &s : subedges) {
+					std::cout << " [" << s.a << "-" << s.b << "]@(" << s.num << "/" << s.den << ")";
+				}
+				std::cout << std::endl;
+			}*/
+			for (uint32_t i = 0; i + 1 < subedges.size(); ++i) {
+				assert(subedges[i].b == subedges[i + 1].a);
+			}
+		}
+
+		//okay, now read back vertex chains by querying by ID values:
+
+		uint32_t fresh_id = 0;
+		left_of_epm.reserve(left_of.size());
+		for (auto const& chain : left_of) {
+			left_of_epm.emplace_back();
+			std::vector< uint32_t >& epm_chain = left_of_epm.back();
+			uint32_t prev_id = fresh_id++;
+			for (uint32_t i = 1; i < chain.size(); ++i) {
+				uint32_t cur_id = fresh_id++;
+				auto f = edge_subedges.find(glm::uvec2(prev_id, cur_id));
+				if (empty_edges.count(glm::uvec2(prev_id, cur_id))) {
+					assert(f == edge_subedges.end());
+				}
+				else {
+					assert(f != edge_subedges.end());
+					for (auto const& se : f->second) {
+						if (epm_chain.empty()) epm_chain.emplace_back(se.a);
+						else assert(epm_chain.back() == se.a);
+						epm_chain.emplace_back(se.b);
+					}
+				}
+				prev_id = cur_id;
+			}
+			assert((chain[0] == chain.back()) == (epm_chain[0] == epm_chain.back()));
+		}
+		right_of_epm.reserve(right_of.size());
+		for (auto const& chain : right_of) {
+			right_of_epm.emplace_back();
+			std::vector< uint32_t >& epm_chain = right_of_epm.back();
+			uint32_t prev_id = fresh_id++;
+			for (uint32_t i = 1; i < chain.size(); ++i) {
+				uint32_t cur_id = fresh_id++;
+				auto f = edge_subedges.find(glm::uvec2(prev_id, cur_id));
+				if (empty_edges.count(glm::uvec2(prev_id, cur_id))) {
+					assert(f == edge_subedges.end());
+				}
+				else {
+					assert(f != edge_subedges.end());
+					for (auto const& se : f->second) {
+						if (epm_chain.empty()) epm_chain.emplace_back(se.a);
+						else assert(epm_chain.back() == se.a);
+						epm_chain.emplace_back(se.b);
+					}
+				}
+				prev_id = cur_id;
+			}
+			assert((chain[0] == chain.back()) == (epm_chain[0] == epm_chain.back()));
+		}
+	}
+	auto cleanup_chain = [&](std::vector< uint32_t >& epm_chain, int32_t value) {
+		//want chain to be loop-free --> look for loops!
+		float length_removed = 0.0f;
+		uint32_t verts_removed = 0;
+
+		//useful:
+		auto remove_from_epm = [&epm_chain, &epm, value](uint32_t first, uint32_t last) {
+			assert(first <= last);
+			assert(last < epm_chain.size());
+			//remove value of all segments [first,last] from planar map:
+			for (uint32_t i = first; i + 1 <= last; ++i) {
+				auto& a = epm.vertices[epm_chain[i]];
+				auto& b = epm.vertices[epm_chain[i + 1]];
+				glm::uvec3 common = IntegerEmbeddedVertex::common_simplex(a.simplex, b.simplex);
+				auto f = epm.simplex_edges.find(common);
+				assert(f != epm.simplex_edges.end());
+				bool found = false;
+				for (auto& e : f->second) {
+					if (e.first == epm_chain[i] && e.second == epm_chain[i + 1]) {
+						e.value.sum -= value;
+						found = true;
+						break;
+					}
+					else if (e.second == epm_chain[i] && e.first == epm_chain[i + 1]) {
+						e.value.sum += value;
+						found = true;
+						break;
+					}
+				}
+				assert(found);
+			}
+		};
+
+		float initial_length = std::numeric_limits< float >::quiet_NaN();
+
+		bool again = true;
+		while (again) {
+			again = false;
+
+			std::vector< float > lengths;
+			lengths.reserve(epm_chain.size());
+			lengths.emplace_back(0.0f);
+			for (uint32_t i = 1; i < epm_chain.size(); ++i) {
+				QVector3D a = epm.vertices[epm_chain[i - 1]].interpolate(newMesh.vertices);
+				QVector3D b = epm.vertices[epm_chain[i]].interpolate(newMesh.vertices);
+				lengths.emplace_back(lengths.back() + (b - a).length());
+			}
+			if (!(initial_length == initial_length)) initial_length = lengths.back();
+
+			std::unordered_map< uint32_t, uint32_t > visited;
+			visited.reserve(epm.vertices.size());
+
+			uint32_t first_i = (epm_chain[0] == epm_chain.back() ? 1 : 0);
+			for (uint32_t i = first_i; i < epm_chain.size(); ++i) {
+				auto ret = visited.insert(std::make_pair(epm_chain[i], i));
+				if (ret.second) continue;
+
+				uint32_t first = ret.first->second;
+				uint32_t last = i;
+				assert(first < last);
+				assert(epm_chain[first] == epm_chain[last]);
+
+				float length = lengths[last] - lengths[first];
+				float length_outer = (lengths[first] - lengths[0]) + (lengths.back() - lengths[last]);
+
+
+				if (epm_chain[0] == epm_chain.back() && length_outer < length) {
+					//remove the 'outer' loop -- (last,back] + [0,first)
+					verts_removed += first + (epm_chain.size() - (last + 1));
+					length_removed += length_outer;
+
+					remove_from_epm(0, first);
+					remove_from_epm(last, epm_chain.size() - 1);
+					epm_chain.erase(epm_chain.begin() + last + 1, epm_chain.end());
+					epm_chain.erase(epm_chain.begin(), epm_chain.begin() + first);
+					assert(epm_chain[0] == epm_chain.back()); //preserve circularity, right?
+				}
+				else {
+					//remove the inner loop -- (first, last)
+					verts_removed += (last + 1) - (first + 1);
+					length_removed += length;
+
+					remove_from_epm(first, last);
+					epm_chain.erase(epm_chain.begin() + first + 1, epm_chain.begin() + last + 1);
+				}
+				again = true;
+				break;
+			}
+		} //while (again)
+
+		if (verts_removed) {
+			qDebug() << "Removed " << verts_removed << " vertices (that's " << length_removed << " units; " << length_removed / initial_length * 100.0 << "% of the initial length of " << initial_length << " units).";
+		}
+
+	};
+
+	qDebug() << "strating loop cleanup";
+
+	for (auto& epm_chain : left_of_epm) {
+		cleanup_chain(epm_chain, 1);
+	}
+
+	for (auto& epm_chain : right_of_epm) {
+		cleanup_chain(epm_chain, -(1 << 8));
+	}
+
+	qDebug() << "building split mesh";
+
+	//build split mesh:
+	std::vector< EmbeddedVertex > split_verts;
+	std::vector< glm::uvec3 > split_tris;
+	std::vector< uint32_t > epm_to_split;
+	epm.split_triangles(newMesh.vertices, newTriangles, &split_verts, &split_tris, &epm_to_split);
+
+
+	//transfer edge values to split mesh:
+	std::unordered_map< glm::uvec2, int32_t > edge_values;
+	for (auto const& se : epm.simplex_edges) {
+		for (auto const& ee : se.second) {
+			uint32_t a = epm_to_split[ee.first];
+			uint32_t b = epm_to_split[ee.second];
+			int32_t value = ee.value.sum;
+			auto ret = edge_values.insert(std::make_pair(glm::uvec2(a, b), value));
+			assert(ret.second);
+
+			ret = edge_values.insert(std::make_pair(glm::uvec2(b, a), -value));
+			assert(ret.second);
+		}
+	}
+
+	//tag triangles with values:
+	std::unordered_map< glm::uvec2, uint32_t > edge_to_tri;
+	edge_to_tri.reserve(split_tris.size() * 3);
+	for (auto const& tri : split_tris) {
+		uint32_t ti = &tri - &split_tris[0];
+		auto ret = edge_to_tri.insert(std::make_pair(glm::uvec2(tri.x, tri.y), ti)); assert(ret.second);
+		ret = edge_to_tri.insert(std::make_pair(glm::uvec2(tri.y, tri.z), ti)); assert(ret.second);
+		ret = edge_to_tri.insert(std::make_pair(glm::uvec2(tri.z, tri.x), ti)); assert(ret.second);
+	}
+
+	constexpr int32_t const Unvisited = std::numeric_limits< int32_t >::max();
+	std::vector< int32_t > values(split_tris.size(), Unvisited);
+
+	std::vector< bool > keep(split_tris.size(), false);
+
+	for (uint32_t seed = 0; seed < split_tris.size(); ++seed) {
+		if (values[seed] != Unvisited) continue;
+
+		std::vector< uint32_t > component;
+		component.reserve(split_tris.size());
+
+		values[seed] = (128 << 8) | (128);
+		component.emplace_back(seed);
+
+		for (uint32_t ci = 0; ci < component.size(); ++ci) {
+			uint32_t ti = component[ci];
+			uint32_t value = values[ti];
+			assert(value != Unvisited);
+			glm::uvec3 tri = split_tris[ti];
+			auto over = [&](uint32_t a, uint32_t b) {
+				auto f = edge_to_tri.find(glm::uvec2(b, a));
+				if (f == edge_to_tri.end()) return;
+				int32_t nv = value;
+				auto f2 = edge_values.find(glm::uvec2(b, a));
+				if (f2 != edge_values.end()) nv += f2->second;
+
+				if (values[f->second] == Unvisited) {
+					values[f->second] = nv;
+					component.emplace_back(f->second);
+				}
+				else {
+					assert(values[f->second] == nv);
+				}
+			};
+			over(tri.x, tri.y);
+			over(tri.y, tri.z);
+			over(tri.z, tri.x);
+		}
+
+		int32_t max_right = 128;
+		int32_t max_left = 128;
+		for (auto ti : component) {
+			int32_t right = values[ti] >> 8;
+			int32_t left = values[ti] & 0xff;
+			max_right = std::max(max_right, right);
+			max_left = std::max(max_left, left);
+		}
+
+		int32_t keep_value = (max_right << 8) | max_left;
+		for (auto ti : component) {
+			if (values[ti] == keep_value) {
+				keep[ti] = true;
+			}
+		}
+	}
+
+	std::vector< uint32_t > split_vert_to_clipped_vertex(split_verts.size(), -1U);
+	auto use_vertex = [&](uint32_t v) {
+		if (split_vert_to_clipped_vertex[v] == -1U) {
+			assert(v < split_verts.size());
+			split_vert_to_clipped_vertex[v] = clipped_vertices.size();
+			clipped_vertices.emplace_back(split_verts[v]);
+		}
+		return split_vert_to_clipped_vertex[v];
+	};
+
+	std::vector<glm::uvec3> clippedTriangles = getTriangles(clipped);
+	for (auto const& tri : split_tris) {
+		if (!keep[&tri - &split_tris[0]]) continue;
+		clippedTriangles.emplace_back(
+			use_vertex(tri.x),
+			use_vertex(tri.y),
+			use_vertex(tri.z)
+		);
+	}
+	clipped.vertices.reserve(clipped_vertices.size());
+	for (auto const& v : clipped_vertices) {
+		clipped.vertices.emplace_back(v.interpolate(newMesh.vertices));
+	}
+
+	clipped.indices = toIntArray(clippedTriangles);
+
+	qDebug() << "Trimmed model from " << newTriangles.size() << " triangles on " << newMesh.vertices.size() << " vertices to " << clippedTriangles.size() << " triangles on " << clipped.vertices.size() << " vertices.";
+	
+
+	qDebug() << "transform vertex indices for left_of and right_of vertices->clipped model";
+	auto transform_chain = [&](std::vector< uint32_t > const& epm_chain) {
+		assert(!epm_chain.empty());
+		std::vector< uint32_t > split_chain;
+		split_chain.reserve(epm_chain.size());
+		for (auto v : epm_chain) {
+			assert(v < epm_to_split.size());
+			v = epm_to_split[v];
+			assert(v != -1U);
+			assert(v < split_vert_to_clipped_vertex.size());
+			v = split_vert_to_clipped_vertex[v];
+			//assert(v != -1U); //<-- sometimes chains don't include the edge loops (like when they cross)
+			split_chain.emplace_back(v);
+		}
+		assert(!split_chain.empty());
+		assert((epm_chain[0] == epm_chain.back()) == (split_chain[0] == split_chain.back()));
+		return split_chain;
+	};
+	if (left_of_vertices_) {
+		left_of_vertices_->clear();
+		left_of_vertices_->reserve(left_of_epm.size());
+		for (auto const& chain : left_of_epm) {
+			//std::cout << "left_of[" << (&chain - &left_of_epm[0]) << "]:"; //DEBUG
+			left_of_vertices_->emplace_back(transform_chain(chain));
+		}
+	}
+	if (right_of_vertices_) {
+		right_of_vertices_->clear();
+		right_of_vertices_->reserve(right_of_epm.size());
+		for (auto const& chain : right_of_epm) {
+			//std::cout << "right_of[" << (&chain - &right_of_epm[0]) << "]:"; //DEBUG
+			right_of_vertices_->emplace_back(transform_chain(chain));
+		}
+	}
+}
+
+void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & active_chains,
 	ObjectMesh* slice_,
 	std::vector< EmbeddedVertex >* slice_on_model_,
 	std::vector< std::vector< uint32_t > >* slice_active_chains_,
@@ -1088,9 +1752,312 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > const& 
 	std::vector< bool >* used_boundary_) {
 
 	//hope to god it works now;
+	assert(slice_);
+	auto& slice = *slice_;
+	slice.clear();
+
+	assert(slice_on_model_);
+	auto& slice_on_model = *slice_on_model_;
+	slice_on_model.clear();
+
+	assert(slice_active_chains_);
+	auto& slice_active_chains = *slice_active_chains_;
+	slice_active_chains.clear();
+
+	assert(slice_next_chains_);
+	auto& slice_next_chains = *slice_next_chains_;
+	slice_next_chains.clear();
+
+	{
+		//DEBUG:
+		uint32_t loops = 0;
+		uint32_t lines = 0;
+		for (auto const& chain : active_chains) {
+			if (chain[0] == chain.back()) ++loops;
+			else ++lines;
+		}
+		qDebug() << "---- peel slice on [" << loops << " loops and " << lines << " lines] ----";
+	}
+
+	ObjectMesh clipped;
+	std::vector< EmbeddedVertex > clipped_on_model;
+	std::vector< std::vector< EmbeddedVertex > > dummy;
+
+	qDebug() << "trimming model...";
+	trimModel(active_chains, dummy, &clipped, &clipped_on_model, nullptr, nullptr);
+	qDebug() << "trimming finished!";
+
+	//This version of the code just uses the 3D distance to the curve.
+	//might have problems with models that get really close to themselves.
+
+	std::vector< float > values(clipped.vertices.size(), std::numeric_limits< float >::infinity());
+
+	auto do_seg = [&values, &clipped](QVector3D const& a, QVector3D const& b) {
+		if (a == b) return;
+		QVector3D ab = b - a;
+		float limit = QVector3D::dotProduct(ab, ab);
+		float inv_limit = 1.0f / limit;
+		for (auto const& v : clipped.vertices) {
+			float amt = QVector3D::dotProduct(v - a, ab);
+			amt = std::max(0.0f, std::min(limit, amt));
+			QVector3D pt = (amt * inv_limit) * (b - a) + a;
+			float dis2 = (v - pt).lengthSquared();
+			float& best2 = values[&v - &clipped.vertices[0]];
+			best2 = std::min(best2, dis2);
+		}
+	};
+
+	for (auto const& chain : active_chains) {
+		for (uint32_t i = 0; i + 1 < chain.size(); ++i) {
+			do_seg(chain[i].interpolate(newMesh.vertices), chain[i + 1].interpolate(newMesh.vertices));
+		}
+	}
+
+	for (auto& v : values) {
+		v = std::sqrt(v);
+	}
+
+	qDebug() << "values computed!, extracting chains...";
+	std::vector<glm::uvec3> clippedTriangles = getTriangles(clipped);
+	std::vector< std::vector< EmbeddedVertex > > next_chains;
+	{
+		float level = 2.0f * stitchHeight / modelUnitLength;
+
+		std::vector< std::vector< EmbeddedVertex > > level_chains;
+
+		extractLevelChains(clipped, values, level, &level_chains);
+
+		{ //(sort-of) hack: make all chains into loops by including portions of the boundary if needed:
+			std::unordered_map< glm::uvec2, uint32_t > next;
+			auto do_edge = [&next](uint32_t a, uint32_t b, uint32_t c) {
+				auto ret = next.insert(std::make_pair(glm::uvec2(a, b), c));
+				assert(ret.second);
+			};
+			for (auto const& tri : clippedTriangles) {
+				do_edge(tri.x, tri.y, tri.z);
+				do_edge(tri.y, tri.z, tri.x);
+				do_edge(tri.z, tri.x, tri.y);
+			}
+			struct ChainEnd {
+				ChainEnd(float along_, uint32_t chain_, bool is_start_) : along(along_), chain(chain_), is_start(is_start_) { }
+				float along;
+				uint32_t chain;
+				bool is_start;
+			};
+			std::unordered_map< glm::uvec2, std::vector< ChainEnd > > on_edge;
+			auto do_end = [&](EmbeddedVertex const& ev, uint32_t chain, bool is_start) {
+				assert(ev.simplex.x != -1U);
+				assert(ev.simplex.y != -1U);
+				assert(ev.simplex.z == -1U);
+
+				glm::uvec2 e = glm::uvec2(ev.simplex.x, ev.simplex.y);
+				float amt = ev.weights.y();
+				if (next.count(e)) {
+					e = glm::uvec2(ev.simplex.y, ev.simplex.x);
+					amt = ev.weights.x();
+				}
+
+				assert(next.count(e) + next.count(glm::uvec2(e.y, e.x)) == 1); //e should be a boundary edge
+				assert(next.count(e) == 0);
+
+				on_edge[e].emplace_back(amt, chain, is_start);
+			};
+			for (auto& chain : level_chains) {
+				if (chain[0] == chain.back()) continue; //ignore loops
+				do_end(chain[0], &chain - &level_chains[0], true);
+				do_end(chain.back(), &chain - &level_chains[0], false);
+			}
+			std::vector< uint32_t > append(level_chains.size(), -1U);
+			std::vector< bool > used_boundary(level_chains.size(), true);
+
+			//loops marked as such before connection-making:
+			for (uint32_t c = 0; c < level_chains.size(); ++c) {
+				if (level_chains[c][0] == level_chains[c].back()) {
+					append[c] = c;
+					used_boundary[c] = false;
+				}
+			}
+
+			auto chase_path = [&](glm::uvec2 begin_e, ChainEnd begin_ce) {
+				assert(!begin_ce.is_start); //start at the end of a path, chase to the start of another
+				std::vector< EmbeddedVertex > path;
+				//path.emplace_back(EmbeddedVertex::on_edge(begin_e, begin_ce.along));
+
+				ChainEnd const* end_ce = nullptr;
+
+				glm::uvec2 e = begin_e;
+				ChainEnd ce = begin_ce;
+				while (true) {
+					{ //find next point along edge, if it exists:
+						ChainEnd const* found_ce = nullptr;
+						auto f = on_edge.find(e);
+						if (f != on_edge.end()) {
+							for (auto const& nce : f->second) {
+								if (nce.along <= ce.along) continue;
+								if (found_ce == nullptr || nce.along < found_ce->along) {
+									found_ce = &nce;
+								}
+							}
+						}
+						if (found_ce) {
+							assert(found_ce->is_start);
+							end_ce = found_ce;
+							break;
+						}
+					}
+					//next point is end of edge.
+					//add vertex:
+					path.emplace_back(EmbeddedVertex::on_vertex(e.y));
+					//circulate to next edge:
+					glm::uvec2 old_e = e;
+					while (true) {
+						auto f = next.find(glm::uvec2(e.y, e.x));
+						if (f == next.end()) break;
+						e = glm::uvec2(f->second, e.y);
+					}
+					assert(e.y == old_e.y);
+					assert(e.x != old_e.x);
+					e = glm::uvec2(e.y, e.x);
+					ce.chain = -1U;
+					ce.along = 0.0f;
+				}
+				assert(end_ce);
+				assert(end_ce->is_start); //start of (another?) path.
+				path.emplace_back(level_chains[end_ce->chain][0]);
+				level_chains[begin_ce.chain].insert(level_chains[begin_ce.chain].end(), path.begin(), path.end());
+				//flag that append code should append other chain:
+				assert(append[begin_ce.chain] == -1U);
+				append[begin_ce.chain] = end_ce->chain;
+			};
+
+			for (auto const& seed_ece : on_edge) {
+				for (auto const& seed : seed_ece.second) {
+					if (!seed.is_start) {
+						chase_path(seed_ece.first, seed);
+					}
+				}
+			}
+
+			for (uint32_t c = 0; c < level_chains.size(); ++c) {
+				if (append[c] == -1U) continue; //marked for discard
+				while (append[c] != c) {
+					uint32_t a = append[c];
+					assert(a < level_chains.size());
+					assert(!level_chains[a].empty());
+					assert(level_chains[c].back() == level_chains[a][0]); //already have first vertex
+					level_chains[c].insert(level_chains[c].end(), level_chains[a].begin() + 1, level_chains[a].end());
+					append[c] = append[a];
+
+					append[a] = -1U; //mark for discard
+					level_chains[a].clear();
+				}
+			}
+			for (uint32_t c = 0; c < level_chains.size(); /* later */) {
+				if (append[c] == -1U) {
+					assert(level_chains[c].empty());
+					used_boundary[c] = used_boundary.back();
+					used_boundary.pop_back();
+					level_chains[c] = level_chains.back();
+					level_chains.pop_back();
+				}
+				else {
+					assert(!level_chains[c].empty());
+					assert(level_chains[c][0] == level_chains[c].back());
+					++c;
+				}
+			}
+
+			if (used_boundary_) *used_boundary_ = used_boundary;
+
+		}
+
+		uint32_t loops = 0;
+		uint32_t lines = 0;
+
+		next_chains.reserve(level_chains.size());
+		for (auto& chain : level_chains) {
+			//chain is embedded on 'clipped' which is embedded on 'model'; re-embed on just 'model':
+			for (auto& v : chain) {
+				glm::uvec3 simplex = clipped_on_model[v.simplex.x].simplex;
+				if (v.simplex.y != -1U) simplex = EmbeddedVertex::common_simplex(simplex, clipped_on_model[v.simplex.y].simplex);
+				if (v.simplex.z != -1U) simplex = EmbeddedVertex::common_simplex(simplex, clipped_on_model[v.simplex.z].simplex);
+				QVector3D weights = v.weights.x() * clipped_on_model[v.simplex.x].weights_on(simplex);
+				if (v.simplex.y != -1U) weights += v.weights.y() * clipped_on_model[v.simplex.y].weights_on(simplex);
+				if (v.simplex.z != -1U) weights += v.weights.z() * clipped_on_model[v.simplex.z].weights_on(simplex);
+				v.simplex = simplex;
+				v.weights = weights;
+			}
+
+			//subdivide chain and add to outputs:
+			if (chain[0] == chain.back()) ++loops;
+			else ++lines;
+			next_chains.emplace_back();
+			sampleChain(getChainSampleSpacing(),  chain, &next_chains.back());
+		}
+		qDebug() << "  extracted " << loops << " loops and " << lines << " lines.";
+	}
+	qDebug() << "starting paranoia check";
+	for (auto const& chain : active_chains) {
+		for (auto const& v : chain) {
+			assert(v.simplex.x < newMesh.vertices.size());
+			assert(v.simplex.y == -1U || v.simplex.y < newMesh.vertices.size());
+			assert(v.simplex.z == -1U || v.simplex.z < newMesh.vertices.size());
+		}
+		for (uint32_t i = 1; i < chain.size(); ++i) {
+			assert(chain[i - 1] != chain[i]);
+		}
+	}
+
+	for (auto const& chain : next_chains) {
+		for (auto const& v : chain) {
+			assert(v.simplex.x < newMesh.vertices.size());
+			assert(v.simplex.y == -1U || v.simplex.y < newMesh.vertices.size());
+			assert(v.simplex.z == -1U || v.simplex.z < newMesh.vertices.size());
+		}
+		for (uint32_t i = 1; i < chain.size(); ++i) {
+			assert(chain[i - 1] != chain[i]);
+		}
+	}
 
 
+	qDebug() << "doing second trim (otce nas ktory si na nebesiach...)";
+	trimModel(active_chains, next_chains, &slice, &slice_on_model, &slice_active_chains, &slice_next_chains);
 
+	//sometimes this can combine vertices, in which case the output chains should be trimmed:
+	uint32_t trimmed = 0;
+	for (auto& chain : slice_active_chains) {
+		for (auto v : chain) {
+			assert(v < slice.vertices.size());
+		}
+		for (uint32_t i = 1; i < chain.size(); /* later */) {
+			if (chain[i - 1] == chain[i]) {
+				chain.erase(chain.begin() + i);
+				++trimmed;
+			}
+			else {
+				++i;
+			}
+		}
+	}
+
+	for (auto& chain : slice_next_chains) {
+		for (auto v : chain) {
+			assert(v < slice.vertices.size());
+		}
+		for (uint32_t i = 1; i < chain.size(); ++i) {
+			if (chain[i - 1] == chain[i]) {
+				chain.erase(chain.begin() + i);
+				++trimmed;
+			}
+			else {
+				++i;
+			}
+		}
+	}
+
+	if (trimmed) {
+		qDebug() << "Trimmed " << trimmed << " too-close-for-epm vertices from slice chains.";
+	}
 }
 void KnitGrapher::stepButtonClicked()
 {
@@ -1116,6 +2083,7 @@ void KnitGrapher::stepButtonClicked()
 		qDebug() << "[Step 1] - slice, calling peelSlice()";
 		//peel_slice(parameters, constrained_model, active_chains, &slice, &slice_on_model, &slice_active_chains, &slice_next_chains, &slice_next_used_boundary);
 		peelSlice(active_chains, &slice, &sliceOnModel, &sliceActiveChains, &sliceNextChains, &nextUsedBoundary);
+		//emit peelSliceDone(&slice, &sliceOnModel, &sliceActiveChains, &sliceNextChains, &nextUsedBoundary);
 	}
 
 	stepCount++;

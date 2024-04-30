@@ -144,7 +144,7 @@ private:
 		);
 
 
-	void peelSlice(std::vector< std::vector< EmbeddedVertex > > const& active_chains,
+	void peelSlice(std::vector< std::vector< EmbeddedVertex > > & active_chains,
 		ObjectMesh* slice_,
 		std::vector< EmbeddedVertex >* slice_on_model_,
 		std::vector< std::vector< uint32_t > >* slice_active_chains_,
@@ -194,5 +194,10 @@ signals:
 	void firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
 		std::vector< std::vector< Stitch > >* active_stitches,
 		RowColGraph* graph);
+	void peelSliceDone(ObjectMesh* slice_,
+		std::vector< EmbeddedVertex >* slice_on_model_,
+		std::vector< std::vector< uint32_t > >* slice_active_chains_,
+		std::vector< std::vector< uint32_t > >* slice_next_chains_,
+		std::vector< bool >* used_boundary_);
 };
 
