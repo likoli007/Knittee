@@ -1,4 +1,6 @@
 #include "Visualizer.h"
+
+
 #include <QWidget>
 #include <QOpenGLWidget>
 //#include <QOpenGLFunctions>
@@ -210,7 +212,22 @@ void Visualizer::paintPickedFace(int faceID) {
     glFinish();
 }
 
+void Visualizer::firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
+    std::vector< std::vector< Stitch > >* active_stitches,
+    RowColGraph* graph) {
 
+    qDebug() << "FIRST ACTIVE CHAINS ARRIVED AT VISUALIZER";
+
+    //assign the passed pointers to class vars
+    this->activeChains = *active_chains;
+    this->activeStitches = *active_stitches;
+    this->rowColGraph = *graph;
+
+
+    firstChainsLoaded = true;
+
+
+}
 
 void Visualizer::meshInterpolated(ObjectMesh mesh, std::vector<float> values) {
     qDebug() << "visualizer loaded interpolated mesh!";
@@ -357,6 +374,11 @@ void Visualizer::paintConstraintHighlight(QVector3D start, QVector3D end, float 
     // Set up
     glLineWidth(5.0f);
 
+    buildmvpMatrix();
+
+    start = mvpMatrix.map(start);
+    end = mvpMatrix.map(end);
+
     if (r == 0.0f && b == 0.0f) {
         glColor3f(1.0f, 1.0f, 1.0f);
     }
@@ -372,6 +394,8 @@ void Visualizer::paintConstraintHighlight(QVector3D start, QVector3D end, float 
     glEnd();
 }
 
+
+
 /*
 *   Function: paints all the constraints of different constraint sets iteratively
 */
@@ -385,9 +409,8 @@ void Visualizer::paintConstraints() {
             for (int i = 0; i < c->vertices.size() - 1; i++) {
                 // Get the 2 vertices of the constraint and perform the mvp matrix transformations on them
                 QVector3D vertex1 = mesh.vertices[c->vertices[i]];
-                vertex1 = mvpMatrix.map(vertex1);
                 QVector3D vertex2 = mesh.vertices[c->vertices[i + 1]];
-                vertex2 = mvpMatrix.map(vertex2);
+                
 
                 paintConstraintHighlight(vertex1, vertex2, r, b);
             }
@@ -473,9 +496,9 @@ void Visualizer::paintInterpolatedMesh() {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
     glFinish();
 
-    qDebug() << "painting interpolated mesh with (verts, tris) = " << interpolatedMesh.vertices.size() << ", " << interpolatedMesh.indices.size()/3;
+    //qDebug() << "painting interpolated mesh with (verts, tris) = " << interpolatedMesh.vertices.size() << ", " << interpolatedMesh.indices.size()/3;
 
-    qDebug() << "1";
+   // qDebug() << "1";
     // Set the texture unit in the shader program
     timeShaderProgram.bind();
     timeTexture->bind(1);
@@ -483,15 +506,72 @@ void Visualizer::paintInterpolatedMesh() {
 
     buildmvpMatrix();
     timeShaderProgram.setUniformValue("mvpMatrix", mvpMatrix);
-    qDebug() << "2";
+    //qDebug() << "2";
     glDrawElements(GL_TRIANGLES, interpolatedMesh.indices.size(), GL_UNSIGNED_INT, nullptr);
 
     glFinish();
-    qDebug() << "3";
+   // qDebug() << "3";
     timeShaderProgram.release();
     timeTexture->release();
     glBindVertexArray(0);
 
+}
+
+void Visualizer::paintFirstActiveChains() {
+    std::vector< QVector3D > locations;
+    locations.reserve(rowColGraph.vertices.size());
+    for (auto const& v : rowColGraph.vertices) {
+        locations.emplace_back(v.at.interpolate(interpolatedMesh.vertices));
+    }
+
+    for (uint32_t vi = 0; vi < rowColGraph.vertices.size(); ++vi) {
+        auto const& v = rowColGraph.vertices[vi];
+        if (v.row_in != -1U) {
+            qDebug() << "i have row_in";
+            paintConstraintHighlight(
+                locations[vi],
+                locations[v.row_in],
+                1.0f, 1.0f
+            );
+        }
+        if (v.row_out != -1U) {
+            qDebug() << "i have row_out";
+            paintConstraintHighlight(
+                locations[vi],
+                locations[v.row_out],
+                1.0f, 1.0f
+            );
+        }
+        if (v.col_in[0] != -1U) {
+            paintConstraintHighlight(
+                locations[vi],
+                locations[v.col_in[0]],
+                1.0f, 1.0f
+            );
+        }
+        if (v.col_in[1] != -1U) {
+            paintConstraintHighlight(
+                locations[vi],
+                locations[v.col_in[1]],
+                1.0f, 1.0f
+            );
+        }
+
+        if (v.col_out[0] != -1U) {
+            paintConstraintHighlight(
+                locations[vi],
+                locations[v.col_out[0]],
+                1.0f, 1.0f
+            );
+        }
+        if (v.col_out[1] != -1U) {
+            paintConstraintHighlight(
+                locations[vi],
+                locations[v.col_out[1]],
+                1.0f, 1.0f
+            );
+        }
+    }
 }
 
 /*
@@ -522,6 +602,10 @@ void Visualizer::paintGL()
     if (interpolatedLoaded) {
         qDebug() << "drawing interpolatedmesh";
         paintInterpolatedMesh();
+    }
+    if (firstChainsLoaded) {
+        qDebug() << "drawing first active chains";
+        paintFirstActiveChains();
     }
 }
 /*

@@ -79,7 +79,7 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(toolsWidget, SIGNAL(unitChanged(float)), &knitGrapher, SLOT(setModelUnitLength(float)));
     QObject::connect(toolsWidget, SIGNAL(stepButtonClicked()), &knitGrapher, SLOT(stepButtonClicked()));
 
-
+    
 
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
@@ -102,7 +102,8 @@ Knittee::Knittee(QWidget* parent)
     visualizerLayout->addWidget(vis);
 
     QObject::connect(&knitGrapher, SIGNAL(knitGraphInterpolated(ObjectMesh, std::vector<float>)), this, SLOT(meshInterpolated(ObjectMesh, std::vector<float>)));
-
+    QObject::connect(&knitGrapher, SIGNAL(firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >*, std::vector< std::vector< Stitch > >*, RowColGraph*)), 
+        this, SLOT(firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >*, std::vector< std::vector< Stitch > >*, RowColGraph*)));
 
 
 
@@ -117,6 +118,14 @@ Knittee::Knittee(QWidget* parent)
     QWidget* centralWidget = new QWidget(this);
     centralWidget->setLayout(mainLayout);
     setCentralWidget(centralWidget);
+}
+
+void Knittee::firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
+    std::vector< std::vector< Stitch > >* active_stitches,
+    RowColGraph* graph) {
+    qDebug() << "knittee caught the firstachtivechains emit!";
+    vis->firstActiveChainsCreated(active_chains, active_stitches, graph);
+
 }
 
 void Knittee::meshInterpolated(ObjectMesh mesh, std::vector<float> values) {

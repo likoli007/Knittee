@@ -714,10 +714,30 @@ void KnitGrapher::remesh()
 		constrained_values = compressed_values;
 }
 
-void KnitGrapher::findFirstActiveChains() {
-	activeChains.clear();
-	activeStitches.clear();
+void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex > >* active_chains_,
+	std::vector< std::vector< Stitch > >* active_stitches_,
+	RowColGraph* graph_) {
+	
+	assert(active_chains_);
+	auto& active_chains = *active_chains_;
+	active_chains.clear();
 
+	assert(active_stitches_);
+	auto& active_stitches = *active_stitches_;
+	active_stitches.clear();
+
+	newTriangles = getTriangles(newMesh);
+	//PARANOIA: triangles must reference valid time values:
+	for (glm::uvec3 const& tri : newTriangles) {
+		assert(tri.x < constrained_values.size());
+		assert(tri.y < constrained_values.size());
+		assert(tri.z < constrained_values.size());
+	}
+
+
+	//find boundary loops:
+
+	//build half-edge -> other vertex map:
 	std::unordered_map< glm::uvec2, uint32_t > next_vertex;
 	{
 		auto do_edge = [&next_vertex](uint32_t a, uint32_t b, uint32_t c) {
@@ -734,6 +754,7 @@ void KnitGrapher::findFirstActiveChains() {
 		}
 	}
 
+	//extract boundary (== unpaired half-edges):
 	std::unordered_map< uint32_t, uint32_t > boundary;
 	{
 		for (const auto& ev : next_vertex) {
@@ -798,8 +819,7 @@ void KnitGrapher::findFirstActiveChains() {
 
 		//subdivide the chain to make sure there are enough samples for later per-sample computations:
 		std::vector< EmbeddedVertex > divided_chain;
-		sampleChain(getChainSampleSpacing(), embedded_chain);
-		divided_chain = sampledChain;
+		sampleChain(getChainSampleSpacing(), embedded_chain, &divided_chain);
 
 		//further subdivide and place stitches:
 		float total_length = 0.0f;
@@ -812,75 +832,83 @@ void KnitGrapher::findFirstActiveChains() {
 		float stitch_width = stitchWidth / modelUnitLength;
 		uint32_t stitches = std::max(3, int32_t(std::round(total_length / stitch_width)));
 
-		activeChains.emplace_back(divided_chain);
-		activeStitches.emplace_back();
-		activeStitches.back().reserve(stitches);
+		active_chains.emplace_back(divided_chain);
+		active_stitches.emplace_back();
+		active_stitches.back().reserve(stitches);
 		for (uint32_t s = 0; s < stitches; ++s) {
-			activeStitches.back().emplace_back((s + 0.5f) / float(stitches), Stitch::FlagLinkAny);
+			active_stitches.back().emplace_back((s + 0.5f) / float(stitches), Stitch::FlagLinkAny);
 		}
 	}
 
-	qDebug() << "Found " << activeChains.size() << " first active chains.";
+	assert(active_chains.size() == active_stitches.size());
+	std::cout << "Found " << active_chains.size() << " first active chains." << std::endl;
 
-	for (uint32_t ci = 0; ci < activeChains.size(); ++ci) {
-		auto const& chain = activeChains[ci];
+	if (graph_) {
+		for (uint32_t ci = 0; ci < active_chains.size(); ++ci) {
+			auto const& chain = active_chains[ci];
 
-		std::vector< float > lengths;
-		lengths.reserve(chain.size());
-		lengths.emplace_back(0.0f);
-		for (uint32_t i = 1; i < chain.size(); ++i) {
-			QVector3D a = chain[i - 1].interpolate(newMesh.vertices);
-			QVector3D b = chain[i].interpolate(newMesh.vertices);
-			lengths.emplace_back(lengths.back() + (b - a).length());
-		}
-		assert(lengths.size() == chain.size());
-
-		auto li = lengths.begin();
-		for (auto& s : activeStitches[ci]) {
-			float l = lengths.back() * s.t;
-
-			while (li != lengths.end() && *li <= l) ++li;
-			assert(li != lengths.begin());
-			assert(li != lengths.end());
-
-			float m = (l - *(li - 1)) / (*li - *(li - 1));
-			uint32_t i = li - lengths.begin();
-
-			assert(s.vertex == -1U);
-			s.vertex = graph.vertices.size();
-			graph.vertices.emplace_back();
-			graph.vertices.back().at = EmbeddedVertex::mix(
-				chain[i - 1], chain[i], m
-			);
-		}
-
-		uint32_t prev = (chain[0] == chain.back() ? activeStitches[ci].back().vertex : -1U);
-		for (auto& s : activeStitches[ci]) {
-			if (prev != -1U) {
-				assert(prev < graph.vertices.size());
-				assert(s.vertex < graph.vertices.size());
-				assert(graph.vertices[prev].row_out == -1U);
-				graph.vertices[prev].row_out = s.vertex;
-				assert(graph.vertices[s.vertex].row_in == -1U);
-				graph.vertices[s.vertex].row_in = prev;
+			std::vector< float > lengths;
+			lengths.reserve(chain.size());
+			lengths.emplace_back(0.0f);
+			for (uint32_t i = 1; i < chain.size(); ++i) {
+				QVector3D a = chain[i - 1].interpolate(newMesh.vertices);
+				QVector3D b = chain[i].interpolate(newMesh.vertices);
+				lengths.emplace_back(lengths.back() + (b - a).length());
 			}
-			prev = s.vertex;
+			assert(lengths.size() == chain.size());
+
+			auto li = lengths.begin();
+			for (auto& s : active_stitches[ci]) {
+				float l = lengths.back() * s.t;
+
+				while (li != lengths.end() && *li <= l) ++li;
+				assert(li != lengths.begin());
+				assert(li != lengths.end());
+
+				float m = (l - *(li - 1)) / (*li - *(li - 1));
+				uint32_t i = li - lengths.begin();
+
+				assert(s.vertex == -1U);
+				s.vertex = graph_->vertices.size();
+				graph_->vertices.emplace_back();
+				graph_->vertices.back().at = EmbeddedVertex::mix(
+					chain[i - 1], chain[i], m
+				);
+			}
+
+			uint32_t prev = (chain[0] == chain.back() ? active_stitches[ci].back().vertex : -1U);
+			for (auto& s : active_stitches[ci]) {
+				if (prev != -1U) {
+					assert(prev < graph_->vertices.size());
+					assert(s.vertex < graph_->vertices.size());
+					assert(graph_->vertices[prev].row_out == -1U);
+					graph_->vertices[prev].row_out = s.vertex;
+					assert(graph_->vertices[s.vertex].row_in == -1U);
+					graph_->vertices[s.vertex].row_in = prev;
+				}
+				prev = s.vertex;
+			}
 		}
 	}
+
 }
 QVector3D mix(const QVector3D& wa, const QVector3D& wb, float m) {
 	return wa + m * (wb - wa);
 }
 
-void KnitGrapher::sampleChain(float spacing, std::vector< EmbeddedVertex > const& chain){
-	sampledChain.clear();
+void KnitGrapher::sampleChain(float spacing,
+	std::vector< EmbeddedVertex > const& chain, //in: chain to be sampled
+	std::vector< EmbeddedVertex >* sampled_chain_){
+	
+	auto& sampled_chain = *sampled_chain_;
+	sampled_chain.clear();
 
 	//assert(sampled_flags_);
 	//auto &sampled_flags = *sampled_flags_;
 	//sampled_flags.clear();
 
 	for (uint32_t ci = 0; ci + 1 < chain.size(); ++ci) {
-		sampledChain.emplace_back(chain[ci]);
+		sampled_chain.emplace_back(chain[ci]);
 
 		QVector3D a = chain[ci].interpolate(newMesh.vertices);
 		QVector3D b = chain[ci + 1].interpolate(newMesh.vertices);
@@ -892,10 +920,10 @@ void KnitGrapher::sampleChain(float spacing, std::vector< EmbeddedVertex > const
 		int32_t insert = std::floor(length / spacing);
 		for (int32_t i = 0; i < insert; ++i) {
 			float m = float(i + 1) / float(insert + 1);
-			sampledChain.emplace_back(common, mix(wa, wb, m));
+			sampled_chain.emplace_back(common, mix(wa, wb, m));
 		}
 	}
-	sampledChain.emplace_back(chain.back());
+	sampled_chain.emplace_back(chain.back());
 }
 
 
@@ -1038,46 +1066,56 @@ bool KnitGrapher::degenerateCheck(std::vector<glm::uvec3> tris) {
 	return false;
 }
 
-void KnitGrapher::peelSlice() {
-	slice.clear();
-	sliceOnModel.clear();
-	sliceActiveChains.clear();
-	sliceNextChains.clear();
 
-	{
-		//DEBUG:
-		uint32_t loops = 0;
-		uint32_t lines = 0;
-		for (auto const& chain : activeChains) {
-			if (chain[0] == chain.back()) ++loops;
-			else ++lines;
-		}
-		qDebug() << "---- peel slice on [" << loops << " loops and " << lines << " lines] ----";
+std::vector<glm::uvec3> KnitGrapher::getTriangles(ObjectMesh const& mesh) {
+	std::vector<glm::uvec3> result;
+
+	for (int i = 0; i < mesh.indices.size(); i += 3) {
+		glm::uvec3 tri;
+		tri.x = mesh.indices[i];
+		tri.y = mesh.indices[i + 1];
+		tri.z = mesh.indices[i + 2];
+		result.push_back(tri);
 	}
-
-	ObjectMesh clipped;
-	std::vector< EmbeddedVertex > clipped_on_model;
-	
-	//ak::trimModel(model, active_chains, std::vector< std::vector< ak::EmbeddedVertex > >(), &clipped, &clipped_on_model);
-
-	//This version of the code just uses the 3D distance to the curve.
-	//might have problems with models that get really close to themselves.
-
-	std::vector< float > values(clipped.vertices.size(), std::numeric_limits< float >::infinity());
+	return result;
 
 }
+void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > const& active_chains,
+	ObjectMesh* slice_,
+	std::vector< EmbeddedVertex >* slice_on_model_,
+	std::vector< std::vector< uint32_t > >* slice_active_chains_,
+	std::vector< std::vector< uint32_t > >* slice_next_chains_,
+	std::vector< bool >* used_boundary_) {
 
+	//hope to god it works now;
+
+
+
+}
 void KnitGrapher::stepButtonClicked()
 {
 	qDebug() << "KnitGrapher received step!";
 
+
+
+
 	if (stepCount == 0) {
 		qDebug() << "[Step 0] - peel begin, calling findFirstActiveChains()";
-		findFirstActiveChains();
+		
+		//generate the 3 variables used in findFirstActiveChains()
+
+
+
+		findFirstActiveChains(&active_chains, &active_stitches, &graph);
+
+		qDebug() << "emitting the firstActiveChainsCreated signal...";
+		emit firstActiveChainsCreated(&active_chains, &active_stitches, &graph);
+
 	}
 	if (stepCount == 1) {
 		qDebug() << "[Step 1] - slice, calling peelSlice()";
-		peelSlice();
+		//peel_slice(parameters, constrained_model, active_chains, &slice, &slice_on_model, &slice_active_chains, &slice_next_chains, &slice_next_used_boundary);
+		peelSlice(active_chains, &slice, &sliceOnModel, &sliceActiveChains, &sliceNextChains, &nextUsedBoundary);
 	}
 
 	stepCount++;

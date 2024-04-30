@@ -6,7 +6,9 @@
 #include <QOpenGLFunctions>
 #include "ObjHandler.h"
 
-
+#include "EmbeddedVertex.h"
+#include "Stitch.h"
+#include "RowColGraph.h"
 
 
 struct Constraint
@@ -28,7 +30,9 @@ public:
     void setConstraints(std::vector<Constraint*>);
 public slots:
     void meshInterpolated(ObjectMesh mesh, std::vector<float> values);
-
+    void firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
+        std::vector< std::vector< Stitch > >* active_stitches,
+        RowColGraph* graph);
 protected:
     int mouseX, mouseY;
 
@@ -63,6 +67,16 @@ protected:
     QPointF wpos;
 
 
+
+    std::vector< std::vector< EmbeddedVertex > > activeChains;
+    std::vector< std::vector< Stitch > > activeStitches;
+    RowColGraph rowColGraph;
+
+
+
+
+
+
     QImage timeTexImage;
 
     std::vector<QVector3D> origins;
@@ -78,6 +92,8 @@ protected:
     bool addingConstraints = false;
     bool showConstraints = false;            //both of these values should be set from the toolbar inside Knittee
     
+
+    bool firstChainsLoaded = false;
     bool interpolatedLoaded = false;
     
     float translateX = 0.0f;
@@ -98,7 +114,7 @@ protected:
     void paintPickedFace(int);
     void paintMesh();
     void paintInterpolatedMesh();
-
+    void paintFirstActiveChains();
 
 
     void buildmvpMatrix();
