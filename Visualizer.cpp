@@ -527,7 +527,7 @@ void Visualizer::paintFirstActiveChains() {
     for (uint32_t vi = 0; vi < rowColGraph.vertices.size(); ++vi) {
         auto const& v = rowColGraph.vertices[vi];
         if (v.row_in != -1U) {
-            qDebug() << "i have row_in";
+            //qDebug() << "i have row_in";
             paintConstraintHighlight(
                 locations[vi],
                 locations[v.row_in],
@@ -535,7 +535,7 @@ void Visualizer::paintFirstActiveChains() {
             );
         }
         if (v.row_out != -1U) {
-            qDebug() << "i have row_out";
+            //qDebug() << "i have row_out";
             paintConstraintHighlight(
                 locations[vi],
                 locations[v.row_out],
@@ -600,11 +600,11 @@ void Visualizer::paintGL()
         paintConstraints();
     }
     if (interpolatedLoaded) {
-        qDebug() << "drawing interpolatedmesh";
+        //qDebug() << "drawing interpolatedmesh";
         paintInterpolatedMesh();
     }
     if (firstChainsLoaded) {
-        qDebug() << "drawing first active chains";
+        //qDebug() << "drawing first active chains";
         paintFirstActiveChains();
     }
 }

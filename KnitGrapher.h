@@ -13,7 +13,10 @@
 #include "EmbeddedPlanarMap.h"
 #include "RowColGraph.h"
 
-
+struct Link {
+	uint32_t from_chain, from_stitch;
+	uint32_t to_chain, to_stitch;
+};
 
 /*
 * This class will be used to construct the KnitGraph from the parameters given by the user
@@ -110,7 +113,7 @@ private:
 	std::vector< std::vector< uint32_t > > sliceActiveChains;
 	std::vector< std::vector< uint32_t > > sliceNextChains;
 	std::vector< bool > nextUsedBoundary;
-
+	std::vector <float> sliceTimes;
 
 
 	float getChainSampleSpacing() const {
@@ -133,6 +136,33 @@ private:
 		std::vector< EmbeddedVertex >* clipped_vertices_,
 		std::vector< std::vector< uint32_t > >* left_of_vertices_, //out (optional): indices of vertices corresponding to left_of chains [may be some rounding]
 		std::vector< std::vector< uint32_t > >* right_of_vertices_ //out (optional): indices of vertices corresponding to right_of chains [may be some rounding]
+	);
+
+
+	std::vector<std::vector< Stitch>> nextStitches;
+	std::vector<Link> links;
+
+	bool fillUnassigned(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop);
+	void flatten(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop);
+	void optimalLink(
+		float target_distance, bool do_roll,
+		std::vector< QVector3D > const& source,
+		std::vector< bool > const& source_linkone,
+		std::vector< QVector3D > const& target,
+		std::vector< bool > const& target_linkone,
+		std::vector< std::pair< uint32_t, uint32_t > >* links_);
+
+
+	void linkChains(
+		ObjectMesh const& slice, //in: slice on which the chains reside
+		std::vector< float > const& slice_times, //in: time field (times @ vertices), for slice
+		std::vector< std::vector< uint32_t > > const& active_chains, //in: current active chains (slice vertex #'s)
+		std::vector< std::vector< Stitch > > const& active_stitches, //in: current active stitches, sorted by time
+		std::vector< std::vector< uint32_t > > const& next_chains, //in: current next chains (slice vertex #'s)
+		std::vector< bool > const& next_used_boundary, //in: did next chain use boundary? (forces no discard)
+		//need this or slice_times (above) std::vector< std::vector< bool > > const &discard_segments,
+		std::vector< std::vector< Stitch > >* next_stitches, //out: next active stitches
+		std::vector< Link >* links //out: active_chains[from_chain][from_vertex] -> linked_next_chains[to_chain][to_vertex] links
 	);
 
 
