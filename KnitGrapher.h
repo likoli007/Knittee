@@ -18,6 +18,26 @@ struct Link {
 	uint32_t to_chain, to_stitch;
 };
 
+struct OnChainStitch {
+	enum On : uint8_t { OnNone, OnActive, OnNext } on;
+	uint32_t chain;
+	uint32_t stitch;
+	enum Type : uint8_t { TypeBegin, TypeStitch, TypeEnd } type = TypeStitch;
+	OnChainStitch(On on_ = OnNone, uint32_t chain_ = -1U, uint32_t stitch_ = -1U) : on(on_), chain(chain_), stitch(stitch_) { }
+
+	bool operator<(OnChainStitch const& o) const {
+		if (on != o.on) return on < o.on;
+		else if (chain != o.chain) return chain < o.chain;
+		else return stitch < o.stitch;
+	}
+	bool operator==(OnChainStitch const& o) const {
+		return on == o.on && chain == o.chain && stitch == o.stitch && type == o.type;
+	}
+	bool operator!=(OnChainStitch const& o) const {
+		return !(*this == o);
+	}
+};
+
 /*
 * This class will be used to construct the KnitGraph from the parameters given by the user
 * A lot of this code will be implemented by refering to the algorithms described by AUTOKNIT
@@ -115,11 +135,18 @@ private:
 	std::vector< bool > nextUsedBoundary;
 	std::vector <float> sliceTimes;
 
+	std::vector< std::vector< EmbeddedVertex > > nextActiveChains;
+	std::vector< std::vector< Stitch > > nextActiveStitches;
 
 	float getChainSampleSpacing() const {
 		return 0.25f * stitchWidth / modelUnitLength;
 	
 	}
+
+	float getMaxPathSampleSpacing() const {
+		return 0.02f * std::min(stitchWidth, 2.0f * stitchHeight) / modelUnitLength;
+	}
+
 	std::vector<glm::uvec3> getTriangles(ObjectMesh const& model);
 
 	void extractLevelChains(
@@ -137,6 +164,48 @@ private:
 		std::vector< std::vector< uint32_t > >* left_of_vertices_, //out (optional): indices of vertices corresponding to left_of chains [may be some rounding]
 		std::vector< std::vector< uint32_t > >* right_of_vertices_ //out (optional): indices of vertices corresponding to right_of chains [may be some rounding]
 	);
+
+	void embeddedPathSimple(
+		ObjectMesh const& model,
+		EmbeddedVertex const& source,
+		EmbeddedVertex const& target,
+		std::vector< EmbeddedVertex >* path_ //out: path; path[0] will be source and path.back() will be target
+	);
+
+	void embeddedPath(
+		ObjectMesh const& model,
+		EmbeddedVertex const& source,
+		EmbeddedVertex const& target,
+		std::vector< EmbeddedVertex >* path_ //out: path; path[0] will be source and path.back() will be target
+	);
+
+
+	void buildNextActiveChains(
+		ObjectMesh const& slice,
+		std::vector< EmbeddedVertex > const& slice_on_model, //in: vertices of slice (on model)
+		std::vector< std::vector< uint32_t > > const& active_chains,  //in: current active chains (on slice)
+		std::vector< std::vector< Stitch > > const& active_stitches, //in: current active stitches
+		std::vector< std::vector< uint32_t > > const& next_chains, //in: next chains (on slice)
+		std::vector< std::vector< Stitch > > const& next_stitches, //in: next stitches
+		std::vector< bool > const& next_used_boundary, //in: did next chain use boundary?
+		std::vector< Link > const& links_in, //in: links between active and next
+		std::vector< std::vector< EmbeddedVertex > >* next_active_chains_, //out: next active chains (on model)
+		std::vector< std::vector< Stitch > >* next_active_stitches_, //out: next active stitches
+		RowColGraph* graph_ //in/out (optional): graph to update
+	);
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 	std::vector<std::vector< Stitch>> nextStitches;
