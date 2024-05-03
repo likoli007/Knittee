@@ -105,7 +105,9 @@
   <ItemGroup>
     <ClCompile Include="EmbeddedPlanarMap.cpp" />
     <ClCompile Include="EmbeddedVertex.cpp" />
+    <ClCompile Include="FlatPoint.cpp" />
     <ClCompile Include="KnitGrapher.cpp" />
+    <ClCompile Include="LaceKnitter.cpp" />
     <ClCompile Include="Link.cpp" />
     <ClCompile Include="MeshToolBar.cpp" />
     <ClCompile Include="ObjectMesh.cpp" />
@@ -132,12 +134,14 @@
     <ClInclude Include="Face.h" />
     <QtMoc Include="KnitGrapher.h" />
     <QtMoc Include="MeshToolBar.h" />
+    <ClInclude Include="FlatPoint.h" />
+    <QtMoc Include="LaceKnitter.h" />
     <ClInclude Include="Link.h" />
     <ClInclude Include="ObjectMesh.h" />
     <ClInclude Include="ObjHandler.h" />
     <ClInclude Include="RowColGraph.h" />
     <ClInclude Include="Stitch.h" />
-    <ClInclude Include="Visualizer.h" />
+    <QtMoc Include="Visualizer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">

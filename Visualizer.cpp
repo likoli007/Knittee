@@ -36,6 +36,12 @@ Visualizer::~Visualizer()
 }
 
 
+void Visualizer::sheetChanged(std::vector<std::vector<FlatPoint>>* sheet) {
+	qDebug() << "sheet changed";
+	this->sheet = *sheet;
+	//update();
+}
+
 QColor timeColor(float time) {
     constexpr int size = 3;
     static const QColor grad[size] = {
@@ -847,6 +853,115 @@ void Visualizer::paintNextChains() {
 
 }
 
+
+
+void Visualizer::paintSheet() {
+
+    glClearColor(0.7451f, 0.7451f, 0.7451f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // Set up orthogonal projection
+
+
+    // +1 here so that loops are not on the edges
+    int sheetWidth = sheet[0].size()+1;
+    int sheetHeight = sheet.size()+1;
+
+    int portWidth = this->width();
+    int portHeight = this->height();
+    
+    int cellWidth = portWidth / sheetWidth;
+    int cellHeight = portHeight / sheetHeight;
+    // Calculate the offset to center the drawing
+    int xOffset = (portWidth - (sheetWidth - 1) * cellWidth) / 2;
+    int yOffset = (portHeight - (sheetHeight - 1) * cellHeight) / 2;
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, portWidth, 0, portHeight, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+
+
+
+    
+    //qDebug() << xOffset << yOffset;
+
+    for (int i = 0; i < sheet.size(); i++) {
+        for (int j = 0; j < sheet[i].size(); j++) {
+            // Calculate the position of the rectangle
+            int rectX = j * cellWidth + xOffset; // Left of the cell
+            int rectY = i * cellHeight + yOffset; // Top of the cell
+
+            // Draw the rectangle around the cell
+            glColor3f(0.0f, 0.0f, 0.0f); // Black color
+            glBegin(GL_LINE_LOOP);
+            glVertex2i(rectX, rectY); // Top-left corner of the cell
+            glVertex2i(rectX + cellWidth, rectY); // Top-right corner of the cell
+            glVertex2i(rectX + cellWidth, rectY + cellHeight); // Bottom-right corner of the cell
+            glVertex2i(rectX, rectY + cellHeight); // Bottom-left corner of the cell
+            glEnd();
+
+            // Calculate the position of the line
+            int lineX = j * cellWidth + xOffset; // Center of the cell horizontally
+            int lineY = i * cellHeight + yOffset + cellHeight / 6; // About 1/6th of the way up from the bottom of the cell
+            int endX = lineX + cellWidth / 4; // End of the line
+            int endY = lineY;
+        
+
+            paintYarn(lineX, lineY, endX, endY);
+           
+            lineX = endX;
+            lineY = endY;
+
+            endX = lineX + sheet[i][j].offset*cellWidth - cellWidth/8;
+            endY = i * cellHeight + yOffset + cellHeight + 2*(cellHeight / 6); // About 1/6th of the way down from the top of the cell
+
+            paintYarn(lineX, lineY, endX, endY);
+
+            lineX = endX;
+            lineY = endY;
+            endX = lineX + cellWidth / 2 + cellWidth/8;
+            endY = lineY;
+
+            paintYarn(lineX, lineY, endX, endY);
+
+
+            lineX = endX;
+            lineY = endY;
+            endX = lineX - sheet[i][j].offset * cellWidth - cellWidth / 8;
+            endY =  i * cellHeight + yOffset + cellHeight / 6;
+
+            paintYarn(lineX, lineY, endX, endY);
+
+            lineX = endX;
+            lineY = endY;
+            endX = lineX+cellWidth/2;
+            endY = lineY;
+            paintYarn(lineX, lineY, endX, endY);
+
+            glLineWidth(1.0f); // Reset line width to default
+        }
+    }
+
+}
+
+void Visualizer::paintYarn(int ax, int ay, int bx, int by) {
+
+    glColor3f(1.0f, 0.0f, 0.0f); // Red color
+    glLineWidth(5.0f); // Set line width to make it thicker
+    glBegin(GL_LINES);
+    glVertex2i(ax, ay); // Start from the left side of the rectangle
+    glVertex2i(bx, by); // End at the right side of the rectangle
+    glEnd();
+
+    // Draw the thinner line (black) on top for the outline effect
+    glColor3f(0.0f, 0.0f, 0.0f); // Black color
+    glLineWidth(10.0f); // Reset line width to default
+    glBegin(GL_LINES);
+    glVertex2i(ax, ay); // Start from the left side of the rectangle
+    glVertex2i(bx, by); // End at the right side of the rectangle
+    glEnd();
+}
+
 /*
 *   Function: paint the OpenGL scene, including mesh, pick mesh, constraints etc.
 *   Return: no return values
@@ -855,39 +970,45 @@ void Visualizer::paintNextChains() {
 */
 void Visualizer::paintGL()
 {
-    // Set up
-    buildmvpMatrix();
-    glClearColor(0.0f, 0.0f, 0.5451f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
 
-    if (showModel) {
-        // Reset the chosen vertex so that it is not added to the constraints twice
-        
-        //WILL IT BREAK? WHO KNOWS? I DON'T
-        //chosenVertex = -1;         // 0 for first in indexed face, 1 for 2nd etc..
-        paintPickFrame();
-        pickFromMesh();
-        glFinish();
-        paintMesh();
-        paintConstraints();
+    if (projectType == 0) {
+        // Set up
+        buildmvpMatrix();
+        glClearColor(0.0f, 0.0f, 0.5451f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+
+        if (showModel) {
+            // Reset the chosen vertex so that it is not added to the constraints twice
+
+            //WILL IT BREAK? WHO KNOWS? I DON'T
+            //chosenVertex = -1;         // 0 for first in indexed face, 1 for 2nd etc..
+            paintPickFrame();
+            pickFromMesh();
+            glFinish();
+            paintMesh();
+            paintConstraints();
+        }
+        if (showInterpolated) {
+            //qDebug() << "drawing interpolatedmesh";
+            paintInterpolatedMesh();
+        }
+        if (showFirstChains) {
+            //qDebug() << "drawing first active chains";
+            paintFirstActiveChains();
+        }
+        if (showSlice) {
+            paintSliceMesh();
+        }
+        if (showLinks) {
+            paintLinks();
+        }
+        if (showNextChains) {
+            paintNextChains();
+        }
     }
-    if (showInterpolated) {
-        //qDebug() << "drawing interpolatedmesh";
-        paintInterpolatedMesh();
-    }
-    if (showFirstChains) {
-        //qDebug() << "drawing first active chains";
-        paintFirstActiveChains();
-    }
-    if (showSlice) {
-        paintSliceMesh();
-    }
-    if (showLinks) {
-		paintLinks();
-	}
-    if (showNextChains) {
-        paintNextChains();
+    else {
+        paintSheet();
     }
 }
 /*
@@ -977,20 +1098,6 @@ void Visualizer::setConstraints(std::vector<Constraint*> c)
     constraints.push_back(currentConstraint);
 }
 
-void Visualizer::mousePressEvent(QMouseEvent* event)
-{
-    QPoint currentPos = event->pos();
-    // left button: rotate the model
-    if (event->button() == Qt::LeftButton) {
-        isRotating = true;
-        lastMousePos = event->pos();
-    }
-    // right button: drag and move the object around
-    if (event->button() == Qt::RightButton) {
-        isDragging = true;
-        lastMousePos = event->pos();
-    }
-}
 
 void Visualizer::pushConstraints() {
     currentConstraint = new Constraint();
@@ -1064,11 +1171,72 @@ void Visualizer::keyPressEvent(QKeyEvent* event)
     }
 }
 
+
+QPair<int, int> Visualizer::getLoopPos(int mX, int mY) {
+    QPair<int, int> res(-1, -1);
+
+    int sheetWidth = sheet[0].size() + 1;
+    int sheetHeight = sheet.size() + 1;
+
+    int portWidth = this->width();
+    int portHeight = this->height();
+
+    int cellWidth = portWidth / sheetWidth;
+    int cellHeight = portHeight / sheetHeight;
+    // Calculate the offset to center the drawing
+    int xOffset = (portWidth - (sheetWidth - 1) * cellWidth) / 2;
+    int yOffset = (portHeight - (sheetHeight - 1) * cellHeight) / 2;
+    for (int i = 0; i < sheet.size(); i++) {
+        for (int j = 0; j < sheet[i].size(); j++) {
+            int rectX = j * cellWidth + xOffset; // Left of the cell
+            int rectY = i * cellHeight + yOffset; // Top of the cell
+            int rectWidth = cellWidth;
+            int rectHeight = cellHeight;
+
+            if (mX > rectX && mX < rectX + rectWidth && mY > rectY && mY < rectY + rectHeight) {
+                qDebug() << "Mouse is in cell: " << i << ", " << j;
+                res.first = i;
+                res.second = j;
+                //chosenVertex = i * sheet[i].size() + j;
+                //qDebug() << "Chosen vertex: " << chosenVertex;
+            }
+        }
+    }
+    return res;
+}
+
+void Visualizer::mousePressEvent(QMouseEvent* event)
+{
+    QPoint currentPos = event->pos();
+    // left button: rotate the model
+    if (event->button() == Qt::LeftButton) {
+        if (projectType == 0) isRotating = true;
+        else {
+            isMovingLoop = true;
+            mouseX = event->pos().x();
+            mouseY = (height() - event->pos().y() - 1);
+            from = getLoopPos(mouseX, mouseY);
+
+        }
+        lastMousePos = event->pos();
+    }
+    // right button: drag and move the object around
+    if (event->button() == Qt::RightButton) {
+        isDragging = true;
+        lastMousePos = event->pos();
+    }
+}
+
 void Visualizer::mouseReleaseEvent(QMouseEvent* event)
 {
     // left button: rotate the model
     if (event->button() == Qt::LeftButton) {
         isRotating = false;
+        isMovingLoop = false;
+        to.first = -1;
+        to.second = -1;
+        from.first = -1;
+        from.second = -1;
     }
     // right button: drag and move the object around
     if (event->button() == Qt::RightButton) {
@@ -1087,7 +1255,17 @@ void Visualizer::mouseMoveEvent(QMouseEvent* event)
     // QToolTip::showText(event->pos(), text); 
     // this should fix it
     //QToolTip::showText(this->mapToGlobal(event->pos()), text);
+    if (isMovingLoop) {
+        mouseX = event->pos().x();
+        mouseY = (height() - event->pos().y() - 1);
+        
+        to = getLoopPos(mouseX, mouseY);
 
+        if (from.first != -1 && to.first != -1) {
+            sheet[from.first][from.second].offset = to.second - from.second;
+        }
+
+    }
 
     if (isRotating) {
         // calculate the change in mouse position between previous and current positions

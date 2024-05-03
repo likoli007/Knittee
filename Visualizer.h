@@ -10,7 +10,7 @@
 #include "Stitch.h"
 #include "RowColGraph.h"
 #include "Link.h"
-
+#include "FlatPoint.h"
 
 struct Constraint
 {
@@ -22,6 +22,7 @@ class Visualizer :
     public QOpenGLWidget,
     protected QOpenGLExtraFunctions
 {
+	Q_OBJECT
 public:
     Visualizer(QWidget* parent = nullptr);
     ~Visualizer();
@@ -31,20 +32,37 @@ public:
     void setConstraints(std::vector<Constraint*>);
     void peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > >*, std::vector< std::vector< uint32_t > >*);
     void linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*);
-    void nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*);
+    void nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex>>*);
+
+    //could be getted and setted in the future
+    int projectType = 0; //is the user operating on a 3D model (0) or a 2D sheet? (1)
+
 public slots:
     void meshInterpolated(ObjectMesh mesh, std::vector<float> values);
     void firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
         std::vector< std::vector< Stitch > >* active_stitches,
         RowColGraph* graph);
+    void sheetChanged(std::vector<std::vector<FlatPoint>>*);
+
 protected:
+    std::vector<std::vector<FlatPoint>> sheet;
+    
+    
+    void paintSheet();
+    bool isMovingLoop = false;
+    QPair<int, int> getLoopPos(int, int);
+    QPair<int, int> from, to;
+    
+    
+    
     int mouseX, mouseY;
 
-
+   
     int timerID = 0;
     void setTimer();
     void timerEvent(QTimerEvent* event);
     void stopTimer();
+
 
 
     std::vector<Constraint*> constraints;
@@ -127,7 +145,7 @@ protected:
 
 
 
-
+    void paintYarn(int x, int y, int ex, int ey);
     void paintGL();
     void paintConstraints();
     void paintPickFrame();
@@ -162,5 +180,9 @@ protected:
     void increaseConstraintValue();
     void decreaseConstraintValue();
     int getClosestConstraint();
+
+
+
+
 };
 

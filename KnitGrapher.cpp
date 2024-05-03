@@ -895,7 +895,9 @@ void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex
 
 }
 QVector3D mix(const QVector3D& wa, const QVector3D& wb, float m) {
-	return wa + m * (wb - wa);
+	//x* (1.0 - a) + y * a
+	return wa * (1.0 - m) + wb * m;
+	//return wa + m * (wb - wa);
 }
 
 void KnitGrapher::sampleChain(float spacing,
@@ -2899,6 +2901,7 @@ void KnitGrapher::linkChains(
 				else if (s + 1 == discard_after.size()) len = last_len;
 				else len = discard_after[s + 1].first - discard_after[s].first;
 				if (len * lengths.back() < MinLength) {
+					qDebug() << "wowee";
 					discard_after[s].second = false;
 				}
 			}

@@ -27,7 +27,8 @@
 #include <QTextEdit>
 
 
-
+#include "LaceKnitter.h"
+#include "FlatPoint.h"
 
 /*
 * This is the main class that will be used to create the GUI for the program
@@ -45,6 +46,8 @@ struct ProjectInfo {
     QString objectFilePath; //path of the 3D object/ 2D sheet that is used by the project
     QString projectName; //name of the project
     //TODO: more options as the program expands
+    int width; //width of the sheet
+    int height; //height of the sheet
 };
 
 class NewProjectDialog : public QDialog
@@ -145,6 +148,12 @@ private:
 
     void saveConstraints();
     void loadConstraints();
+
+    LaceKnitter laceKnitter;
+
+    void setUpNew2DProject(ProjectInfo options);
+    void start2DProject(ProjectInfo context);
+    
 
 protected:
     void KeyPressEvent(QKeyEvent* event);

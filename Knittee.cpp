@@ -109,6 +109,10 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(&knitGrapher, SIGNAL(linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*)), this, SLOT(linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*)));
     QObject::connect(&knitGrapher, SIGNAL(nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*)), this, SLOT(nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*)));
 
+
+    QObject::connect(&laceKnitter, SIGNAL(sheetChanged(std::vector<std::vector<FlatPoint>>*)), vis, SLOT(sheetChanged(std::vector<std::vector<FlatPoint>>*)));
+
+
     messageTextEdit = new QTextEdit(this);
     messageTextEdit->setReadOnly(true);
     messageTextEdit->setMinimumSize(800, 100);
@@ -211,7 +215,7 @@ void Knittee::loadProject(QString filePath) {
     QTextStream in(&file);
     QString projectName = in.readLine();
     int projectType = in.readLine().toInt();
-    file.close();
+    
     QFileInfo projFileInfo(filePath); // Get the file info for the .proj file
     QString projFolder = projFileInfo.absolutePath(); // Get the folder containing the .proj file
     QString meshFilePath;
@@ -225,7 +229,24 @@ void Knittee::loadProject(QString filePath) {
         projectInfo.projectName = projectName;
         projectInfo.type = projectType;
         projectInfo.objectFilePath = meshFilePath;
+        file.close();
         start3DProject(projectInfo);
+    }
+    else
+    {
+        int width = in.readLine().toInt();
+        int height = in.readLine().toInt();
+
+        ProjectInfo projectInfo;
+        projectInfo.projectName = projectName;
+        projectInfo.type = projectType;
+        projectInfo.width = width;
+        projectInfo.height = height;
+
+        file.close();
+        laceKnitter.setDimensions(width, height);
+        laceKnitter.loadFromFile(projFolder);
+        start2DProject(projectInfo);
     }
 
 
@@ -276,6 +297,7 @@ void Knittee::start3DProject(ProjectInfo context)
 
     loadConstraints();
 
+    vis->projectType = 0;
     vis->loadMesh(mesh);
     knitGrapher.setOriginalMesh(mesh);
 
@@ -283,6 +305,30 @@ void Knittee::start3DProject(ProjectInfo context)
     visualizerLayout->insertWidget(0, toolsWidget);
     // Handle selected options
     // context.type, context.file, etc. contain the selected values
+}
+
+
+void Knittee::start2DProject(ProjectInfo context)
+{
+    qDebug() << "starting 2D project: " << context.width << "x" << context.height;
+
+    vis->projectType = 1;
+
+    laceKnitter.setDimensions(context.width, context.height);
+    laceKnitter.loadFromFile(projectPath);
+
+    
+    
+    
+
+    visualizerLayout->removeItem(visualizerLayout->itemAt(0));
+    visualizerLayout->insertWidget(0, toolsWidget);
+
+
+
+    //vis->set2DMode(context.height, context.width);
+
+
 }
 
 void Knittee::openOptionsWindow()
@@ -379,6 +425,33 @@ void Knittee::setUpNew3DProject(ProjectInfo context)
     start3DProject(context);
 }
 
+
+
+void Knittee::setUpNew2DProject(ProjectInfo info) {
+    QString projectFolderPath = QCoreApplication::applicationDirPath() + "/Projects/" + info.projectName;
+    QDir().mkpath(projectFolderPath);
+    QFile file(projectFolderPath + "/" + info.projectName + ".knittee");
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qDebug() << "Error opening project file!";
+        return;
+    }
+    file.write(info.projectName.toUtf8());
+    file.write("\n");
+    file.write(QString::number(info.type).toUtf8());
+    file.write("\n");
+    file.write(QString::number(info.width).toUtf8());
+    file.write("\n");
+	file.write(QString::number(info.height).toUtf8());
+    file.close();
+
+    laceKnitter.createSheet(info.width, info.height);
+    laceKnitter.saveToFile(projectFolderPath);
+
+
+    projectPath = projectFolderPath;
+    start2DProject(info);
+}
+
 void Knittee::handleNewProject(ProjectInfo options)
 {
     if (options.type == 0) {
@@ -387,7 +460,8 @@ void Knittee::handleNewProject(ProjectInfo options)
         //openFile(options.filePath);
     }
     else {
-        qDebug() << "2D Sheet editing not yet implemented!";
+        qDebug() << "Setting up 2D editing project...";
+        setUpNew2DProject(options);
     }
 
     // Handle selected options
@@ -536,7 +610,9 @@ void NewProjectDialog::onConfirm()
     }
     else if (sheetRadio->isChecked()) {
         projectInfo.type = 1;
-        qDebug() << "2D not yet implemented, selected size: " << widthLineEdit->text() << "/" << heightLineEdit->text();
+        projectInfo.height = heightLineEdit->text().toInt();
+        projectInfo.width = widthLineEdit->text().toInt();
+        qDebug() << "2D project starting, selected size: " << widthLineEdit->text() << "/" << heightLineEdit->text();
     }
     close();
     emit projectConfigurationsSelected(projectInfo);
