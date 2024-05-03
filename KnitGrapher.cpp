@@ -843,7 +843,7 @@ void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex
 	}
 
 	assert(active_chains.size() == active_stitches.size());
-	std::cout << "Found " << active_chains.size() << " first active chains." << std::endl;
+	qDebug() << "Found " << active_chains.size() << " first active chains.";
 
 	if (graph_) {
 		for (uint32_t ci = 0; ci < active_chains.size(); ++ci) {
@@ -937,7 +937,7 @@ void KnitGrapher::interpolateValues() {
 		qDebug() << "Constraints size does not match model vertices size" << constrained_values.size() << newMesh.vertices.size();
 		return;
 	}
-	qDebug() << "Interpolating values...";
+
 
 	qDebug() << newMesh.vertices.size() << " vertices and " << newMesh.indices.size() << " triangles.";
 	auto& values = constrained_values;
@@ -1215,7 +1215,7 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 	std::vector< std::vector< uint32_t > >* right_of_vertices_ //out (optional): indices of vertices corresponding to right_of chains [may be some rounding]
 ) {
 
-	qDebug() << "trimModel() asserts and paranoias...";
+	
 
 	assert(clipped_);
 	auto& clipped = *clipped_;
@@ -1272,7 +1272,7 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 		}
 	}
 
-	qDebug() << "embedding chains using planar map...";
+
 
 	globedges.clear(); //global list used for edge tracking in epm; awkward but should work.
 	EmbeddedPlanarMap< Value, Value::Reverse, Value::Combine, Value::Split > epm;
@@ -1300,7 +1300,7 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 		}
 	}
 
-	qDebug() << "left_of chains have " << total_chain_edges << " edges.";
+
 
 	for (auto & chain : right_of) {
 		uint32_t prev = epm.add_vertex(chain[0]);
@@ -1331,7 +1331,6 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 	qDebug() << "EPM has " << epm.simplex_vertices.size() << " simplices with vertices.";
 	qDebug() << "EPM has " << epm.simplex_edges.size() << " simplices with edges (" << total_simplex_edges << " edges from " << total_chain_edges << " chain edges).";
 
-	qDebug() << "read out left_of_vertices and right_of_vertices from edge information";
 	std::vector< std::vector< uint32_t > > left_of_epm, right_of_epm;
 	{
 		//for each original id->id edge, extract the chain of vertices that it expands to:
@@ -1579,7 +1578,7 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 
 	};
 
-	qDebug() << "strating loop cleanup";
+
 
 	for (auto& epm_chain : left_of_epm) {
 		cleanup_chain(epm_chain, 1);
@@ -1589,7 +1588,6 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 		cleanup_chain(epm_chain, -(1 << 8));
 	}
 
-	qDebug() << "building split mesh";
 
 	//build split mesh:
 	std::vector< EmbeddedVertex > split_verts;
@@ -1708,7 +1706,7 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 	qDebug() << "Trimmed model from " << newTriangles.size() << " triangles on " << newMesh.vertices.size() << " vertices to " << clippedTriangles.size() << " triangles on " << clipped.vertices.size() << " vertices.";
 	
 
-	qDebug() << "transform vertex indices for left_of and right_of vertices->clipped model";
+
 	auto transform_chain = [&](std::vector< uint32_t > const& epm_chain) {
 		assert(!epm_chain.empty());
 		std::vector< uint32_t > split_chain;
@@ -1783,9 +1781,9 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 	std::vector< EmbeddedVertex > clipped_on_model;
 	std::vector< std::vector< EmbeddedVertex > > dummy;
 
-	qDebug() << "trimming model...";
+
 	trimModel(active_chains, dummy, &clipped, &clipped_on_model, nullptr, nullptr);
-	qDebug() << "trimming finished!";
+
 
 	//This version of the code just uses the 3D distance to the curve.
 	//might have problems with models that get really close to themselves.
@@ -1817,7 +1815,7 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 		v = std::sqrt(v);
 	}
 
-	qDebug() << "values computed!, extracting chains...";
+	
 	std::vector<glm::uvec3> clippedTriangles = getTriangles(clipped);
 	std::vector< std::vector< EmbeddedVertex > > next_chains;
 	{
@@ -1996,7 +1994,7 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 		}
 		qDebug() << "  extracted " << loops << " loops and " << lines << " lines.";
 	}
-	qDebug() << "starting paranoia check";
+
 	for (auto const& chain : active_chains) {
 		for (auto const& v : chain) {
 			assert(v.simplex.x < newMesh.vertices.size());
@@ -2020,7 +2018,7 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 	}
 
 
-	qDebug() << "doing second trim (otce nas ktory si na nebesiach...)";
+
 	trimModel(active_chains, next_chains, &slice, &slice_on_model, &slice_active_chains, &slice_next_chains);
 
 	//sometimes this can combine vertices, in which case the output chains should be trimmed:
@@ -2062,7 +2060,7 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 
 
 bool KnitGrapher::fillUnassigned(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop) {
-	qDebug() << "fillUnassigned() start";
+
 	bool have_assigned = false;
 	for (auto c : closest) {
 		if (c != -1U) {
@@ -2137,7 +2135,7 @@ bool KnitGrapher::fillUnassigned(std::vector< uint32_t >& closest, std::vector< 
 	for (auto c : closest) {
 		assert(c != -1U);
 	}
-	qDebug() << "fillUnassigned() finish!";
+
 	return true;
 }
 
@@ -2337,7 +2335,7 @@ void KnitGrapher::optimalLink(
 void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop) {
 	assert(closest.size() == weights.size());
 	if (closest.empty()) return;
-	qDebug() << "flatten start!";
+
 	//make sure that 'closest' looks like:
 	//  a a a b b b c c c
 	//   a a b b b b c c
@@ -2346,7 +2344,6 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 	//  (with the possible exception that some symbols may be skipped on the left or right)
 
 	//(a) condense closest into short list of symbols:
-	qDebug() << "condensing...";
 	std::vector< std::pair< uint32_t, float > > symbols;
 	symbols.reserve(closest.size()); //certainly no more symbols than closest
 	for (uint32_t i = 0; i < closest.size(); ++i) {
@@ -2543,7 +2540,7 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 		}
 	};
 
-	qDebug() << "queueing starting states...";
+
 	for (uint32_t s = 0; s < bit_symbols.size(); ++s) {
 		State init;
 		init.used = 0;
@@ -2572,7 +2569,7 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 	}
 	assert(finished.cost != std::numeric_limits< float >::infinity()); //found ~some~ path
 
-	qDebug() << "reading back states...";
+	
 	std::vector< State::Packed > path;
 	path.emplace_back(finished.state);
 	path.emplace_back(finished.from);
@@ -2583,7 +2580,7 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 	}
 	std::reverse(path.begin(), path.end());
 
-	qDebug() << "Starting keep loop...";
+
 	std::vector< int8_t > keep(bit_symbols.size(), -1);
 	for (uint32_t i = 1; i < path.size(); ++i) {
 		State state = State::unpack(path[i - 1]);
@@ -2636,7 +2633,7 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 	}
 	assert(kept_at_least_one);
 
-	qDebug() << "doing relabelling";
+
 	//use keep to figure out which elements of closest to re-label.
 	std::vector< bool > relabel; relabel.reserve(closest.size());
 	{
@@ -2746,7 +2743,7 @@ void KnitGrapher::linkChains(
 	std::vector< Link >* links_ //out: active_chains[from_chain][from_vertex] -> linked_next_chains[to_chain][to_vertex] links
 ) {
 
-	qDebug() << "linkChains() starting!";
+
 	assert(slice_times.size() == slice.vertices.size());
 
 	for (auto const& chain : active_chains) {
@@ -2786,7 +2783,6 @@ void KnitGrapher::linkChains(
 	auto& links = *links_;
 	links.clear();
 
-	qDebug() << "argument preparation phase complete!";
 
 	//figure out the time to trim after:
 	float active_max_time = -std::numeric_limits< float >::infinity();
@@ -2829,6 +2825,8 @@ void KnitGrapher::linkChains(
 		next_discard_after.emplace_back();
 		auto& discard_after = next_discard_after.back();
 		discard_after.emplace_back(0.0f, (slice_times[chain[0]] > active_max_time));
+		//qDebug() << (slice_times[chain[0]] > active_max_time) << slice_times[chain[0]] << active_max_time;
+		qDebug() << "discard after emplace";
 		for (uint32_t vi = 0; vi + 1 < chain.size(); ++vi) {
 			float ta = slice_times[chain[vi]];
 			float tb = slice_times[chain[vi + 1]];
@@ -2840,6 +2838,7 @@ void KnitGrapher::linkChains(
 				float m = (active_max_time - ta) / (tb - ta);
 				float l = m * (lb - la) + la;
 				discard_after.emplace_back(l / lengths.back(), (tb > active_max_time));
+				qDebug() << l / lengths.back() << (tb-0.1 > active_max_time) << tb << active_max_time;
 			}
 			else {
 				assert((ta > active_max_time) == (tb > active_max_time));
@@ -2866,6 +2865,7 @@ void KnitGrapher::linkChains(
 				else if (s + 1 == discard_after.size()) len = last_len;
 				else len = discard_after[s + 1].first - discard_after[s].first;
 				if (len * lengths.back() < MinLength) {
+					qDebug() << "les than min length!";
 					discard_after[s].second = true;
 				}
 			}
@@ -2915,7 +2915,7 @@ void KnitGrapher::linkChains(
 			}
 		}
 	}
-	qDebug() << "stitch removal complete!";
+
 
 	{ //for any next chains that touch a boundary, mark as 'accept':
 		uint32_t marked = 0;
@@ -2934,7 +2934,9 @@ void KnitGrapher::linkChains(
 	{ //if all segments are marked 'discard', then mark everything 'accept':
 		bool only_discard = true;
 		for (auto const& discard_after : next_discard_after) {
+			qDebug() << "getting d";
 			for (auto const& d : discard_after) {
+				qDebug() << d.first << d.second;
 				if (!d.second) {
 					only_discard = false;
 					break;
@@ -2956,7 +2958,7 @@ void KnitGrapher::linkChains(
 		}
 	}
 
-	qDebug() << "finding segments of active and next chains that are mutual nearest neighbors";
+
 
 	std::vector< std::vector< uint32_t > > active_closest;
 	std::vector< std::vector< uint32_t > > next_closest;
@@ -3069,7 +3071,7 @@ void KnitGrapher::linkChains(
 	}
 
 
-	qDebug() << "discarding non-mutuals...";
+
 	auto discard_nonmutual = [&]() {
 		std::vector< std::set< uint32_t > > active_refs; active_refs.reserve(active_closest.size());
 		for (auto const& ac : active_closest) {
@@ -3110,7 +3112,7 @@ void KnitGrapher::linkChains(
 	//start by removing any non-mutual links:
 	discard_nonmutual();
 
-	qDebug() << "filling discarded areas with adjacent information";
+
 	//fill discarded areas with adjacent information, and process further to make sure the result can be flattened:
 	while (true) {
 		for (auto& closest : active_closest) {
@@ -3150,7 +3152,7 @@ void KnitGrapher::linkChains(
 			break;
 		}
 	}
-	qDebug() << "[CHECKPOINT] linkChains() fill-flatten loop complete!";
+
 
 	struct BeginEnd {
 		BeginEnd(float begin_, float end_) : begin(begin_), end(end_) { }
@@ -3178,7 +3180,7 @@ void KnitGrapher::linkChains(
 
 	std::map< std::pair< uint32_t, uint32_t >, Match > matches;
 
-	qDebug() << "building parametric segments into matches";
+
 	//build parametric segments into matches:
 	for (auto& closest : active_closest) {
 		uint32_t ai = &closest - &active_closest[0];
@@ -3214,7 +3216,7 @@ void KnitGrapher::linkChains(
 		}
 	}
 
-	qDebug() << "doing stitch assignments";
+
 
 	{ //do stitch assignments:
 		//sort ranges from matches back to actives:
@@ -3270,7 +3272,7 @@ void KnitGrapher::linkChains(
 		}
 	}
 
-	qDebug() << "merging segments";
+
 	//merge segments because it's probably more convenient for balancing:
 	uint32_t active_merges = 0;
 	for (auto& anm : matches) {
@@ -3311,7 +3313,7 @@ void KnitGrapher::linkChains(
 	}
 	if (next_merges) qDebug() << "Merged " << next_merges << " next segments." ;
 
-	qDebug() << "balancing stitch assignments";
+
 	{ //balance stitch assignments for splits:
 		//sort ranges from matches back to actives: (doing again because of merging)
 		std::vector< std::vector< BeginEndStitches* > > active_segments(active_chains.size());
@@ -3505,7 +3507,7 @@ void KnitGrapher::linkChains(
 		}
 	}
 
-	qDebug() << "looking for merges/splits";
+
 	//Look for merges/splits:
 	std::vector< uint32_t > active_matches(active_chains.size(), 0);
 	std::vector< uint32_t > next_matches(next_chains.size(), 0);
@@ -3538,7 +3540,7 @@ void KnitGrapher::linkChains(
 		}
 	}
 	//allocate next stitches:
-	qDebug() << "allocating next stitches...";
+
 	next_stitches.assign(next_chains.size(), std::vector< Stitch >());
 
 	//allocate stitch counts based on segment lengths + source stitches:
@@ -3752,7 +3754,7 @@ void KnitGrapher::linkChains(
 
 		next_stitches[anm.first.second].insert(next_stitches[anm.first.second].end(), new_stitches.begin(), new_stitches.end());
 	} //end stitch allocation
-	qDebug() << "balancingnew stitch allocation";
+
 
 	{ //balance new stitch allocations for merges:
 		//sort ranges from matches back to nexts:
@@ -3924,7 +3926,7 @@ void KnitGrapher::linkChains(
 		}
 	}
 
-	qDebug() << "making stitch info...";
+
 	for (auto& stitches : next_stitches) {
 		std::stable_sort(stitches.begin(), stitches.end(), [](Stitch const& a, Stitch const& b) {
 			return a.t < b.t;
@@ -3999,7 +4001,6 @@ void KnitGrapher::linkChains(
 	std::vector< std::unordered_set< uint32_t > > all_next_claimed(next_chains.size());
 	std::vector< std::unordered_set< uint32_t > > all_active_claimed(active_chains.size());
 
-	qDebug() << "starting to connect stitches...";
 	for (auto const& anm : matches) {
 		Match const& match = anm.second;
 
@@ -4113,7 +4114,7 @@ void KnitGrapher::linkChains(
 			qDebug() << " About to connect " << active_stitch_locations.size() << " active stitches (" << active_ones << " linkones) to " << next_stitch_locations.size() << " new stitches (" << new_ones << " linkones).";
 		}
 
-		qDebug() << "building links...";
+
 		//actually build links:
 		{ //least-clever linking solution: FlagLinkOne's link 1-1, others link to keep arrays mostly in sync
 
@@ -4236,9 +4237,8 @@ void KnitGrapher::linkChains(
 			}
 		}
 	}
-	qDebug() << "links built!";
 
-	qDebug() << "doing final paranoia...";
+
 	//PARANOIA: every stitch should have been claimed
 	for (uint32_t ai = 0; ai < active_chains.size(); ++ai) {
 		assert(all_active_claimed[ai].size() == active_stitches[ai].size());
@@ -4267,7 +4267,7 @@ void KnitGrapher::linkChains(
 		}
 	}
 	qDebug() << "Marked " << marked << " of " << total << " newly created stitches as 'discard'.";
-	qDebug() << "linkChains() finished!";
+
 }
 
 
@@ -4660,7 +4660,6 @@ void KnitGrapher::buildNextActiveChains(
 	RowColGraph* graph_ //in/out (optional): graph to update
 ) {
 
-	qDebug() << "buildNextActiveChains() started!";
 	
 	for (auto const& chain : active_chains) {
 		for (auto v : chain) {
@@ -4716,7 +4715,7 @@ void KnitGrapher::buildNextActiveChains(
 		}
 
 	}
-	qDebug() << "starting initializations and paranoias done!";
+
 
 
 	//any active chain with no links out is considered inactive and discarded:
@@ -4760,7 +4759,7 @@ void KnitGrapher::buildNextActiveChains(
 			.emplace_back(l.from_chain, l.from_stitch);
 	}
 
-	qDebug() << "inactive chains discarded!";
+
 
 	//record whether the segments adjacent to every next stitch is are marked as "discard" or "keep":
 	std::vector< std::vector< std::pair< bool, bool > > > keep_adj(next_chains.size());
@@ -4879,7 +4878,7 @@ void KnitGrapher::buildNextActiveChains(
 		}
 	}
 
-	qDebug() << "discrad-keep loop finished!";
+
 
 	//need lengths to figure out where stitches are on chains:
 	//(duplicated, inelegantly, from link-chains)
@@ -4907,7 +4906,7 @@ void KnitGrapher::buildNextActiveChains(
 	std::vector< std::vector< uint32_t > > next_vertices;
 	next_vertices.reserve(next_chains.size());
 
-	qDebug() << "made lengths.. now possibly building graph...";
+
 
 	if (!graph_) {
 		//blank vertex info if no graph:
@@ -4985,7 +4984,7 @@ void KnitGrapher::buildNextActiveChains(
 	}
 
 	//build a lookup structure for stitches:
-	qDebug() << "building lookup structure for stitches...";
+
 	std::map< std::pair< OnChainStitch, OnChainStitch >, OnChainStitch > next_vertex;
 
 	//edges where middle vertex is on a next chain:
@@ -5057,7 +5056,7 @@ void KnitGrapher::buildNextActiveChains(
 			}
 		}
 	}
-	qDebug() << "building edges from active chains...";
+
 	//now edges from active chains:
 	for (uint32_t ac = 0; ac < active_chains.size(); ++ac) {
 		if (discard_active[ac]) {
@@ -5161,7 +5160,7 @@ void KnitGrapher::buildNextActiveChains(
 
 
 	//Walk through created edges array, creating chains therefrom:
-	qDebug() << "walking through created edges...";
+
 
 	std::vector< std::vector< OnChainStitch > > loops;
 	std::map< std::pair< OnChainStitch, OnChainStitch >, std::vector< OnChainStitch > > partials;
@@ -5480,7 +5479,7 @@ void KnitGrapher::buildNextActiveChains(
 			}
 		}
 	}
-	qDebug() << "buildNextActiveChains() done!";
+	
 
 }
 
@@ -5514,11 +5513,6 @@ void KnitGrapher::clearPeeling() {
 
 void KnitGrapher::stepButtonClicked()
 {
-	qDebug() << "KnitGrapher received step!";
-
-
-
-
 	if (stepCount % 4 == 0) {
 		//auto old_peel_step = stepCount;
 		//auto old_peel_action = peel_action;
@@ -5530,25 +5524,27 @@ void KnitGrapher::stepButtonClicked()
 		
 		graph = old_rowcol_graph;
 		if (stepCount == 0) {
-			qDebug() << "[Step 0] - peel begin, calling findFirstActiveChains()";
+			qDebug() << "[Step 0] - peel begin, calling findFirstActiveChains()---------------------------------------------------";
 
 			//generate the 3 variables used in findFirstActiveChains()
 			findFirstActiveChains(&active_chains, &active_stitches, &graph);
 		}
 		else {
-			qDebug() << "[Step " << stepCount << "] - repeat, moving active and next chains...";
+			qDebug() << "[Step " << stepCount << "] - repeat, moving active and next chains...--------------------------------------";
 			active_chains = old_next_active_chains;
 			active_stitches = old_next_active_stitches;
 		}
 
-		qDebug() << "emitting the firstActiveChainsCreated signal...";
+		//qDebug() << "emitting the firstActiveChainsCreated signal...";
 		emit firstActiveChainsCreated(&active_chains, &active_stitches, &graph);
 	}
 	if (stepCount % 4 == 1) {
-		qDebug() << "[Step " << stepCount << " ] - slice, calling peelSlice()";
+		qDebug() << "[Step " << stepCount << " ] - slice, calling peelSlice()-------------------------------------------------------";
 		//peel_slice(parameters, constrained_model, active_chains, &slice, &slice_on_model, &slice_active_chains, &slice_next_chains, &slice_next_used_boundary);
 		peelSlice(active_chains, &slice, &sliceOnModel, &sliceActiveChains, &sliceNextChains, &nextUsedBoundary);
 		
+
+		qDebug() << "sliceonmodel size" << sliceOnModel.size();
 		sliceTimes.clear();
 		sliceTimes.reserve(sliceOnModel.size());
 		for (auto& ev : sliceOnModel) {
@@ -5558,13 +5554,13 @@ void KnitGrapher::stepButtonClicked()
 		emit peelSliceDone(&slice, &sliceActiveChains, &sliceNextChains);
 	}
 	if (stepCount % 4 == 2) {
-		qDebug() << "[Step "<< stepCount << " ] - link, calling linkChains()";
+		qDebug() << "[Step "<< stepCount << " ] - link, calling linkChains()-------------------------------------------------------------------";
 		linkChains(slice, sliceTimes, sliceActiveChains, active_stitches, sliceNextChains, nextUsedBoundary, &nextStitches, &links);
 		emit linkChainsDone(&nextStitches, &links);
 
 	}
 	if (stepCount % 4 == 3) {
-		qDebug() << "[Step " << stepCount << " ] - build, calling buildNextActiveChains()";
+		qDebug() << "[Step " << stepCount << " ] - build, calling buildNextActiveChains()------------------------------------------------------------";
 		buildNextActiveChains(slice, sliceOnModel, sliceActiveChains, active_stitches, sliceNextChains, nextStitches, nextUsedBoundary, links, &nextActiveChains, &nextActiveStitches, &graph);
 
 		emit nextActiveChainsDone(&nextActiveChains);
