@@ -13,10 +13,7 @@
 #include "EmbeddedPlanarMap.h"
 #include "RowColGraph.h"
 
-struct Link {
-	uint32_t from_chain, from_stitch;
-	uint32_t to_chain, to_stitch;
-};
+#include "Link.h"
 
 struct OnChainStitch {
 	enum On : uint8_t { OnNone, OnActive, OnNext } on;
@@ -137,6 +134,8 @@ private:
 
 	std::vector< std::vector< EmbeddedVertex > > nextActiveChains;
 	std::vector< std::vector< Stitch > > nextActiveStitches;
+
+	void clearPeeling();
 
 	float getChainSampleSpacing() const {
 		return 0.25f * stitchWidth / modelUnitLength;
@@ -293,10 +292,8 @@ signals:
 	void firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
 		std::vector< std::vector< Stitch > >* active_stitches,
 		RowColGraph* graph);
-	void peelSliceDone(ObjectMesh* slice_,
-		std::vector< EmbeddedVertex >* slice_on_model_,
-		std::vector< std::vector< uint32_t > >* slice_active_chains_,
-		std::vector< std::vector< uint32_t > >* slice_next_chains_,
-		std::vector< bool >* used_boundary_);
+	void peelSliceDone(ObjectMesh* slice_, std::vector< std::vector< uint32_t > >* slice_active_chains_, std::vector< std::vector< uint32_t > >* slice_next_chains_);
+	void linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*);
+	void nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*);
 };
 

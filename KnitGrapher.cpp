@@ -2819,8 +2819,7 @@ void KnitGrapher::linkChains(
 	std::vector< std::vector< float > > active_lengths = make_lengths(active_chains);
 	std::vector< std::vector< float > > next_lengths = make_lengths(next_chains);
 
-	qDebug() << "make_lengths() within linkChains() complete!";
-
+	
 	std::vector< std::vector< std::pair< float, bool > > > next_discard_after;
 	next_discard_after.reserve(next_chains.size());
 	for (auto const& chain : next_chains) {
@@ -4406,6 +4405,7 @@ void KnitGrapher::embeddedPathSimple(
 
 			loc_tris.emplace_back();
 			auto r = edge_triangles.equal_range(glm::uvec2(ev.simplex));
+
 			assert(r.first != r.second);
 			for (auto ri = r.first; ri != r.second; ++ri) {
 				uint32_t ti = ri->second;
@@ -5484,6 +5484,34 @@ void KnitGrapher::buildNextActiveChains(
 
 }
 
+void KnitGrapher::clearPeeling() {
+	//peel_step = 0;
+	//peel_action = PeelBegin;
+	//stepCount = 0;
+
+	graph.clear();
+	
+	active_chains.clear();
+	active_stitches.clear();
+	
+
+	slice.clear();
+	sliceOnModel.clear();
+	sliceActiveChains.clear();
+	sliceNextChains.clear();
+	nextUsedBoundary.clear();
+	sliceTimes.clear();
+	
+
+	nextStitches.clear();
+	links.clear();
+	
+
+	nextActiveChains.clear();
+	nextActiveStitches.clear();
+	
+}
+
 void KnitGrapher::stepButtonClicked()
 {
 	qDebug() << "KnitGrapher received step!";
@@ -5491,23 +5519,33 @@ void KnitGrapher::stepButtonClicked()
 
 
 
-	if (stepCount == 0) {
-		qDebug() << "[Step 0] - peel begin, calling findFirstActiveChains()";
+	if (stepCount % 4 == 0) {
+		//auto old_peel_step = stepCount;
+		//auto old_peel_action = peel_action;
+		auto old_next_active_chains = nextActiveChains;
+		auto old_next_active_stitches = nextActiveStitches;
+		auto old_rowcol_graph = graph;
+		clearPeeling();
 		
-		//generate the 3 variables used in findFirstActiveChains()
+		
+		graph = old_rowcol_graph;
+		if (stepCount == 0) {
+			qDebug() << "[Step 0] - peel begin, calling findFirstActiveChains()";
 
-
-
-		findFirstActiveChains(&active_chains, &active_stitches, &graph);
+			//generate the 3 variables used in findFirstActiveChains()
+			findFirstActiveChains(&active_chains, &active_stitches, &graph);
+		}
+		else {
+			qDebug() << "[Step " << stepCount << "] - repeat, moving active and next chains...";
+			active_chains = old_next_active_chains;
+			active_stitches = old_next_active_stitches;
+		}
 
 		qDebug() << "emitting the firstActiveChainsCreated signal...";
-
-
 		emit firstActiveChainsCreated(&active_chains, &active_stitches, &graph);
-
 	}
-	if (stepCount == 1) {
-		qDebug() << "[Step 1] - slice, calling peelSlice()";
+	if (stepCount % 4 == 1) {
+		qDebug() << "[Step " << stepCount << " ] - slice, calling peelSlice()";
 		//peel_slice(parameters, constrained_model, active_chains, &slice, &slice_on_model, &slice_active_chains, &slice_next_chains, &slice_next_used_boundary);
 		peelSlice(active_chains, &slice, &sliceOnModel, &sliceActiveChains, &sliceNextChains, &nextUsedBoundary);
 		
@@ -5517,16 +5555,19 @@ void KnitGrapher::stepButtonClicked()
 			sliceTimes.emplace_back(ev.interpolate(constrained_values));
 		}
 		
-		//emit peelSliceDone(&slice, &sliceOnModel, &sliceActiveChains, &sliceNextChains, &nextUsedBoundary);
+		emit peelSliceDone(&slice, &sliceActiveChains, &sliceNextChains);
 	}
-	if (stepCount == 2) {
-		qDebug() << "[Step 2] - link, calling linkChains()";
+	if (stepCount % 4 == 2) {
+		qDebug() << "[Step "<< stepCount << " ] - link, calling linkChains()";
 		linkChains(slice, sliceTimes, sliceActiveChains, active_stitches, sliceNextChains, nextUsedBoundary, &nextStitches, &links);
+		emit linkChainsDone(&nextStitches, &links);
+
 	}
-	if (stepCount == 3) {
-		qDebug() << "[Step 3] - build, calling buildNextActiveChains()";
+	if (stepCount % 4 == 3) {
+		qDebug() << "[Step " << stepCount << " ] - build, calling buildNextActiveChains()";
 		buildNextActiveChains(slice, sliceOnModel, sliceActiveChains, active_stitches, sliceNextChains, nextStitches, nextUsedBoundary, links, &nextActiveChains, &nextActiveStitches, &graph);
 
+		emit nextActiveChainsDone(&nextActiveChains);
 	}
 
 	stepCount++;
@@ -5549,7 +5590,7 @@ void KnitGrapher::constructKnitGraph(std::vector<Constraint*> constraints)
 	// Step 1: create a new mesh that conforms to the constraints and stitch size given by the user
 	qDebug() << "Constraints:" << constraints.size();
 
-	this->constraints = constraints;
+	this->constraints = constraints;   
 
 	stitchWidth = 3.66f;
 	stitchHeight = 1.73f;

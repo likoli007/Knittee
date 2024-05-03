@@ -9,6 +9,7 @@
 #include "EmbeddedVertex.h"
 #include "Stitch.h"
 #include "RowColGraph.h"
+#include "Link.h"
 
 
 struct Constraint
@@ -28,6 +29,9 @@ public:
     void setConstraintsMode();
     std::vector<Constraint*> getConstraints();
     void setConstraints(std::vector<Constraint*>);
+    void peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > >*, std::vector< std::vector< uint32_t > >*);
+    void linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*);
+    void nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*);
 public slots:
     void meshInterpolated(ObjectMesh mesh, std::vector<float> values);
     void firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
@@ -36,10 +40,18 @@ public slots:
 protected:
     int mouseX, mouseY;
 
+
+    int timerID = 0;
+    void setTimer();
+    void timerEvent(QTimerEvent* event);
+    void stopTimer();
+
+
     std::vector<Constraint*> constraints;
     Constraint* currentConstraint;
 
     ObjectMesh interpolatedMesh;
+    ObjectMesh sliceMesh;
     std::vector<float> interpolatedValues;
 
     std::vector<std::array<float, 3>> colors;
@@ -71,9 +83,11 @@ protected:
     std::vector< std::vector< EmbeddedVertex > > activeChains;
     std::vector< std::vector< Stitch > > activeStitches;
     RowColGraph rowColGraph;
-
-
-
+    std::vector< std::vector< uint32_t > > sliceActiveChains;
+    std::vector< std::vector< uint32_t > > sliceNextChains;
+    std::vector< std::vector< Stitch > > nextStitches;
+    std::vector< Link > links;
+    std::vector<std::vector<EmbeddedVertex>> nextActiveChains;
 
 
 
@@ -85,17 +99,22 @@ protected:
     QVector3D rayDirection;
     bool rayDebug = false;
     bool getFace = false;
-    bool objectLoaded = false;
+   
     bool isRotating = false;
     bool isZooming = false;
     bool isDragging = false;
     bool addingConstraints = false;
+   
+    
+    bool showModel = false;
+    bool showFirstChains = false;
+    bool showInterpolated = false;
+    bool showSlice = false;
     bool showConstraints = false;            //both of these values should be set from the toolbar inside Knittee
-    
+    bool showLinks = false;
+    bool showNextChains = false;
+    bool showSliceChains = false;
 
-    bool firstChainsLoaded = false;
-    bool interpolatedLoaded = false;
-    
     float translateX = 0.0f;
     float translateY = 0.0f;
     float translateZ = -5.0f;
@@ -107,15 +126,20 @@ protected:
     void resizeGL(int w, int h);
 
 
+
+
     void paintGL();
     void paintConstraints();
     void paintPickFrame();
-    void paintConstraintHighlight(QVector3D, QVector3D, float, float);
+    void paintPath(QVector3D, QVector3D, float, float, float);
     void paintPickedFace(int);
     void paintMesh();
     void paintInterpolatedMesh();
     void paintFirstActiveChains();
-
+    void paintSliceMesh();
+    void paintSphere(QVector3D, float);
+    void paintLinks();
+    void paintNextChains();
 
     void buildmvpMatrix();
     void mousePressEvent(QMouseEvent* event);

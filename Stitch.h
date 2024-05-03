@@ -10,3 +10,4 @@ struct Stitch {
 	Flag flag; //what sort of links are allowed to this stitch (or if this stitch is just marked for removal)
 	Stitch(float t_, Flag flag_, unsigned int vertex_ = -1U) : t(t_), vertex(vertex_), flag(flag_) { }
 };
+

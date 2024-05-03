@@ -6,7 +6,8 @@
 #include "Visualizer.h"
 #include "MeshToolBar.h"
 #include "KnitGrapher.h"
-
+#include "Stitch.h"
+#include "Link.h"
 #include <QtWidgets/QMainWindow>
 #include <QDialog>
 #include <QWidget>
@@ -109,6 +110,9 @@ private slots:
     void firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
         std::vector< std::vector< Stitch > >* active_stitches,
         RowColGraph* graph);
+    void peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > > *, std::vector< std::vector< uint32_t > >*);
+    void linkChainsDone(std::vector< std::vector< Stitch > >* , std::vector< Link >* );
+    void nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*);
 private:
     int modellingType = 0; //is the user operating on a 3D model (0) or a 2D sheet? (1), perhaps could be an enum?
 
@@ -126,7 +130,7 @@ private:
     //bottom textedit for messages to user
     QTextEdit* messageTextEdit;
 
-
+    bool canSlice = false;
 
     void loadProject(QString);
     void openOptionsWindow();
@@ -141,4 +145,7 @@ private:
 
     void saveConstraints();
     void loadConstraints();
+
+protected:
+    void KeyPressEvent(QKeyEvent* event);
 };

@@ -6,6 +6,7 @@ Knittee::Knittee(QWidget* parent)
 {
 
     ui.setupUi(this);
+    setFocusPolicy(Qt::StrongFocus);
 
     auto topMenu = this->menuBar();//new QMenuBar(this);
 
@@ -15,7 +16,7 @@ Knittee::Knittee(QWidget* parent)
     auto aboutAction = new QAction("&About");   //about menu: display some basic information about the project
 
 
-
+    
 
     //populate the projectMenu
     QAction* loadAction = new QAction("&Load", projectMenu);
@@ -104,8 +105,9 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(&knitGrapher, SIGNAL(knitGraphInterpolated(ObjectMesh, std::vector<float>)), this, SLOT(meshInterpolated(ObjectMesh, std::vector<float>)));
     QObject::connect(&knitGrapher, SIGNAL(firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >*, std::vector< std::vector< Stitch > >*, RowColGraph*)), 
         this, SLOT(firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >*, std::vector< std::vector< Stitch > >*, RowColGraph*)));
-
-
+    QObject::connect(&knitGrapher, SIGNAL(peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > >*, std::vector< std::vector< uint32_t > >*)), this, SLOT(peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > > *, std::vector< std::vector< uint32_t > >*)));
+    QObject::connect(&knitGrapher, SIGNAL(linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*)), this, SLOT(linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*)));
+    QObject::connect(&knitGrapher, SIGNAL(nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*)), this, SLOT(nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*)));
 
     messageTextEdit = new QTextEdit(this);
     messageTextEdit->setReadOnly(true);
@@ -120,6 +122,21 @@ Knittee::Knittee(QWidget* parent)
     setCentralWidget(centralWidget);
 }
 
+void Knittee::nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >* active_chains) {
+	qDebug() << "knittee caught the nextactivechains emit!";
+	vis->nextActiveChainsDone(active_chains);
+}
+
+void Knittee::linkChainsDone(std::vector< std::vector< Stitch > >* next_stitches, std::vector< Link >* links) {
+    qDebug() << "knittee caught the linkchainsdone emits!";
+	vis->linkChainsDone(next_stitches, links);
+}
+
+void Knittee::peelSliceDone(ObjectMesh* slice_, std::vector< std::vector< uint32_t > >* slice_active_chains_, std::vector< std::vector< uint32_t > >* slice_next_chains_) {
+	vis->peelSliceDone(slice_, slice_active_chains_, slice_next_chains_);
+
+}
+
 void Knittee::firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
     std::vector< std::vector< Stitch > >* active_stitches,
     RowColGraph* graph) {
@@ -130,6 +147,7 @@ void Knittee::firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex 
 
 void Knittee::meshInterpolated(ObjectMesh mesh, std::vector<float> values) {
 	vis->meshInterpolated(mesh, values);
+    canSlice = true;
 }
 
 void Knittee::selectProject() {
@@ -382,6 +400,15 @@ void Knittee::setConstraintsMode()
     messageTextEdit->setText("Constraints mode enabled. Press 'C' while hovering over the mesh to add a constraint.\nOnce done, press 'ENTER' to finish");
 }
 
+
+void Knittee::KeyPressEvent(QKeyEvent* event)
+{
+    qDebug() << "Key pressesssd: " << event->key();
+    if (event->key() == Qt::Key_N) {
+        qDebug() << "pressed N";
+        knitGrapher.stepButtonClicked();
+    }
+}
 
 Knittee::~Knittee()
 {}

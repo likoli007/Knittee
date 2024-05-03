@@ -87,6 +87,9 @@ void Visualizer::generateTimeTexture() {
 */
 void Visualizer::initializeGL()
 {
+
+
+
     initializeOpenGLFunctions();
 
     glEnable(GL_DEPTH_TEST);
@@ -140,6 +143,8 @@ void Visualizer::initializeGL()
     modelMatrix.setToIdentity();
     float aspectRatio = static_cast<float>(width()) / static_cast<float>(height());
     projectionMatrix.perspective(45.0f, aspectRatio, 0.1f, 10000.0f); // fov?
+
+    setTimer();
 }
 
 /*
@@ -218,20 +223,26 @@ void Visualizer::firstActiveChainsCreated(std::vector< std::vector< EmbeddedVert
 
     qDebug() << "FIRST ACTIVE CHAINS ARRIVED AT VISUALIZER";
 
+
+
+
     //assign the passed pointers to class vars
     this->activeChains = *active_chains;
     this->activeStitches = *active_stitches;
     this->rowColGraph = *graph;
 
 
-    firstChainsLoaded = true;
-
+    showFirstChains = true;
+    showInterpolated = true;
+    showLinks = false;
+    showSlice = false;
+    showSliceChains = false;
 
 }
 
 void Visualizer::meshInterpolated(ObjectMesh mesh, std::vector<float> values) {
     qDebug() << "visualizer loaded interpolated mesh!";
-    objectLoaded = false;
+    showModel = false;
 
 
 
@@ -287,7 +298,7 @@ void Visualizer::meshInterpolated(ObjectMesh mesh, std::vector<float> values) {
     glEnableVertexAttribArray(1);
     glFinish();
 
-    interpolatedLoaded = true;
+    showInterpolated = true;
 }
 
 
@@ -370,7 +381,7 @@ void Visualizer::paintPickFrame() {
 /*
 *   Function: paint the constraint set by the user, currently a thick line running from the selected constrained vertices
 */
-void Visualizer::paintConstraintHighlight(QVector3D start, QVector3D end, float r, float b) {
+void Visualizer::paintPath(QVector3D start, QVector3D end, float r, float g, float b) {
     // Set up
     glLineWidth(5.0f);
 
@@ -379,12 +390,20 @@ void Visualizer::paintConstraintHighlight(QVector3D start, QVector3D end, float 
     start = mvpMatrix.map(start);
     end = mvpMatrix.map(end);
 
-    if (r == 0.0f && b == 0.0f) {
-        glColor3f(1.0f, 1.0f, 1.0f);
+    if (showConstraints) {
+        if (r == 0.0f && b == 0.0f) {
+            glColor3f(1.0f, 1.0f, 1.0f);
+        }
+        else {
+            glColor3f(r, g, b);
+        }
     }
     else {
-		glColor3f(r, 0.0f, b);
-	}
+        glColor3f(r, g, b);   
+    }
+    
+
+
     
 
     glBegin(GL_LINES);
@@ -412,7 +431,7 @@ void Visualizer::paintConstraints() {
                 QVector3D vertex2 = mesh.vertices[c->vertices[i + 1]];
                 
 
-                paintConstraintHighlight(vertex1, vertex2, r, b);
+                paintPath(vertex1, vertex2, r, 0.0f, b);
             }
         }
     }
@@ -528,50 +547,304 @@ void Visualizer::paintFirstActiveChains() {
         auto const& v = rowColGraph.vertices[vi];
         if (v.row_in != -1U) {
             //qDebug() << "i have row_in";
-            paintConstraintHighlight(
+            paintPath(
                 locations[vi],
                 locations[v.row_in],
-                1.0f, 1.0f
+                1.0f, 0.0f, 1.0f
             );
         }
         if (v.row_out != -1U) {
             //qDebug() << "i have row_out";
-            paintConstraintHighlight(
+            paintPath(
                 locations[vi],
                 locations[v.row_out],
-                1.0f, 1.0f
+                1.0f, 0.0f, 1.0f
             );
         }
         if (v.col_in[0] != -1U) {
-            paintConstraintHighlight(
+            paintPath(
                 locations[vi],
                 locations[v.col_in[0]],
-                1.0f, 1.0f
+                1.0f, 0.0f, 1.0f
             );
         }
         if (v.col_in[1] != -1U) {
-            paintConstraintHighlight(
+            paintPath(
                 locations[vi],
                 locations[v.col_in[1]],
-                1.0f, 1.0f
+                1.0f, 0.0f, 1.0f
             );
         }
 
         if (v.col_out[0] != -1U) {
-            paintConstraintHighlight(
+            paintPath(
                 locations[vi],
                 locations[v.col_out[0]],
-                1.0f, 1.0f
+                1.0f, 0.0f, 1.0f
             );
         }
         if (v.col_out[1] != -1U) {
-            paintConstraintHighlight(
+            paintPath(
                 locations[vi],
                 locations[v.col_out[1]],
-                1.0f, 1.0f
+                1.0f, 0.0f, 1.0f
             );
         }
     }
+}
+
+void Visualizer::paintSphere(QVector3D center, float radius) {
+    const int slices = 15;
+    const int stacks = 15;
+
+
+    center = mvpMatrix.map(center);
+
+    glBegin(GL_TRIANGLE_STRIP);
+    for (int i = 0; i <= stacks; ++i)
+    {
+        float phi = M_PI * i / stacks;
+        float sinPhi = sin(phi);
+        float cosPhi = cos(phi);
+
+        for (int j = 0; j <= slices; ++j)
+        {
+            float theta = 2 * M_PI * j / slices;
+            float sinTheta = sin(theta);
+            float cosTheta = cos(theta);
+
+            float x = cosTheta * sinPhi;
+            float y = cosPhi;
+            float z = sinTheta * sinPhi;
+
+            glVertex3f(center.x() + x * radius, center.y() + y * radius, center.z() + z * radius);
+            x = cosTheta * sin(phi + M_PI / stacks);
+            y = cos(phi + M_PI / stacks);
+            z = sinTheta * sin(phi + M_PI / stacks);
+
+            glVertex3f(center.x() + x * radius, center.y() + y * radius, center.z() + z * radius);
+        }
+    }
+    glEnd();
+}
+
+void Visualizer::peelSliceDone(ObjectMesh* slice, std::vector< std::vector< uint32_t > >* slice_active_chains_, std::vector< std::vector< uint32_t > >* slice_next_chains_) {
+    showInterpolated = false;
+    qDebug() << "slice arrived at visualizer";
+    sliceMesh = *slice;
+    sliceActiveChains = *slice_active_chains_;
+    sliceNextChains = *slice_next_chains_;
+
+
+
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+    // Set up the vertex buffer data
+    glBufferData(GL_ARRAY_BUFFER, sliceMesh.vertices.size() * sizeof(QVector3D), sliceMesh.vertices.data(), GL_STATIC_DRAW);
+
+    // Create and bind the index buffer
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sliceMesh.indices.size() * sizeof(GLuint), sliceMesh.indices.data(), GL_STATIC_DRAW);
+    GLenum error;
+    while ((error = glGetError()) != GL_NO_ERROR) {
+        qDebug() << "OpenGL error: " << error;
+    }
+    // Specify the format of the vertex data (position only)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), nullptr);
+
+
+    glEnableVertexAttribArray(0);
+    
+    glFinish();
+
+    showSlice = true;
+    showSliceChains = true;
+}
+
+
+//paint both the slice mesh and the chains
+void Visualizer::paintSliceMesh() {
+    glClearColor(0.0f, 0.0f, 0.5451f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+
+    shaderProgram.bind();
+    shaderProgram.setUniformValue("mvpMatrix", mvpMatrix);
+
+    // Shader lighting values computation set up
+    QMatrix4x4 invViewMatrix = viewMatrix.inverted();
+    QVector3D cameraPosition = invViewMatrix.column(3).toVector3D();
+    QVector3D lightDirection = cameraPosition.normalized();
+    //shaderProgram.setUniformValue("lightDirection", lightDirection);
+
+    // Start the paint process
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glFinish();
+
+    // Need to check which face is selected, best done in the CPU rather than shader, as it will be used later on
+    for (int i = 0; i < sliceMesh.indices.size(); i += 3) {
+        QVector3D v0 = sliceMesh.vertices[sliceMesh.indices[i]].normalized();
+        QVector3D v1 = sliceMesh.vertices[sliceMesh.indices[i + 1]].normalized();
+        QVector3D v2 = sliceMesh.vertices[sliceMesh.indices[i + 2]].normalized();
+
+        QVector3D edge1 = (v1 - v0).normalized();
+        QVector3D edge2 = (v2 - v0).normalized();
+        QVector3D faceNormal = QVector3D::crossProduct(edge1, edge2).normalized();
+        float shading = qMax(0.0f, QVector3D::dotProduct(faceNormal, lightDirection));
+
+        int isSelected = 0;
+        if (i / 3 == selectedFace) {
+            isSelected = 1;
+        }
+
+        // Set the uniform values for the shader, selectedFace determines face color,
+        // shadingValue determines the 'darkness' of the face about to be painted
+        shaderProgram.setUniformValue("selectedFace", isSelected);
+        shaderProgram.setUniformValue("shadingValue", shading);
+
+        glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, reinterpret_cast<void*>(sizeof(GLuint) * i));
+    }
+    shaderProgram.release();
+    glBindVertexArray(0);
+
+    if (showSliceChains) {
+        for (auto activeChain : sliceActiveChains) {
+            for (int i = 0; i < activeChain.size() - 1; i++) {
+                QVector3D vertex1 = sliceMesh.vertices[activeChain[i]];
+                QVector3D vertex2 = sliceMesh.vertices[activeChain[i + 1]];
+                paintPath(vertex1, vertex2, 1.0f, 0.0f, 0.0f);
+            }
+        }
+
+        for (auto nextChain : sliceNextChains) {
+            for (int i = 0; i < nextChain.size() - 1; i++) {
+                QVector3D vertex1 = sliceMesh.vertices[nextChain[i]];
+                QVector3D vertex2 = sliceMesh.vertices[nextChain[i + 1]];
+                paintPath(vertex1, vertex2, 0.0f, 0.0f, 1.0f);
+            }
+        }
+    }
+}
+
+//brazenly copied from knitgrapher, move to its own 'common functions' file later
+QVector3D mmix(const QVector3D& wa, const QVector3D& wb, float m) {
+    return wa + m * (wb - wa);
+}
+
+std::vector< std::vector< QVector3D > > copyLocations(ObjectMesh const& model, std::vector< std::vector< uint32_t > > const& chains) {
+    std::vector< std::vector< QVector3D > > locations;
+    locations.reserve(chains.size());
+    for (auto const& chain : chains) {
+        locations.emplace_back();
+        locations.back().reserve(chain.size());
+        for (auto v : chain) {
+            locations.back().emplace_back(model.vertices[v]);
+        }
+    }
+    return locations;
+}
+std::vector< std::vector< QVector3D > > interpolateStitchLocations(std::vector< std::vector< QVector3D > > const& chains, std::vector< std::vector< Stitch > > const& stitches) {
+    assert(stitches.size() == chains.size());
+
+    std::vector< std::vector< QVector3D > > locations;
+    locations.reserve(locations.size());
+
+    for (auto const& chain : chains) {
+        locations.emplace_back();
+
+        uint32_t ci = &chain - &chains[0];
+        if (stitches[ci].empty()) continue;
+
+        std::vector< float > lengths;
+        lengths.reserve(chain.size());
+        lengths.emplace_back(0.0f);
+        for (uint32_t pi = 0; pi + 1 < chain.size(); ++pi) {
+            QVector3D a = chain[pi];
+            QVector3D b = chain[pi + 1];
+            lengths.emplace_back(lengths.back() + (b - a).length());
+        }
+        assert(lengths.size() == chain.size());
+
+        locations.back().reserve(stitches[ci].size());
+        auto li = lengths.begin();
+        for (auto const& s : stitches[ci]) {
+            float l = s.t * lengths.back();
+            while (li != lengths.end() && *li <= l) ++li;
+            assert(li != lengths.end());
+            assert(li != lengths.begin());
+            float m = (l - *(li - 1)) / (*li - *(li - 1));
+            uint32_t i = li - lengths.begin();
+            locations.back().emplace_back(mmix(chain[i - 1], chain[i], m));
+        }
+    }
+
+    return locations;
+}
+
+void Visualizer::nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >* next_chains) {
+    nextActiveChains = *next_chains;
+
+    showLinks = false;
+    showSliceChains = false;
+    showNextChains = true;
+}
+
+void Visualizer::paintLinks() {
+    std::vector< std::vector< QVector3D > > from = interpolateStitchLocations(copyLocations(sliceMesh, sliceActiveChains), activeStitches);
+    std::vector< std::vector< QVector3D > > to = interpolateStitchLocations(copyLocations(sliceMesh, sliceNextChains), nextStitches);
+
+
+
+    for (auto link : links) {
+
+        QVector3D const& vertex1 = from[link.from_chain][link.from_stitch];
+        QVector3D const& vertex2 = to[link.to_chain][link.to_stitch];
+
+		paintPath(vertex1, vertex2, 0.0f, 1.0f, 0.0f);
+	}
+
+
+
+}
+
+void Visualizer::linkChainsDone(std::vector< std::vector< Stitch > >* next_stitches, std::vector< Link >* links_) {
+    nextStitches = *next_stitches;
+    links = *links_;
+
+    qDebug() << "links arrived at visualizer";
+
+    showLinks = true;
+
+
+}
+
+std::vector< std::vector< QVector3D > > interpolateLocations(ObjectMesh const& model, std::vector< std::vector< EmbeddedVertex > > const& chains) {
+    std::vector< std::vector< QVector3D > > locations;
+    locations.reserve(chains.size());
+    for (auto const& chain : chains) {
+        locations.emplace_back();
+        locations.back().reserve(chain.size());
+        for (auto const& ev : chain) {
+            locations.back().emplace_back(ev.interpolate(model.vertices));
+        }
+    }
+    return locations;
+}
+
+void Visualizer::paintNextChains() {
+
+    std::vector< std::vector< QVector3D > > next_active_locations = interpolateLocations(interpolatedMesh, nextActiveChains);
+
+    for (auto nextChain : next_active_locations) {
+        for (int i = 0; i < nextChain.size() - 1; i++) {
+            QVector3D vertex1 = nextChain[i];
+            QVector3D vertex2 = nextChain[i + 1];
+            paintPath(vertex1, vertex2, 1.0f, 0.0f, 0.0f);
+        }
+    }
+
 }
 
 /*
@@ -588,7 +861,7 @@ void Visualizer::paintGL()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
-    if (objectLoaded) {
+    if (showModel) {
         // Reset the chosen vertex so that it is not added to the constraints twice
         
         //WILL IT BREAK? WHO KNOWS? I DON'T
@@ -599,13 +872,22 @@ void Visualizer::paintGL()
         paintMesh();
         paintConstraints();
     }
-    if (interpolatedLoaded) {
+    if (showInterpolated) {
         //qDebug() << "drawing interpolatedmesh";
         paintInterpolatedMesh();
     }
-    if (firstChainsLoaded) {
+    if (showFirstChains) {
         //qDebug() << "drawing first active chains";
         paintFirstActiveChains();
+    }
+    if (showSlice) {
+        paintSliceMesh();
+    }
+    if (showLinks) {
+		paintLinks();
+	}
+    if (showNextChains) {
+        paintNextChains();
     }
 }
 /*
@@ -637,7 +919,7 @@ void Visualizer::loadMesh(ObjectMesh object) {
     // Unbind the VAO
     glBindVertexArray(0);
 
-    objectLoaded = true;
+    showModel = true;
     qDebug() << "end load";
 }
 
@@ -822,7 +1104,7 @@ void Visualizer::mouseMoveEvent(QMouseEvent* event)
         m_rotationAngleY = loopAround(m_rotationAngleY, 0.0f, 359.999f);
 
         lastMousePos = currentPos;
-        update();
+        //update();
     }
     if (isDragging) {
         QPoint currentPos = event->pos();
@@ -844,9 +1126,9 @@ void Visualizer::mouseMoveEvent(QMouseEvent* event)
         translateY -= deltaY * 0.05f / zoomLevel;//* movementDirection.y();
 
         lastMousePos = currentPos;
-        update();
+        //update();
     }
-    update();
+    //update();
 }
 void Visualizer::wheelEvent(QWheelEvent* event)
 {
@@ -862,7 +1144,26 @@ void Visualizer::wheelEvent(QWheelEvent* event)
             zoomLevel += zoomFactor;
         }
         isZooming = true;
-        update();
+        //update();
     }
 }
 
+void Visualizer::stopTimer() {
+    killTimer(timerID);
+    timerID = 0;
+}
+
+void Visualizer::setTimer()
+{
+	timerID = startTimer(16);  //16ms should be 60fps
+
+}
+
+void Visualizer::timerEvent(QTimerEvent* event) 
+{
+    if (event->timerId() == timerID)
+    {
+        // Trigger a repaint event to update the scene
+        update();
+    }
+}

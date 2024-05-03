@@ -106,6 +106,7 @@
     <ClCompile Include="EmbeddedPlanarMap.cpp" />
     <ClCompile Include="EmbeddedVertex.cpp" />
     <ClCompile Include="KnitGrapher.cpp" />
+    <ClCompile Include="Link.cpp" />
     <ClCompile Include="MeshToolBar.cpp" />
     <ClCompile Include="ObjectMesh.cpp" />
     <ClCompile Include="ObjHandler.cpp" />
@@ -131,6 +132,7 @@
     <ClInclude Include="Face.h" />
     <QtMoc Include="KnitGrapher.h" />
     <QtMoc Include="MeshToolBar.h" />
+    <ClInclude Include="Link.h" />
     <ClInclude Include="ObjectMesh.h" />
     <ClInclude Include="ObjHandler.h" />
     <ClInclude Include="RowColGraph.h" />
