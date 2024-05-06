@@ -8,6 +8,9 @@
 #include <set>
 #include <deque>
 #include <Eigen/SparseCholesky>
+#include <glm/gtx/norm.hpp>
+#include <glm/gtx/hash.hpp>
+
 
 std::vector<KnitGrapher::Edge> KnitGrapher::globedges;
 
@@ -20,8 +23,11 @@ KnitGrapher::KnitGrapher(QObject* parent) : QObject(parent)
 }
 
 void KnitGrapher::setOriginalMesh(ObjectMesh mesh)
-{
-	originalMesh = mesh;
+{	
+
+	AutoKnitMesh step(mesh);
+	originalMesh = step;
+	
 }
 
 QPair<GLuint, GLuint> qMinMax(GLuint a, GLuint b)
@@ -40,47 +46,30 @@ float KnitGrapher::getMaxEdgeLength()
 }
 
 
-void KnitGrapher::generateTriangles() {
-	//populate the oldTriangles vector with uvec3 by traversing my oldMesh.indices
-	for (int i = 0; i < originalMesh.indices.size(); i += 3) {
-		glm::uvec3 triangle(originalMesh.indices[i], originalMesh.indices[i + 1], originalMesh.indices[i+2]);
-		oldTriangles.push_back(triangle);
-	}
-}
-
-//custom comparator used in visit(), since QPair does no have <= == operators
-auto customComparator = [](const QPair<float, GLuint>& lhs, const QPair<float, GLuint>& rhs) {
-	if (lhs.first > rhs.first)
-		return true;
-	else if (lhs.first == rhs.first)
-		return lhs.second > rhs.second;
-	else
-		return false;
-};
 
 // Dijkstra's algorithm 'visit' function
-void visit(std::vector<QPair<float, GLuint>>& todo,
-	std::vector<QPair<float, GLuint>>& visited,
-	GLuint vertex,
+void visit(std::vector< std::pair< float, uint32_t > >& todo,
+	std::vector< std::pair< float, uint32_t > >& visited,
+	uint32_t vertex,
 	float distance,
-	GLuint from) {
+	uint32_t from) {
 	if (distance < visited[vertex].first) {
-		visited[vertex] = QPair<float, GLuint>(distance, from);
+		visited[vertex] = std::make_pair(distance, from);
 		todo.emplace_back(distance, vertex);
-		std::push_heap(todo.begin(), todo.end(), customComparator);
+		std::push_heap(todo.begin(), todo.end(), std::greater< std::pair< float, uint32_t > >());
 	}
 }
 
-GLuint KnitGrapher::lookup(GLuint a, GLuint b, QHash<QPoint, GLuint>& marked_verts) {
-	auto f = marked_verts.find((a < b ? QPoint(a, b) : QPoint(b, a)));
-	if (f != marked_verts.end()) return f.value();
-	else return -1;
+uint32_t KnitGrapher::lookup(uint32_t a, uint32_t b, std::unordered_map< glm::uvec2, uint32_t >& marked_verts) {
+	auto f = marked_verts.find((a < b ? glm::uvec2(a, b) : glm::uvec2(b, a)));
+	if (f != marked_verts.end()) return f->second;
+	else return -1U;
 }
 
 // quad not even implemented in my mesh loading, but good to have this here for later use
-void KnitGrapher::quad(std::vector<glm::uvec3>& new_tris, std::vector<QVector3D>& verts, GLuint a, GLuint b, GLuint c, GLuint d) {
-	float ac = QVector3D(verts[c] - verts[a]).lengthSquared();
-	float bd = QVector3D(verts[d] - verts[b]).lengthSquared();
+void KnitGrapher::quad(std::vector<glm::uvec3>& new_tris, std::vector<glm::vec3>& verts, uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+	float ac = glm::length2(verts[c] - verts[a]);
+	float bd = glm::length2(verts[d] - verts[b]);
 	if (ac < bd) {
 		new_tris.emplace_back(glm::uvec3(a, b, c));
 		new_tris.emplace_back(glm::uvec3(c, d, a));
@@ -92,9 +81,9 @@ void KnitGrapher::quad(std::vector<glm::uvec3>& new_tris, std::vector<QVector3D>
 }
 
 
-void KnitGrapher::divide(QSet<QPoint>& marked,
-	std::vector<QVector3D>& verts,
-	std::vector<std::vector<GLuint>>& paths,
+void KnitGrapher::divide(std::unordered_set< glm::uvec2 > marked,
+	std::vector< glm::vec3 >& verts,
+	std::vector<std::vector<uint32_t>>& paths,
 	std::vector<glm::uvec3>& tris)
 {
 	//assert(!marked.empty());
@@ -103,21 +92,19 @@ void KnitGrapher::divide(QSet<QPoint>& marked,
 		return;
 	}
 
-	QHash<QPoint, GLuint> marked_verts;
+	std::unordered_map< glm::uvec2, uint32_t > marked_verts;
 	marked_verts.reserve(marked.size());
 
-	std::vector<QPoint> edges(marked.begin(), marked.end());
+	std::vector< glm::ivec2 > edges(marked.begin(), marked.end());
 
 	//lambda sort, had to change to QPoint 
-	std::sort(edges.begin(), edges.end(), [](const QPoint& a, const QPoint& b) {
-		if (a.x() != b.x()) return a.x() < b.x();
-		else return a.y() < b.y();
+	std::sort(edges.begin(), edges.end(), [](glm::uvec2 const& a, glm::uvec2 const& b) {
+		if (a.x != b.x) return a.x < b.x;
+		else return a.y < b.y;
 		});
-
 	for (auto const& e : edges) {
-		marked_verts.insert(e, verts.size());
-		// marked_verts.insert(std::make_pair(e, verts.size()));
-		verts.emplace_back((verts[e.x()] + verts[e.y()]) / 2.0f);   //why 2.0f?
+		marked_verts.insert(std::make_pair(e, verts.size()));
+		verts.emplace_back((verts[e.x] + verts[e.y]) / 2.0f);
 	}
 
 	/*
@@ -126,10 +113,10 @@ void KnitGrapher::divide(QSet<QPoint>& marked,
 	};*/
 
 	for (auto& path : paths) {
-		std::vector<GLuint> new_path;
+		std::vector<uint32_t> new_path;
 		new_path.emplace_back(path[0]);
-		for (int i = 1; i < path.size(); ++i) {
-			int v = lookup(path[i - 1], path[i], marked_verts);
+		for (uint32_t i = 1; i < path.size(); ++i) {
+			uint32_t v = lookup(path[i - 1], path[i], marked_verts);
 			if (v != -1U) new_path.emplace_back(v);
 			new_path.emplace_back(path[i]);
 		}
@@ -139,12 +126,12 @@ void KnitGrapher::divide(QSet<QPoint>& marked,
 	std::vector<glm::uvec3> new_tris;
 
 	for (auto const& tri : tris) {
-		GLuint a = tri.x;
-		GLuint b = tri.y;
-		GLuint c = tri.z;
-		GLuint ab = lookup(a, b, marked_verts);
-		GLuint bc = lookup(b, c, marked_verts);
-		GLuint ca = lookup(c, a, marked_verts);
+		uint32_t a = tri.x;
+		uint32_t b = tri.y;
+		uint32_t c = tri.z;
+		uint32_t ab = lookup(a, b, marked_verts);
+		uint32_t bc = lookup(b, c, marked_verts);
+		uint32_t ca = lookup(c, a, marked_verts);
 
 		if (ab != -1U && bc != -1U && ca != -1U) {
 			//1 -> 4 subdiv!
@@ -187,11 +174,11 @@ void KnitGrapher::divide(QSet<QPoint>& marked,
 		}
 	}
 	tris = std::move(new_tris);
-	newTriangles = new_tris;
+	//newTriangles = new_tris;
 }
 
-bool is_ccw(QVector2D const& a, QVector2D const& b, QVector2D const& c) {
-	return QVector2D::dotProduct(QVector2D(-(b.y() - a.y()), (b.x() - a.x())), c - a) > 0.0f;
+bool is_ccw(glm::vec2 const& a, glm::vec2 const& b, glm::vec2 const& c) {
+	return glm::dot(glm::vec2(-(b.y - a.y), (b.x - a.x)), c - a) > 0.0f;
 };
 
 inline uint qHash(const QVector2D& key)
@@ -199,16 +186,15 @@ inline uint qHash(const QVector2D& key)
 	return qHash(QPair<float, float>(key.x(), key.y()));
 }
 
-float& get_dis(GLuint a, GLuint b, QHash<QPoint, float>& min_dis) {
+float& get_dis(uint32_t a, uint32_t b, std::unordered_map< glm::uvec2, float >& min_dis) {
 	if (a > b) std::swap(a, b);
-	auto it = min_dis.insert(QPoint(a, b), qInf());
-	return it.value();
+	return min_dis.insert(std::make_pair(glm::uvec2(a, b), std::numeric_limits< float >::infinity())).first->second;
 };
-void KnitGrapher::unfold(GLuint depth, GLuint root, QVector2D const& flat_root,
-	GLuint ai, QVector2D const& flat_a,
-	GLuint bi, QVector2D const& flat_b,
-	QVector2D const& limit_a, QVector2D const& limit_b, QHash< QPoint, GLuint > const& opposite,
-	std::vector<QVector3D> const& newVertices, QHash<QPoint, float>& min_dis) {
+void KnitGrapher::unfold(uint32_t depth, uint32_t root, glm::vec2 const& flat_root,
+	uint32_t ai, glm::vec2 const& flat_a,
+	uint32_t bi, glm::vec2 const& flat_b,
+	glm::vec2 const& limit_a, glm::vec2 const& limit_b, std::unordered_map< glm::uvec2, uint32_t >  const& opposite,
+	std::vector<glm::vec3> const& newVertices, std::unordered_map< glm::uvec2, float >& min_dis) {
 
 	//std::cout << "r: " << root << ": (" << flat_root.x << ", " << flat_root.y << ")" << std::endl; //DEBUG
 				//std::cout << "a: " << ai << ": (" << flat_a.x << ", " << flat_a.y << ")" << std::endl; //DEBUG
@@ -223,22 +209,22 @@ void KnitGrapher::unfold(GLuint depth, GLuint root, QVector2D const& flat_root,
 
 
 	uint32_t ci;
-	QVector2D flat_c;
+	glm::vec2 flat_c;
 	{ //if there is a triangle over the ai->bi edge, find other vertex and flatten it:
-		auto f = opposite.find(QPoint(bi, ai));
+		auto f = opposite.find(glm::uvec2(bi, ai));
 		if (f == opposite.end()) return;
-		ci = f.value();
+		ci = f->second;
 		//figure out c's position along ab and distance from ab:
-		QVector3D const& a = newVertices[ai];
-		QVector3D const& b = newVertices[bi];
-		QVector3D const& c = newVertices[ci];
+		glm::vec3 const& a = newVertices[ai];
+		glm::vec3 const& b = newVertices[bi];
+		glm::vec3 const& c = newVertices[ci];
 
-		QVector3D ab = (b - a).normalized();
-		float along = QVector3D::dotProduct(c - a, ab);
-		float perp = -QVector3D::crossProduct(c - a, ab).length();
+		glm::vec3 ab = glm::normalize(b - a);
+		float along = glm::dot(c - a, ab);
+		float perp = -glm::length(c - a - ab * along);
 
-		QVector2D flat_ab = (flat_b - flat_a).normalized();
-		QVector2D flat_perp_ab = QVector2D(-flat_ab.y(), flat_ab.x());
+		glm::vec2 flat_ab = glm::normalize(flat_b - flat_a);
+		glm::vec2 flat_perp_ab = glm::vec2(-flat_ab.y, flat_ab.x);
 
 		flat_c = flat_a + flat_ab * along + flat_perp_ab * perp;
 	}
@@ -252,7 +238,7 @@ void KnitGrapher::unfold(GLuint depth, GLuint root, QVector2D const& flat_root,
 
 	if (ccw_rac && ccw_rcb) {
 		float& dis = get_dis(root, ci, min_dis);
-		dis = std::min(dis, (flat_root - flat_c).length());
+		dis = std::min(dis, glm::length(flat_root - flat_c));
 
 		//PARANOIA:
 		float dis3 = (newVertices[root] - newVertices[ci]).length();
@@ -297,7 +283,7 @@ void KnitGrapher::unfold(GLuint depth, GLuint root, QVector2D const& flat_root,
 
 void KnitGrapher::remesh()
 {
-	qDebug() << "Start of remesh() function...";
+	qDebug() << "Starting remesh()";
 
 	//check if constraints are empty, no way to remesh without them
 	if (constraints.size() == 0) {
@@ -307,30 +293,26 @@ void KnitGrapher::remesh()
 
 	//extract edges from the model
 	qDebug() << "extracting edges from all triangles...";
-	std::vector< std::vector< QPair< GLuint, float > > > adjacents(originalMesh.vertices.size());
+	std::vector< std::vector< std::pair< uint32_t, float > > > adj(originalMesh	.vertices.size());
 	QSet <QPair<GLuint, GLuint>> edges;
 	{ 
-		for (auto const& tri : oldTriangles) {
-			edges.insert(qMinMax(tri.x, tri.y));
-			edges.insert(qMinMax(tri.y, tri.z));
-			edges.insert(qMinMax(tri.z, tri.x));
+		std::set< std::pair< uint32_t, uint32_t > > edges;
+		for (auto const& tri : originalMesh.triangles) {
+			edges.insert(std::minmax(tri.x, tri.y));
+			edges.insert(std::minmax(tri.y, tri.z));
+			edges.insert(std::minmax(tri.z, tri.x));
 		}
-		for (QPair<GLuint, GLuint> edge : edges)
-		{
-			float length = (originalMesh.vertices[edge.second] - originalMesh.vertices[edge.first]).length();
-
-			QPair <GLuint, float> edge1(edge.second, length);
-			QPair <GLuint, float> edge2(edge.first, length);
-
-			adjacents[edge.first].push_back(edge1);
-			adjacents[edge.second].push_back(edge2);
+		for (auto const& e : edges) {
+			float len = glm::length(originalMesh.vertices[e.second] - originalMesh.vertices[e.first]);
+			adj[e.first].emplace_back(e.second, len);
+			adj[e.second].emplace_back(e.first, len);
 		}
 	}
 
 
 	//find chain paths on original model
 	qDebug() << "finding chain paths on original model... (linking constraint vertices together)";
-	std::vector<std::vector<GLuint>> paths;
+	std::vector< std::vector< uint32_t > > paths;
 
 	//altough done here, technically my constraints chain has nice 'single jump' vertex chains, so not really necessary
 	//could be coopted in Visualizer for constraint by dijkstra adding...
@@ -340,23 +322,23 @@ void KnitGrapher::remesh()
 			qDebug() << "Constraint has no vertices, skipping...";
 			continue;
 		}
-		std::vector<GLuint> path;
-		for (GLuint goal : constraint->vertices) {
+		std::vector<uint32_t> path;
+		for (uint32_t goal : constraint->vertices) {
 			if (path.empty()) {
 				path.push_back(goal);
 				continue;
 			}
-			std::vector<QPair<float, GLuint>> todo;
-			std::vector<QPair<float, GLuint>> visited(originalMesh.vertices.size(), QPair<float, GLuint>(qInf(), -1U));
+			std::vector< std::pair< float, uint32_t > > todo;
+			std::vector< std::pair< float, uint32_t > > visited(originalMesh.vertices.size(), std::make_pair(std::numeric_limits< float >::infinity(), -1U));
 			visit(todo, visited, goal, 0.0f, -1U);
 
 			while (!todo.empty()) {
-				std::pop_heap(todo.begin(), todo.end(), customComparator);
-				QPair<float, GLuint> at = todo.back();
+				std::pop_heap(todo.begin(), todo.end(), std::greater< std::pair< float, uint32_t > >());
+				auto at = todo.back();
 				todo.pop_back();
 				if (at.first > visited[at.second].first) continue;
 				if (at.second == path.back()) break;
-				for (QPair<float, GLuint> const& a : adjacents[at.second]) {
+				for (auto const &a : adj[at.second]) {
 					visit(todo, visited, a.first, at.first + a.second, at.second);
 				}
 			}
@@ -388,42 +370,41 @@ void KnitGrapher::remesh()
 	// create a higher resolution mesh according to the parameters set by the user
 	// in algorithm is part of the 'Parameters' class, i have those values inside this KnitGrapher class
 	float maxEdgeLength = getMaxEdgeLength();
+	float minEdgeRatio = 0.3f;
+	float minEdgeRatioSquared = minEdgeRatio * minEdgeRatio;
 	float maxEdgeLengthSquared = maxEdgeLength * maxEdgeLength;
 
 
 	qDebug() << "Max Edge Length:" << maxEdgeLength;
 
-	std::vector<QVector3D> newVerts = originalMesh.vertices;
-	std::vector<glm::uvec3> newTris = oldTriangles;
+	std::vector< glm::vec3 > verts = originalMesh.vertices;
+	std::vector< glm::uvec3 > tris = originalMesh.triangles;
 
 	// there is degenarate triangle checking in the original algorithm, will do the same here
-	if (degenerateCheck(newTris)) {
+	if (degenerateCheck(tris)) {
 		qDebug() << "Degenerate triangle found, error...";
 		return;
 	}
 
-	qDebug() << "Starting divide() block, oldTris: " << newTris.size();
+	qDebug() << "Starting divide() block, oldTris: " << tris.size();
 	// Lambda functions in original code were made into their own functions...
 	while (true) {
-		QSet<QPoint> marked;
-		auto mark = [&marked](int a, int b) {
+		std::unordered_set< glm::uvec2 > marked;
+		auto mark = [&marked](uint32_t a, uint32_t b) {
 			if (b < a) std::swap(a, b);
-			marked.insert(QPoint(a, b));
+			marked.insert(glm::uvec2(a, b));
 		};
-		auto is_marked = [&marked](int a, int b) {
+		auto is_marked = [&marked](uint32_t a, uint32_t b) {
 			if (b < a) std::swap(a, b);
-			return marked.find(QPoint(a, b)) != marked.end();
+			return marked.find(glm::uvec2(a, b)) != marked.end();
 		};
 		(void)is_marked;
 		(void)minEdgeRatioSquared;
 
-		for (auto const& tri : newTris) {
-			float len_ab2 = QVector3D(newVerts[tri.y] - newVerts[tri.x]).lengthSquared();
-			float len_bc2 = QVector3D(newVerts[tri.z] - newVerts[tri.y]).lengthSquared();
-			float len_ca2 = QVector3D(newVerts[tri.x] - newVerts[tri.z]).lengthSquared();
-
-			//qDebug() << "Lengths: " << len_ab2 << len_bc2 << len_ca2;
-
+		for (auto const& tri : tris) {
+			float len_ab2 = glm::length2(verts[tri.y] - verts[tri.x]);
+			float len_bc2 = glm::length2(verts[tri.z] - verts[tri.y]);
+			float len_ca2 = glm::length2(verts[tri.x] - verts[tri.z]);
 			if (len_ab2 > maxEdgeLengthSquared) mark(tri.x, tri.y);
 			if (len_bc2 > maxEdgeLengthSquared) mark(tri.y, tri.z);
 			if (len_ca2 > maxEdgeLengthSquared) mark(tri.z, tri.x);
@@ -432,9 +413,9 @@ void KnitGrapher::remesh()
 			qDebug() << "No marked edges found, breaking...";
 			break;
 		}
-		divide(marked, newVerts, paths, newTris);
+		divide(marked, verts, paths, tris);
 	}
-	qDebug() << "divide() sleu finished! newTris: " << newTris.size();
+	qDebug() << "divide() sleu finished! newTris: " << tris.size();
 
 	//after this while cycle, have newTriangles variable equal to divides newTris...
 	//once again the degenerate triangle check in original algortihm
@@ -446,53 +427,52 @@ void KnitGrapher::remesh()
 
 	//extract edges from subdivided model:
 	qDebug() << "extracting edges from subdivided model...";
-	adjacents.assign(newVerts.size(), std::vector< QPair< GLuint, float > >());
+	adj.assign(verts.size(), std::vector< std::pair< uint32_t, float > >());
 	{ //extract edges from subdivided model:
-		QSet<QPair<GLuint, GLuint>> newEdges;
-		for (auto const& tri : newTris) {
-			edges.insert(qMinMax(tri.x, tri.y));
-			edges.insert(qMinMax(tri.y, tri.z));
-			edges.insert(qMinMax(tri.z, tri.x));
+		std::set< std::pair< uint32_t, uint32_t > > edges;
+		for (auto const& tri : tris) {
+			edges.insert(std::minmax(tri.x, tri.y));
+			edges.insert(std::minmax(tri.y, tri.z));
+			edges.insert(std::minmax(tri.z, tri.x));
 		}
 
 		for (auto const& e : edges) {
-			float len = QVector3D(newVerts[e.second] - newVerts[e.first]).length();
-			//float len = glm::length(verts[e.second] - verts[e.first]);
-			adjacents[e.first].emplace_back(e.second, len);
-			adjacents[e.second].emplace_back(e.first, len);
+			float len = glm::length(verts[e.second] - verts[e.first]);
+			adj[e.first].emplace_back(e.second, len);
+			adj[e.second].emplace_back(e.first, len);
 		}
 	}
 
 
 	qDebug() << "Building opposites...";
-	QHash< QPoint, GLuint > opposite; //vertex opposite each [oriented] triangle edge
-	opposite.reserve(newTris.size());
-	for (auto const& tri : newTris) {
-		auto ret_xy = opposite.insert(QPoint(tri.x, tri.y), tri.z);
-		//assert(ret_xy.second);
-		auto ret_yz = opposite.insert(QPoint(tri.y, tri.z), tri.x);
-		//assert(ret_yz.second);
-		auto ret_zx = opposite.insert(QPoint(tri.z, tri.x), tri.y);
-		//assert(ret_zx.second);
+	std::unordered_map< glm::uvec2, uint32_t > opposite; //vertex opposite each [oriented] triangle edge
+	opposite.reserve(tris.size() * 3);
+	for (auto const& tri : tris) {
+		auto ret_xy = opposite.insert(std::make_pair(glm::uvec2(tri.x, tri.y), tri.z));
+		assert(ret_xy.second);
+		auto ret_yz = opposite.insert(std::make_pair(glm::uvec2(tri.y, tri.z), tri.x));
+		assert(ret_yz.second);
+		auto ret_zx = opposite.insert(std::make_pair(glm::uvec2(tri.z, tri.x), tri.y));
+		assert(ret_zx.second);
 	}
 
 	qDebug() << "build (+ add to adj) extra shortcut edges by unwrapping triangle neighborhoods:";
 	{ //build (+ add to adj) extra "shortcut" edges by unwrapping triangle neighborhoods:
-		QHash< QPoint, float > min_dis;
-		for (auto const& tri : newTris) {
-			QVector2D flat_x, flat_y, flat_z; //original verts
-			QVector3D const& x = newVerts[tri.x];
-			QVector3D const& y = newVerts[tri.y];
-			QVector3D const& z = newVerts[tri.z];
-			flat_x = QVector2D(0.0f, 0.0f);
-			flat_y = QVector2D((y - x).length(), 0.0f);
+		std::unordered_map< glm::uvec2, float > min_dis;
+		for (auto const& tri : tris) {
+			glm::vec2 flat_x, flat_y, flat_z; //original verts
+			glm::vec3 const& x = verts[tri.x];
+			glm::vec3 const& y = verts[tri.y];
+			glm::vec3 const& z = verts[tri.z];
+			flat_x = glm::vec2(0.0f, 0.0f);
+			flat_y = glm::vec2(glm::length(y - x), 0.0f);
 
-			QVector3D xy = (y - x).normalized();
-			QVector3D perp_xy = QVector3D::crossProduct(QVector3D::crossProduct(y - x, z - x), y - x).normalized();
-			float along = QVector3D::dotProduct(z - x, xy);
-			float perp = QVector3D::dotProduct(z - x, perp_xy);
+			glm::vec3 xy = glm::normalize(y - x);
+			glm::vec3 perp_xy = glm::normalize(glm::cross(glm::cross(y - x, z - x), y - x));
+			float along = glm::dot(z - x, xy);
+			float perp = glm::dot(z - x, perp_xy);
 
-			flat_z = QVector2D(along, perp);
+			flat_z = glm::vec2(along, perp);
 
 			//look through edge [ai,bi] from point [root], where edge [ai,bi] is ccw oriented.
 			const constexpr GLuint D = 3; //depth to unfold triangles to for more adjacency information; makes slightly nicer geodesics at the expense of increased compute time.
@@ -500,13 +480,13 @@ void KnitGrapher::remesh()
 			//TODO: make this a parameter
 
 			if (D > 0) {
-				unfold(D, tri.x, flat_x, tri.y, flat_y, tri.z, flat_z, flat_y, flat_z, opposite, newVerts, min_dis);
-				unfold(D, tri.y, flat_y, tri.z, flat_z, tri.x, flat_x, flat_z, flat_x, opposite, newVerts, min_dis);
-				unfold(D, tri.z, flat_z, tri.x, flat_x, tri.y, flat_y, flat_x, flat_y, opposite, newVerts, min_dis);
+				unfold(D, tri.x, flat_x, tri.y, flat_y, tri.z, flat_z, flat_y, flat_z, opposite, verts, min_dis);
+				unfold(D, tri.y, flat_y, tri.z, flat_z, tri.x, flat_x, flat_z, flat_x, opposite, verts, min_dis);
+				unfold(D, tri.z, flat_z, tri.x, flat_x, tri.y, flat_y, flat_x, flat_y, opposite, verts, min_dis);
 			}
 		}
-		for (uint32_t x = 0; x < newVerts.size(); ++x) {
-			for (auto const& yd : adjacents[x]) {
+		for (uint32_t x = 0; x < verts.size(); ++x) {
+			for (auto const& yd : adj[x]) {
 				float& dis = get_dis(x, yd.first, min_dis);
 				dis = std::min(dis, yd.second);
 			}
@@ -514,31 +494,28 @@ void KnitGrapher::remesh()
 
 		//clear adj + re-create from min_dis:
 		uint32_t old_adj = 0;
-		for (auto const& a : adjacents) {
+		for (auto const& a : adj) {
 			old_adj += a.size();
 		}
 
-		adjacents.assign(newVerts.size(), std::vector< QPair< GLuint, float > >());
+		adj.assign(verts.size(), std::vector< std::pair< uint32_t, float > >());
 
-		QHash<QPoint, float>::const_iterator xyd;
-		for (xyd = min_dis.constBegin(); xyd != min_dis.constEnd(); ++xyd) {
-			adjacents[xyd.key().x()].emplace_back(xyd.key().y(), xyd.value());
-			adjacents[xyd.key().y()].emplace_back(xyd.key().x(), xyd.value());
-			//generated from below statements...
-
-			//adjacents[xyd.first.x].emplace_back(xyd.first.y, xyd.second);
-			//adjacents[xyd.first.y].emplace_back(xyd.first.x, xyd.second);
+		//QHash<QPoint, float>::const_iterator xyd;
+		for (auto const& xyd : min_dis) {
+			assert(xyd.first.x != xyd.first.y);
+			adj[xyd.first.x].emplace_back(xyd.first.y, xyd.second);
+			adj[xyd.first.y].emplace_back(xyd.first.x, xyd.second);
 		}
 
 		uint32_t new_adj = 0;
-		for (auto const& a : adjacents) {
+		for (auto const& a : adj) {
 			new_adj += a.size();
 		}
 
 		//std::cout << "Went from " << old_adj << " to " << new_adj << " by unfolding triangles." << std::endl;
 
 		//for consistency:
-		for (auto& a : adjacents) {
+		for (auto& a : adj) {
 			std::sort(a.begin(), a.end());
 		}
 	}
@@ -546,7 +523,7 @@ void KnitGrapher::remesh()
 
 	//start creating embedded vertices
 	std::vector< std::vector< EmbeddedVertex > > embedded_chains;
-	qDebug() << "strating embedded_chains building...";
+	qDebug() << "starting embedded_chains building...";
 	// was a big for cycle, but that was because of radius checking, which is not part of my program
 	for (auto const& cons : constraints) {
 		if (cons->vertices.size() != 0) {   //checking for dummy constraints, dummy...
@@ -597,14 +574,14 @@ void KnitGrapher::remesh()
 		std::vector< glm::uvec3 > split_tris;
 		std::vector< uint32_t > epm_to_split;
 
-		epm.split_triangles(newVerts, newTris, &split_evs, &split_tris, &epm_to_split);
+		epm.split_triangles(verts, tris, &split_evs, &split_tris, &epm_to_split);
 
-		std::vector< QVector3D > split_verts;
+		std::vector< glm::vec3 > split_verts;
 
 		qDebug() << "populating split_verts...";
 		split_verts.reserve(split_evs.size());
 		for (auto const& ev : split_evs) {
-			split_verts.emplace_back(ev.interpolate(newVerts));
+			split_verts.emplace_back(ev.interpolate(verts));
 		}
 
 		qDebug() << "record constrained edges in terms of split_verts";
@@ -680,7 +657,7 @@ void KnitGrapher::remesh()
 
 
 		//remove any split_verts that aren't used:
-		std::vector< QVector3D > compressed_verts;
+		std::vector< glm::vec3 > compressed_verts;
 		std::vector< float > compressed_values;
 		std::vector< glm::uvec3 > compressed_tris;
 		for (uint32_t ti = 0; ti < split_tris.size(); ++ti) {
@@ -704,17 +681,18 @@ void KnitGrapher::remesh()
 			tri.z = add_vert(tri.z);
 		}
 
-		qDebug() << "Went from " << newTris.size() << " to (via split) " << split_tris.size() << " to (via discard) " << compressed_tris.size() << " triangles."; //DEBUG
+		qDebug() << "Went from " << tris.size() << " to (via split) " << split_tris.size() << " to (via discard) " << compressed_tris.size() << " triangles."; //DEBUG
 
 		newMesh.vertices = compressed_verts;
-		newMesh.indices = toIntArray(compressed_tris);
-		newTriangles = compressed_tris;
+		newMesh.triangles = compressed_tris;
 
 		qDebug() << compressed_values.size() << " constrained values and " << compressed_verts.size() << " vertices";
 
 
 		constrained_values = compressed_values;
 }
+
+
 
 void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex > >* active_chains_,
 	std::vector< std::vector< Stitch > >* active_stitches_,
@@ -728,9 +706,9 @@ void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex
 	auto& active_stitches = *active_stitches_;
 	active_stitches.clear();
 
-	newTriangles = getTriangles(newMesh);
+	//newTriangles = getTriangles(newMesh);
 	//PARANOIA: triangles must reference valid time values:
-	for (glm::uvec3 const& tri : newTriangles) {
+	for (glm::uvec3 const& tri : newMesh.triangles) {
 		assert(tri.x < constrained_values.size());
 		assert(tri.y < constrained_values.size());
 		assert(tri.z < constrained_values.size());
@@ -749,7 +727,7 @@ void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex
 				qDebug() << "ERROR: non-manifold mesh [or inconsistent orientation] -- directed edge appears twice.";
 			}
 		};
-		for (glm::uvec3 const& tri : newTriangles) {
+		for (glm::uvec3 const& tri : newMesh.triangles) {
 			do_edge(tri.x, tri.y, tri.z);
 			do_edge(tri.y, tri.z, tri.x);
 			do_edge(tri.z, tri.x, tri.y);
@@ -826,9 +804,9 @@ void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex
 		//further subdivide and place stitches:
 		float total_length = 0.0f;
 		for (uint32_t ci = 1; ci < divided_chain.size(); ++ci) {
-			QVector3D a = divided_chain[ci - 1].interpolate(newMesh.vertices);
-			QVector3D b = divided_chain[ci].interpolate(newMesh.vertices);
-			total_length += (b - a).length();
+			glm::vec3 a = divided_chain[ci - 1].interpolate(newMesh.vertices);
+			glm::vec3 b = divided_chain[ci].interpolate(newMesh.vertices);
+			total_length += glm::length(b - a);
 		}
 
 		float stitch_width = stitchWidth / modelUnitLength;
@@ -853,9 +831,9 @@ void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex
 			lengths.reserve(chain.size());
 			lengths.emplace_back(0.0f);
 			for (uint32_t i = 1; i < chain.size(); ++i) {
-				QVector3D a = chain[i - 1].interpolate(newMesh.vertices);
-				QVector3D b = chain[i].interpolate(newMesh.vertices);
-				lengths.emplace_back(lengths.back() + (b - a).length());
+				glm::vec3 a = chain[i - 1].interpolate(newMesh.vertices);
+				glm::vec3 b = chain[i].interpolate(newMesh.vertices);
+				lengths.emplace_back(lengths.back() + glm::length(b - a));
 			}
 			assert(lengths.size() == chain.size());
 
@@ -894,11 +872,15 @@ void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex
 	}
 
 }
+
+/*
 QVector3D mix(const QVector3D& wa, const QVector3D& wb, float m) {
 	//x* (1.0 - a) + y * a
 	return wa * (1.0 - m) + wb * m;
 	//return wa + m * (wb - wa);
-}
+}*/
+
+
 
 void KnitGrapher::sampleChain(float spacing,
 	std::vector< EmbeddedVertex > const& chain, //in: chain to be sampled
@@ -914,17 +896,17 @@ void KnitGrapher::sampleChain(float spacing,
 	for (uint32_t ci = 0; ci + 1 < chain.size(); ++ci) {
 		sampled_chain.emplace_back(chain[ci]);
 
-		QVector3D a = chain[ci].interpolate(newMesh.vertices);
-		QVector3D b = chain[ci + 1].interpolate(newMesh.vertices);
+		glm::vec3 a = chain[ci].interpolate(newMesh.vertices);
+		glm::vec3 b = chain[ci + 1].interpolate(newMesh.vertices);
 		glm::uvec3 common = EmbeddedVertex::common_simplex(chain[ci].simplex, chain[ci + 1].simplex);
-		QVector3D wa = chain[ci].weights_on(common);
-		QVector3D wb = chain[ci + 1].weights_on(common);
+		glm::vec3 wa = chain[ci].weights_on(common);
+		glm::vec3 wb = chain[ci + 1].weights_on(common);
 
-		float length = (b - a).length();
+		float length = glm::length(b - a);
 		int32_t insert = std::floor(length / spacing);
 		for (int32_t i = 0; i < insert; ++i) {
 			float m = float(i + 1) / float(insert + 1);
-			sampled_chain.emplace_back(common, mix(wa, wb, m));
+			sampled_chain.emplace_back(common, glm::mix(wa, wb, m));
 		}
 	}
 	sampled_chain.emplace_back(chain.back());
@@ -941,7 +923,7 @@ void KnitGrapher::interpolateValues() {
 	}
 
 
-	qDebug() << newMesh.vertices.size() << " vertices and " << newMesh.indices.size() << " triangles.";
+	qDebug() << newMesh.vertices.size() << " vertices and " << newMesh.triangles.size() << " triangles.";
 	auto& values = constrained_values;
 
 	std::vector< uint32_t > dofs;
@@ -962,14 +944,14 @@ void KnitGrapher::interpolateValues() {
 
 
 
-	for (const auto& tri : newTriangles) {
-		const QVector3D& a = newMesh.vertices[tri.x];
-		const QVector3D& b = newMesh.vertices[tri.y];
-		const QVector3D& c = newMesh.vertices[tri.z];
+	for (const auto& tri : newMesh.triangles) {
+		const glm::vec3& a = newMesh.vertices[tri.x];
+		const glm::vec3& b = newMesh.vertices[tri.y];
+		const glm::vec3& c = newMesh.vertices[tri.z];
 
-		float weight_ab = QVector3D::dotProduct(c - a, b - a) / QVector3D::crossProduct(c - a, b - a).length();
-		float weight_bc = QVector3D::dotProduct(a - b, c - b) / QVector3D::crossProduct(a - b, c - b).length();
-		float weight_ca = QVector3D::dotProduct(b - c, a - c) / QVector3D::crossProduct(b - c, a - c).length();
+		float weight_ab = glm::dot(a - c, b - c) / glm::length(glm::cross(a - c, b - c));
+		float weight_bc = glm::dot(b - a, c - a) / glm::length(glm::cross(b - a, c - a));
+		float weight_ca = glm::dot(c - b, a - b) / glm::length(glm::cross(c - b, a - b));
 
 		edge_weights.insert(std::make_pair(std::minmax(tri.x, tri.y), 0.0f)).first->second += weight_ab;
 		edge_weights.insert(std::make_pair(std::minmax(tri.y, tri.z), 0.0f)).first->second += weight_bc;
@@ -985,7 +967,7 @@ void KnitGrapher::interpolateValues() {
 
 
 	std::vector< Eigen::Triplet< double > > coefficients;
-	coefficients.reserve(newMesh.indices.size() * 3); //more than is needed
+	coefficients.reserve(newMesh.triangles.size() * 3); //more than is needed
 	Eigen::VectorXd rhs(total_dofs);
 
 	for (uint32_t i = 0; i < dofs.size(); ++i) {
@@ -1052,9 +1034,9 @@ std::vector<GLuint> KnitGrapher::toIntArray(std::vector<glm::uvec3> triangles) {
 
 bool KnitGrapher::degenerateCheck(std::vector<glm::uvec3> tris) {
 	for (auto const& tri : tris) {
-		QVector3D const& x = originalMesh.vertices[tri.x];
-		QVector3D const& y = originalMesh.vertices[tri.y];
-		QVector3D const& z = originalMesh.vertices[tri.z];
+		glm::vec3 const& x = originalMesh.vertices[tri.x];
+		glm::vec3 const& y = originalMesh.vertices[tri.y];
+		glm::vec3 const& z = originalMesh.vertices[tri.z];
 
 		if (tri.x == tri.y || tri.y == tri.z || tri.z == tri.x)
 		{
@@ -1085,8 +1067,9 @@ std::vector<glm::uvec3> KnitGrapher::getTriangles(ObjectMesh const& mesh) {
 
 }
 
+
 void KnitGrapher::extractLevelChains(
-	ObjectMesh const& model, //in: model on which to embed vertices
+	AutoKnitMesh const& model, //in: model on which to embed vertices
 	std::vector< float > const& values, //in: values at vertices
 	float const level, //in: level at which to extract chains
 	std::vector< std::vector< EmbeddedVertex > >* chains_ //chains of edges at given level
@@ -1096,17 +1079,17 @@ void KnitGrapher::extractLevelChains(
 	chains.clear();
 
 	//embed points along all edges that start below level and end at or above it:
-	std::vector<glm::uvec3> modelTriangles = getTriangles(model);
-	std::vector< QVector3D > const& verts = model.vertices;
-	std::vector< glm::uvec3 > const& tris = modelTriangles;
+
+	std::vector< glm::vec3 > const& verts = model.vertices;
+	std::vector< glm::uvec3 > const& tris = model.triangles;
 
 	std::unordered_map< glm::uvec2, EmbeddedVertex > embedded_pts;
-	std::unordered_map< glm::uvec2, QVector3D > pts;
+	std::unordered_map< glm::uvec2, glm::vec3 > pts;
 	auto add = [&](uint32_t a, uint32_t b) {
 		assert(values[a] < level && values[b] >= level);
-		float vmix = (level - values[a]) / (values[b] - values[a]);
-		pts[glm::uvec2(a, b)] = mix(verts[a], verts[b], vmix);
-		embedded_pts[glm::uvec2(a, b)] = EmbeddedVertex::on_edge(a, b, vmix);
+		float mix = (level - values[a]) / (values[b] - values[a]);
+		pts[glm::uvec2(a, b)] = glm::mix(verts[a], verts[b], mix);
+		embedded_pts[glm::uvec2(a, b)] = EmbeddedVertex::on_edge(a, b, mix);
 		return glm::uvec2(a, b);
 	};
 	std::unordered_map< glm::uvec2, glm::uvec2 > links;
@@ -1209,9 +1192,10 @@ void KnitGrapher::extractLevelChains(
 
 }
 
+
 void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_of,
 	std::vector< std::vector< EmbeddedVertex > >& right_of,
-	ObjectMesh* clipped_,
+	AutoKnitMesh* clipped_,
 	std::vector< EmbeddedVertex >* clipped_vertices_,
 	std::vector< std::vector< uint32_t > >* left_of_vertices_, //out (optional): indices of vertices corresponding to left_of chains [may be some rounding]
 	std::vector< std::vector< uint32_t > >* right_of_vertices_ //out (optional): indices of vertices corresponding to right_of chains [may be some rounding]
@@ -1228,10 +1212,10 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 	clipped_vertices.clear();
 
 
-	newTriangles = getTriangles(newMesh);
+	//newTriangles = getTriangles(newMesh);
 	{ //PARANOIA: make sure all chains are loops or edge-to-edge:
 		std::unordered_set< glm::uvec2 > edges;
-		for (auto const& tri : newTriangles) {
+		for (auto const& tri : newMesh.triangles) {
 			auto do_edge = [&edges](uint32_t a, uint32_t b) {
 				if (a > b) std::swap(a, b);
 				auto ret = edges.insert(glm::uvec2(a, b));
@@ -1527,9 +1511,9 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 			lengths.reserve(epm_chain.size());
 			lengths.emplace_back(0.0f);
 			for (uint32_t i = 1; i < epm_chain.size(); ++i) {
-				QVector3D a = epm.vertices[epm_chain[i - 1]].interpolate(newMesh.vertices);
-				QVector3D b = epm.vertices[epm_chain[i]].interpolate(newMesh.vertices);
-				lengths.emplace_back(lengths.back() + (b - a).length());
+				glm::vec3 a = epm.vertices[epm_chain[i - 1]].interpolate(newMesh.vertices);
+				glm::vec3 b = epm.vertices[epm_chain[i]].interpolate(newMesh.vertices);
+				lengths.emplace_back(lengths.back() + glm::length(b - a));
 			}
 			if (!(initial_length == initial_length)) initial_length = lengths.back();
 
@@ -1595,7 +1579,7 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 	std::vector< EmbeddedVertex > split_verts;
 	std::vector< glm::uvec3 > split_tris;
 	std::vector< uint32_t > epm_to_split;
-	epm.split_triangles(newMesh.vertices, newTriangles, &split_verts, &split_tris, &epm_to_split);
+	epm.split_triangles(newMesh.vertices, newMesh.triangles, &split_verts, &split_tris, &epm_to_split);
 
 
 	//transfer edge values to split mesh:
@@ -1643,17 +1627,16 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 			assert(value != Unvisited);
 			glm::uvec3 tri = split_tris[ti];
 			auto over = [&](uint32_t a, uint32_t b) {
-				auto f = edge_to_tri.find(glm::uvec2(b, a));
+				auto f = edge_to_tri.find(glm::uvec2(b,a));
 				if (f == edge_to_tri.end()) return;
 				int32_t nv = value;
-				auto f2 = edge_values.find(glm::uvec2(b, a));
+				auto f2 = edge_values.find(glm::uvec2(b,a));
 				if (f2 != edge_values.end()) nv += f2->second;
 
 				if (values[f->second] == Unvisited) {
 					values[f->second] = nv;
 					component.emplace_back(f->second);
-				}
-				else {
+				} else {
 					assert(values[f->second] == nv);
 				}
 			};
@@ -1689,10 +1672,10 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 		return split_vert_to_clipped_vertex[v];
 	};
 
-	std::vector<glm::uvec3> clippedTriangles = getTriangles(clipped);
+	//std::vector<glm::uvec3> clippedTriangles = getTriangles(clipped);
 	for (auto const& tri : split_tris) {
 		if (!keep[&tri - &split_tris[0]]) continue;
-		clippedTriangles.emplace_back(
+		clipped.triangles.emplace_back(
 			use_vertex(tri.x),
 			use_vertex(tri.y),
 			use_vertex(tri.z)
@@ -1703,9 +1686,9 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 		clipped.vertices.emplace_back(v.interpolate(newMesh.vertices));
 	}
 
-	clipped.indices = toIntArray(clippedTriangles);
+	//clipped.indices = toIntArray(clippedTriangles);
 
-	qDebug() << "Trimmed model from " << newTriangles.size() << " triangles on " << newMesh.vertices.size() << " vertices to " << clippedTriangles.size() << " triangles on " << clipped.vertices.size() << " vertices.";
+	qDebug() << "Trimmed model from " << newMesh.triangles.size() << " triangles on " << newMesh.vertices.size() << " vertices to " << clipped.triangles.size() << " triangles on " << clipped.vertices.size() << " vertices.";
 	
 
 
@@ -1745,7 +1728,7 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 }
 
 void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & active_chains,
-	ObjectMesh* slice_,
+	AutoKnitMesh* slice_,
 	std::vector< EmbeddedVertex >* slice_on_model_,
 	std::vector< std::vector< uint32_t > >* slice_active_chains_,
 	std::vector< std::vector< uint32_t > >* slice_next_chains_,
@@ -1779,7 +1762,7 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 		qDebug() << "---- peel slice on [" << loops << " loops and " << lines << " lines] ----";
 	}
 
-	ObjectMesh clipped;
+	AutoKnitMesh clipped;
 	std::vector< EmbeddedVertex > clipped_on_model;
 	std::vector< std::vector< EmbeddedVertex > > dummy;
 
@@ -1792,16 +1775,16 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 
 	std::vector< float > values(clipped.vertices.size(), std::numeric_limits< float >::infinity());
 
-	auto do_seg = [&values, &clipped](QVector3D const& a, QVector3D const& b) {
+	auto do_seg = [&values, &clipped](glm::vec3 const& a, glm::vec3 const& b) {
 		if (a == b) return;
-		QVector3D ab = b - a;
-		float limit = QVector3D::dotProduct(ab, ab);
+		glm::vec3 ab = b - a;
+		float limit = glm::dot(ab, ab);
 		float inv_limit = 1.0f / limit;
 		for (auto const& v : clipped.vertices) {
-			float amt = QVector3D::dotProduct(v - a, ab);
+			float amt = glm::dot(v - a, ab);
 			amt = std::max(0.0f, std::min(limit, amt));
-			QVector3D pt = (amt * inv_limit) * (b - a) + a;
-			float dis2 = (v - pt).lengthSquared();
+			glm::vec3 pt = (amt * inv_limit) * (b - a) + a;
+			float dis2 = glm::length2(v - pt);
 			float& best2 = values[&v - &clipped.vertices[0]];
 			best2 = std::min(best2, dis2);
 		}
@@ -1818,7 +1801,7 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 	}
 
 	
-	std::vector<glm::uvec3> clippedTriangles = getTriangles(clipped);
+	//std::vector<glm::uvec3> clippedTriangles = getTriangles(clipped);
 	std::vector< std::vector< EmbeddedVertex > > next_chains;
 	{
 		float level = 2.0f * stitchHeight / modelUnitLength;
@@ -1833,7 +1816,7 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 				auto ret = next.insert(std::make_pair(glm::uvec2(a, b), c));
 				assert(ret.second);
 			};
-			for (auto const& tri : clippedTriangles) {
+			for (auto const& tri : clipped.triangles) {
 				do_edge(tri.x, tri.y, tri.z);
 				do_edge(tri.y, tri.z, tri.x);
 				do_edge(tri.z, tri.x, tri.y);
@@ -1851,10 +1834,10 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 				assert(ev.simplex.z == -1U);
 
 				glm::uvec2 e = glm::uvec2(ev.simplex.x, ev.simplex.y);
-				float amt = ev.weights.y();
+				float amt = ev.weights.y;
 				if (next.count(e)) {
 					e = glm::uvec2(ev.simplex.y, ev.simplex.x);
-					amt = ev.weights.x();
+					amt = ev.weights.x;
 				}
 
 				assert(next.count(e) + next.count(glm::uvec2(e.y, e.x)) == 1); //e should be a boundary edge
@@ -1981,9 +1964,9 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 				glm::uvec3 simplex = clipped_on_model[v.simplex.x].simplex;
 				if (v.simplex.y != -1U) simplex = EmbeddedVertex::common_simplex(simplex, clipped_on_model[v.simplex.y].simplex);
 				if (v.simplex.z != -1U) simplex = EmbeddedVertex::common_simplex(simplex, clipped_on_model[v.simplex.z].simplex);
-				QVector3D weights = v.weights.x() * clipped_on_model[v.simplex.x].weights_on(simplex);
-				if (v.simplex.y != -1U) weights += v.weights.y() * clipped_on_model[v.simplex.y].weights_on(simplex);
-				if (v.simplex.z != -1U) weights += v.weights.z() * clipped_on_model[v.simplex.z].weights_on(simplex);
+				glm::vec3 weights = v.weights.x * clipped_on_model[v.simplex.x].weights_on(simplex);
+				if (v.simplex.y != -1U) weights += v.weights.y * clipped_on_model[v.simplex.y].weights_on(simplex);
+				if (v.simplex.z != -1U) weights += v.weights.z * clipped_on_model[v.simplex.z].weights_on(simplex);
 				v.simplex = simplex;
 				v.weights = weights;
 			}
@@ -2059,6 +2042,9 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 		qDebug() << "Trimmed " << trimmed << " too-close-for-epm vertices from slice chains.";
 	}
 }
+
+
+
 
 
 bool KnitGrapher::fillUnassigned(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop) {
@@ -2141,11 +2127,13 @@ bool KnitGrapher::fillUnassigned(std::vector< uint32_t >& closest, std::vector< 
 	return true;
 }
 
+
+
 void KnitGrapher::optimalLink(
 	float target_distance, bool do_roll,
-	std::vector< QVector3D > const& source,
+	std::vector< glm::vec3 > const& source,
 	std::vector< bool > const& source_linkone,
-	std::vector< QVector3D > const& target,
+	std::vector< glm::vec3 > const& target,
 	std::vector< bool > const& target_linkone,
 	std::vector< std::pair< uint32_t, uint32_t > >* links_) {
 
@@ -2223,7 +2211,7 @@ void KnitGrapher::optimalLink(
 	auto penalty = [&source, &target, &target_distance](uint32_t si, uint32_t ti) {
 		assert(si < source.size());
 		assert(ti < target.size());
-		float dis = (source[si] - target[ti]).length() - target_distance;
+		float dis = glm::length(source[si] - target[ti]) - target_distance;
 		return dis * dis;
 	};
 
@@ -2334,6 +2322,8 @@ void KnitGrapher::optimalLink(
 
 }
 
+
+
 void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop) {
 	assert(closest.size() == weights.size());
 	if (closest.empty()) return;
@@ -2378,6 +2368,7 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 		assert(bit_symbols.size() == symbols.size());
 		bits = symbol_bit.size();
 	}
+
 
 	struct State {
 		uint16_t used = 0; //have seen all symbols with bits in used
@@ -2553,6 +2544,7 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 		if (!is_loop) break;
 	}
 
+
 	while (!todo.empty()) {
 		std::pop_heap(todo.begin(), todo.end(), TODOCompare);
 		auto state = State::unpack(todo.back().second);
@@ -2581,7 +2573,7 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 		path.emplace_back(f->second.second);
 	}
 	std::reverse(path.begin(), path.end());
-
+	//std::cout << "----" << std::endl; //DEBUG
 
 	std::vector< int8_t > keep(bit_symbols.size(), -1);
 	for (uint32_t i = 1; i < path.size(); ++i) {
@@ -2720,6 +2712,8 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 
 }
 
+
+
 //huge function from autoknit, below is the copied comments
 //NOTE:
 // in the output of link_chains, links are ordered so that if a vertex appears
@@ -2734,7 +2728,7 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 //     or ... (b,a) (c,a) ...
 //  (depending on which chain is 'from' and which is 'to')
 void KnitGrapher::linkChains(
-	ObjectMesh const& slice, //in: slice on which the chains reside
+	AutoKnitMesh const& slice, //in: slice on which the chains reside
 	std::vector< float > const& slice_times, //in: time field (times @ vertices), for slice
 	std::vector< std::vector< uint32_t > > const& active_chains, //in: current active chains (slice vertex #'s)
 	std::vector< std::vector< Stitch > > const& active_stitches, //in: current active stitches, sorted by time
@@ -2785,7 +2779,6 @@ void KnitGrapher::linkChains(
 	auto& links = *links_;
 	links.clear();
 
-
 	//figure out the time to trim after:
 	float active_max_time = -std::numeric_limits< float >::infinity();
 	for (auto const& chain : active_chains) {
@@ -2805,9 +2798,9 @@ void KnitGrapher::linkChains(
 			float total_length = 0.0f;
 			lengths.emplace_back(total_length);
 			for (uint32_t vi = 1; vi < chain.size(); ++vi) {
-				QVector3D const& a = slice.vertices[chain[vi - 1]];
-				QVector3D const& b = slice.vertices[chain[vi]];
-				total_length += (b - a).length();
+				glm::vec3 const& a = slice.vertices[chain[vi - 1]];
+				glm::vec3 const& b = slice.vertices[chain[vi]];
+				total_length += glm::length(b - a);
 				lengths.emplace_back(total_length);
 			}
 			assert(lengths.size() == chain.size());
@@ -2827,8 +2820,6 @@ void KnitGrapher::linkChains(
 		next_discard_after.emplace_back();
 		auto& discard_after = next_discard_after.back();
 		discard_after.emplace_back(0.0f, (slice_times[chain[0]] > active_max_time));
-		//qDebug() << (slice_times[chain[0]] > active_max_time) << slice_times[chain[0]] << active_max_time;
-		qDebug() << "discard after emplace";
 		for (uint32_t vi = 0; vi + 1 < chain.size(); ++vi) {
 			float ta = slice_times[chain[vi]];
 			float tb = slice_times[chain[vi + 1]];
@@ -2840,7 +2831,6 @@ void KnitGrapher::linkChains(
 				float m = (active_max_time - ta) / (tb - ta);
 				float l = m * (lb - la) + la;
 				discard_after.emplace_back(l / lengths.back(), (tb > active_max_time));
-				qDebug() << l / lengths.back() << (tb-0.1 > active_max_time) << tb << active_max_time;
 			}
 			else {
 				assert((ta > active_max_time) == (tb > active_max_time));
@@ -2867,7 +2857,6 @@ void KnitGrapher::linkChains(
 				else if (s + 1 == discard_after.size()) len = last_len;
 				else len = discard_after[s + 1].first - discard_after[s].first;
 				if (len * lengths.back() < MinLength) {
-					qDebug() << "les than min length!";
 					discard_after[s].second = true;
 				}
 			}
@@ -2901,7 +2890,6 @@ void KnitGrapher::linkChains(
 				else if (s + 1 == discard_after.size()) len = last_len;
 				else len = discard_after[s + 1].first - discard_after[s].first;
 				if (len * lengths.back() < MinLength) {
-					qDebug() << "wowee";
 					discard_after[s].second = false;
 				}
 			}
@@ -2918,7 +2906,6 @@ void KnitGrapher::linkChains(
 			}
 		}
 	}
-
 
 	{ //for any next chains that touch a boundary, mark as 'accept':
 		uint32_t marked = 0;
@@ -2937,9 +2924,7 @@ void KnitGrapher::linkChains(
 	{ //if all segments are marked 'discard', then mark everything 'accept':
 		bool only_discard = true;
 		for (auto const& discard_after : next_discard_after) {
-			qDebug() << "getting d";
 			for (auto const& d : discard_after) {
-				qDebug() << d.first << d.second;
 				if (!d.second) {
 					only_discard = false;
 					break;
@@ -2966,14 +2951,14 @@ void KnitGrapher::linkChains(
 	std::vector< std::vector< uint32_t > > active_closest;
 	std::vector< std::vector< uint32_t > > next_closest;
 
-	std::vector<glm::uvec3> sliceTriangles = getTriangles(slice);
+	//std::vector<glm::uvec3> sliceTriangles = getTriangles(slice);
 
 	{ //find closest pairs:
 
 		std::vector< std::vector< uint32_t > > adj(slice.vertices.size());
 		{ //adjacency matrix -- always handy:
 			std::unordered_set< glm::uvec2 > edges;
-			for (auto const& tri : sliceTriangles) {
+			for (auto const& tri : slice.triangles) {
 				auto do_edge = [&edges](uint32_t a, uint32_t b) {
 					if (b > a) std::swap(a, b);
 					edges.insert(glm::uvec2(a, b));
@@ -3020,7 +3005,7 @@ void KnitGrapher::linkChains(
 					if (d > dis[at]) continue;
 					assert(d == dis[at]);
 					for (auto n : adj[at]) {
-						float nd = d + (slice.vertices[n] - slice.vertices[at]).length();
+						float nd = d + glm::length(slice.vertices[n] - slice.vertices[at]);
 						if (nd < dis[n]) queue(n, nd, from[at]);
 					}
 				}
@@ -3107,7 +3092,7 @@ void KnitGrapher::linkChains(
 			}
 		}
 
-		if (discarded) qDebug() << "Discarded " << discarded << " non-mutual segment matches.";
+		if (discarded) qDebug()<< "Discarded " << discarded << " non-mutual segment matches.";
 
 		return discarded > 0;
 	};
@@ -3220,7 +3205,6 @@ void KnitGrapher::linkChains(
 	}
 
 
-
 	{ //do stitch assignments:
 		//sort ranges from matches back to actives:
 		std::vector< std::vector< BeginEndStitches* > > active_segments(active_chains.size());
@@ -3276,7 +3260,6 @@ void KnitGrapher::linkChains(
 	}
 
 
-	//merge segments because it's probably more convenient for balancing:
 	uint32_t active_merges = 0;
 	for (auto& anm : matches) {
 		if (anm.second.active.size() <= 1) continue;
@@ -3295,7 +3278,7 @@ void KnitGrapher::linkChains(
 		}
 		assert(anm.second.active.size() <= 2); //<-- should be guaranteed by flatten
 	}
-	if (active_merges) qDebug() << "Merged " << active_merges << " active segments." ;
+	if (active_merges) qDebug() << "Merged " << active_merges << " active segments.";
 
 	uint32_t next_merges = 0;
 	for (auto& anm : matches) {
@@ -3314,7 +3297,7 @@ void KnitGrapher::linkChains(
 		}
 		assert(anm.second.next.size() <= 2); //<-- should be guaranteed by flatten
 	}
-	if (next_merges) qDebug() << "Merged " << next_merges << " next segments." ;
+	if (next_merges) qDebug() << "Merged " << next_merges << " next segments.";
 
 
 	{ //balance stitch assignments for splits:
@@ -3501,7 +3484,8 @@ void KnitGrapher::linkChains(
 			//end DEBUG
 
 			if (old_back != new_back || old_front != new_front) {
-				qDebug() << "Balanced a merge: old: " << old_back << " " << old_front << " new: " << new_back << " " << new_front;
+				qDebug() << "Balanced a merge: old: " << old_back << old_front << " new: " << new_back  << new_front;
+				//std::cout.flush();
 				//} else {
 				//if (old_back == new_back && old_front == new_front) {
 					//std::cout << "NOTE: merge was already balanced." << std::endl;
@@ -3553,15 +3537,15 @@ void KnitGrapher::linkChains(
 		Match& match = anm.second;
 
 		if (match.active.empty()) {
-			qDebug() << "Ignoring match with empty active chain.";
+			std::cout << "Ignoring match with empty active chain." << std::endl;
 			continue;
 		}
 		else if (match.next.empty()) {
 			if (active_matches[anm.first.first] == 1) {
-				qDebug() << "WARNING: active chain matches nothing at all; will not be linked and will thus be discarded.";
+				std::cout << "WARNING: active chain matches nothing at all; will not be linked and will thus be discarded." << std::endl;
 			}
 			else {
-				qDebug() << "Ignoring match with empty next chain.";
+				std::cout << "Ignoring match with empty next chain." << std::endl;
 			}
 
 			continue;
@@ -3917,9 +3901,8 @@ void KnitGrapher::linkChains(
 			//end DEBUG
 
 			if (old_back != new_back || old_front != new_front) {
-				qDebug() << "Balanced a split:\n" << "old: " << old_back << "\n" << "     " << old_front << "\n" << "new: " << new_back << "\n" << "     " << new_front << "\n";
-
-
+				qDebug() << "Balanced a split: " << "old: " << old_back << old_front  << " new: " << new_back << new_front;
+				//std::cout.flush();
 				//} else {
 				//if (old_back == new_back && old_front == new_front) {
 				//	std::cout << "NOTE: split was already balanced." << std::endl;
@@ -3940,7 +3923,7 @@ void KnitGrapher::linkChains(
 		std::vector< uint32_t > const& chain,
 		std::vector< float > const& lengths,
 		std::vector< Stitch > const& stitches,
-		std::vector< QVector3D >* stitch_locations_,
+		std::vector< glm::vec3 >* stitch_locations_,
 		std::vector< bool >* stitch_linkones_) {
 
 			assert(chain.size() == lengths.size());
@@ -3963,7 +3946,7 @@ void KnitGrapher::linkChains(
 				uint32_t i = li - lengths.begin();
 
 				stitch_locations.emplace_back(
-					mix(
+					glm::mix(
 						slice.vertices[chain[i - 1]],
 						slice.vertices[chain[i]],
 						(l - *(li - 1)) / (*li - *(li - 1))
@@ -3973,10 +3956,10 @@ void KnitGrapher::linkChains(
 			}
 	};
 
-	std::vector< std::vector< QVector3D > > all_active_stitch_locations(active_chains.size());
+	std::vector< std::vector< glm::vec3 > > all_active_stitch_locations(active_chains.size());
 	std::vector< std::vector< bool > > all_active_stitch_linkones(active_chains.size());
 
-	std::vector< std::vector< QVector3D > > all_next_stitch_locations(next_chains.size());
+	std::vector< std::vector< glm::vec3 > > all_next_stitch_locations(next_chains.size());
 	std::vector< std::vector< bool > > all_next_stitch_linkones(next_chains.size());
 
 	for (uint32_t ai = 0; ai < active_chains.size(); ++ai) {
@@ -4008,7 +3991,7 @@ void KnitGrapher::linkChains(
 		Match const& match = anm.second;
 
 		std::vector< uint32_t > next_stitch_indices;
-		std::vector< QVector3D > next_stitch_locations;
+		std::vector< glm::vec3 > next_stitch_locations;
 		std::vector< bool > next_stitch_linkones;
 		std::unordered_set< uint32_t >& next_claimed = all_next_claimed[anm.first.second];
 		auto do_range = [&](float begin, float end) {
@@ -4062,7 +4045,7 @@ void KnitGrapher::linkChains(
 
 
 		std::vector< uint32_t > active_stitch_indices;
-		std::vector< QVector3D > active_stitch_locations;
+		std::vector< glm::vec3 > active_stitch_locations;
 		std::vector< bool > active_stitch_linkones;
 		std::unordered_set< uint32_t >& active_claimed = all_active_claimed[anm.first.first];
 		for (auto const& be : match.active) {
@@ -4116,7 +4099,6 @@ void KnitGrapher::linkChains(
 			}
 			qDebug() << " About to connect " << active_stitch_locations.size() << " active stitches (" << active_ones << " linkones) to " << next_stitch_locations.size() << " new stitches (" << new_ones << " linkones).";
 		}
-
 
 		//actually build links:
 		{ //least-clever linking solution: FlagLinkOne's link 1-1, others link to keep arrays mostly in sync
@@ -4237,63 +4219,47 @@ void KnitGrapher::linkChains(
 				assert(p.second < next_stitch_indices.size());
 				link.to_stitch = next_stitch_indices[p.second];
 				links.emplace_back(link);
+				}
 			}
 		}
-	}
 
 
-	//PARANOIA: every stitch should have been claimed
-	for (uint32_t ai = 0; ai < active_chains.size(); ++ai) {
-		assert(all_active_claimed[ai].size() == active_stitches[ai].size());
-	}
-	for (uint32_t ni = 0; ni < next_chains.size(); ++ni) {
-		assert(all_next_claimed[ni].size() == next_stitches[ni].size());
-	}
-
-	//mark next stitches in discard range as 'discard':
-	assert(next_discard_after.size() == next_stitches.size());
-	uint32_t marked = 0;
-	uint32_t total = 0;
-	for (auto& stitches : next_stitches) {
-		auto const& discard_after = next_discard_after[&stitches - &next_stitches[0]];
-
-		auto di = discard_after.begin();
-		for (auto& s : stitches) {
-			assert(di != discard_after.end());
-			while (di + 1 != discard_after.end() && (di + 1)->first <= s.t) ++di;
-			assert(di->first <= s.t);
-			if (di->second) {
-				s.flag = Stitch::FlagDiscard;
-				++marked;
-			}
-			++total;
+		//PARANOIA: every stitch should have been claimed
+		for (uint32_t ai = 0; ai < active_chains.size(); ++ai) {
+			assert(all_active_claimed[ai].size() == active_stitches[ai].size());
 		}
-	}
+		for (uint32_t ni = 0; ni < next_chains.size(); ++ni) {
+			assert(all_next_claimed[ni].size() == next_stitches[ni].size());
+		}
+
+		//mark next stitches in discard range as 'discard':
+		assert(next_discard_after.size() == next_stitches.size());
+		uint32_t marked = 0;
+		uint32_t total = 0;
+		for (auto& stitches : next_stitches) {
+			auto const& discard_after = next_discard_after[&stitches - &next_stitches[0]];
+
+			auto di = discard_after.begin();
+			for (auto& s : stitches) {
+				assert(di != discard_after.end());
+				while (di + 1 != discard_after.end() && (di + 1)->first <= s.t) ++di;
+				assert(di->first <= s.t);
+				if (di->second) {
+					s.flag = Stitch::FlagDiscard;
+					++marked;
+				}
+				++total;
+			}
+		}
 	qDebug() << "Marked " << marked << " of " << total << " newly created stitches as 'discard'.";
 
 }
 
 
-QVector3D glmMin(QVector3D a, QVector3D b) {
-	//simulate glm::vec3 min, components wise
-	return QVector3D(
-		qMin(a.x(), b.x()),
-		qMin(a.y(), b.y()),
-		qMin(a.z(), b.z())
-	);
-}
 
-QVector3D glmMax(QVector3D a, QVector3D b) {
-	//simulate glm::vec3 max, components wise
-	return QVector3D(
-		qMax(a.x(), b.x()),
-		qMax(a.y(), b.y()),
-		qMax(a.z(), b.z())
-	);
-}
 
 void KnitGrapher::embeddedPathSimple(
-	ObjectMesh const& model,
+	AutoKnitMesh const& model,
 	EmbeddedVertex const& source,
 	EmbeddedVertex const& target,
 	std::vector< EmbeddedVertex >* path_ //out: path; path[0] will be source and path.back() will be target
@@ -4308,7 +4274,7 @@ void KnitGrapher::embeddedPathSimple(
 
 	//idea: place distance storage along each edge and on each corner.
 	std::vector< EmbeddedVertex > loc_ev;
-	std::vector< QVector3D > loc_pos;
+	std::vector< glm::vec3 > loc_pos;
 
 	//TODO: eventually, incrementally build locs starting from source / target verts
 
@@ -4326,10 +4292,10 @@ void KnitGrapher::embeddedPathSimple(
 	std::unordered_map< glm::uvec3, uint32_t > simplex_triangle;
 	std::unordered_set< glm::uvec2 > edges;
 
-	std::vector<glm::uvec3> modelTriangles = getTriangles(model);
+	//std::vector<glm::uvec3> modelTriangles = getTriangles(model);
 
-	for (auto const& tri : modelTriangles) {
-		uint32_t ti = &tri - &modelTriangles[0];
+	for (auto const& tri : model.triangles) {
+		uint32_t ti = &tri - &model.triangles[0];
 		auto do_edge = [&](uint32_t a, uint32_t b) {
 			if (a > b) std::swap(a, b);
 			edge_triangles.insert(std::make_pair(glm::uvec2(a, b), ti));
@@ -4352,7 +4318,7 @@ void KnitGrapher::embeddedPathSimple(
 	edge_locs.reserve(edges.size());
 	float const max_spacing = getMaxPathSampleSpacing();
 	for (auto const& e : edges) {
-		uint32_t count = std::max(0, int32_t(std::floor((model.vertices[e.y] - model.vertices[e.x]).length() / max_spacing)));
+		uint32_t count = std::max(0, int32_t(std::floor(glm::length(model.vertices[e.y] - model.vertices[e.x]) / max_spacing)));
 		uint32_t begin = loc_ev.size();
 		uint32_t end = begin + count;
 		edge_locs.insert(std::make_pair(e, std::make_pair(begin, end)));
@@ -4365,9 +4331,9 @@ void KnitGrapher::embeddedPathSimple(
 
 	//build adjacency lists for each triangle:
 	std::vector< std::vector< uint32_t > > loc_tris(loc_ev.size());
-	std::vector< std::vector< uint32_t > > tri_adj(modelTriangles.size());
-	for (auto const& tri : modelTriangles) {
-		uint32_t ti = &tri - &modelTriangles[0];
+	std::vector< std::vector< uint32_t > > tri_adj(model.triangles.size());
+	for (auto const& tri : model.triangles) {
+		uint32_t ti = &tri - &model.triangles[0];
 		auto do_edge = [&](uint32_t a, uint32_t b) {
 			if (a > b) std::swap(b, a);
 			auto f = edge_locs.find(glm::uvec2(a, b));
@@ -4408,7 +4374,6 @@ void KnitGrapher::embeddedPathSimple(
 
 			loc_tris.emplace_back();
 			auto r = edge_triangles.equal_range(glm::uvec2(ev.simplex));
-
 			assert(r.first != r.second);
 			for (auto ri = r.first; ri != r.second; ++ri) {
 				uint32_t ti = ri->second;
@@ -4439,23 +4404,13 @@ void KnitGrapher::embeddedPathSimple(
 	uint32_t source_idx = add_embedded(source);
 	uint32_t target_idx = add_embedded(target);
 
-	/*//DEBUG:
-	std::cout << "Source is loc " << source_idx << " with adj\n";
-	for (auto t : loc_tris[source_idx]) {
-		std::cout << " " << t << ":";
-		for (auto a : tri_adj[t]) {
-			std::cout << " " << a;
-		}
-		std::cout << "\n";
-	}
-	std::cout.flush();*/
 
 	//now do actual search:
 
 	std::vector< float > loc_dis(loc_pos.size(), std::numeric_limits< float >::infinity());
 	std::vector< uint32_t > loc_from(loc_pos.size(), -1U);
 
-	QVector3D target_pos = target.interpolate(model.vertices);
+	glm::vec3 target_pos = target.interpolate(model.vertices);
 
 	std::vector< std::pair< float, std::pair< uint32_t, float > > > todo;
 
@@ -4464,7 +4419,7 @@ void KnitGrapher::embeddedPathSimple(
 		loc_dis[at] = distance;
 		loc_from[at] = from;
 
-		float heuristic = (target_pos - loc_pos[at]).length();
+		float heuristic = glm::length(target_pos - loc_pos[at]);
 		todo.emplace_back(std::make_pair(-(heuristic + distance), std::make_pair(at, distance)));
 		std::push_heap(todo.begin(), todo.end());
 	};
@@ -4483,7 +4438,7 @@ void KnitGrapher::embeddedPathSimple(
 		for (auto t : loc_tris[at]) {
 			for (auto n : tri_adj[t]) {
 				if (n == at) continue;
-				float d = distance + (loc_pos[n] - loc_pos[at]).length();
+				float d = distance + glm::length(loc_pos[n] - loc_pos[at]);
 				if (d < loc_dis[n]) queue(n, d, at);
 			}
 		}
@@ -4508,7 +4463,7 @@ void KnitGrapher::embeddedPathSimple(
 }
 
 void KnitGrapher::embeddedPath(
-	ObjectMesh const& model,
+	AutoKnitMesh const& model,
 	EmbeddedVertex const& source,
 	EmbeddedVertex const& target,
 	std::vector< EmbeddedVertex >* path_ //out: path; path[0] will be source and path.back() will be target
@@ -4523,9 +4478,7 @@ void KnitGrapher::embeddedPath(
 	std::vector< std::vector< uint32_t > > adj(model.vertices.size());
 
 	std::unordered_set< glm::uvec2 > edges;
-
-	std::vector<glm::uvec3> modelTriangles = getTriangles(model);
-	for (auto const& tri : modelTriangles) {
+	for (auto const& tri : model.triangles) {
 		auto do_edge = [&](uint32_t a, uint32_t b) {
 			if (a > b) std::swap(a, b);
 			edges.insert(glm::uvec2(a, b));
@@ -4550,12 +4503,12 @@ void KnitGrapher::embeddedPath(
 		assert(distance < dis[at]);
 		dis[at] = distance;
 
-		float heuristic = (model.vertices[target_idx] - model.vertices[at]).length();
+		float heuristic = glm::length(model.vertices[target_idx] - model.vertices[at]);
 		todo.emplace_back(std::make_pair(-(heuristic + distance), std::make_pair(at, distance)));
 		std::push_heap(todo.begin(), todo.end());
 	};
 
-	queue(source.simplex.x, (source.interpolate(model.vertices) - model.vertices[source.simplex.x]).length());
+	queue(source.simplex.x, glm::length(source.interpolate(model.vertices) - model.vertices[source.simplex.x]));
 
 	while (!todo.empty()) {
 		std::pop_heap(todo.begin(), todo.end());
@@ -4569,20 +4522,20 @@ void KnitGrapher::embeddedPath(
 		if (at == target_idx) break; //bail out early -- don't need distances to everything.
 
 		for (auto n : adj[at]) {
-			float d = distance + (model.vertices[n] - model.vertices[at]).length();
+			float d = distance + glm::length(model.vertices[n] - model.vertices[at]);
 			if (d < dis[n]) queue(n, d);
 		}
 	}
 
 	//okay, so this is a conservative (long) estimate of path length:
-	float dis2 = dis[target_idx] + (target.interpolate(model.vertices) - model.vertices[target_idx]).length();
+	float dis2 = dis[target_idx] + glm::length(target.interpolate(model.vertices) - model.vertices[target_idx]);
 	dis2 = dis2 * dis2;
 
 	//come up with a model containing only triangles that might be used in the path:
 
-	ObjectMesh trimmed;
+	AutoKnitMesh trimmed;
 	trimmed.vertices.reserve(model.vertices.size());
-	trimmed.indices.reserve(modelTriangles.size()*3);
+	trimmed.triangles.reserve(model.triangles.size());
 
 	std::vector< uint32_t > to_trimmed(model.vertices.size(), -1U);
 	std::vector< uint32_t > from_trimmed;
@@ -4596,20 +4549,17 @@ void KnitGrapher::embeddedPath(
 		return to_trimmed[v];
 	};
 
-	std::vector<glm::uvec3> trimmedTriangles = getTriangles(trimmed);
-
 	{ //keep triangles that are close enough to source and target that the path could possible pass through them:
-		QVector3D src = source.interpolate(model.vertices);
-		QVector3D tgt = target.interpolate(model.vertices);
-		for (auto const& tri : modelTriangles) {
+		glm::vec3 src = source.interpolate(model.vertices);
+		glm::vec3 tgt = target.interpolate(model.vertices);
+		for (auto const& tri : model.triangles) {
+			glm::vec3 min = glm::min(model.vertices[tri.x], glm::min(model.vertices[tri.y], model.vertices[tri.z]));
+			glm::vec3 max = glm::max(model.vertices[tri.x], glm::max(model.vertices[tri.y], model.vertices[tri.z]));
 
-			QVector3D min = glmMin(model.vertices[tri.x], glmMin(model.vertices[tri.y], model.vertices[tri.z]));
-			QVector3D max = glmMax(model.vertices[tri.x], glmMax(model.vertices[tri.y], model.vertices[tri.z]));
-
-			float len2_src = (glmMax(min, glmMin(max, src)) - src).lengthSquared();
-			float len2_tgt = (glmMax(min, glmMin(max, tgt)) - tgt).lengthSquared();
+			float len2_src = glm::length2(glm::max(min, glm::min(max, src)) - src);
+			float len2_tgt = glm::length2(glm::max(min, glm::min(max, tgt)) - tgt);
 			if (len2_src + len2_tgt < dis2) {
-				trimmedTriangles.emplace_back(glm::uvec3(
+				trimmed.triangles.emplace_back(glm::uvec3(
 					vertex_to_trimmed(tri.x), vertex_to_trimmed(tri.y), vertex_to_trimmed(tri.z)
 				));
 			}
@@ -4649,8 +4599,10 @@ void KnitGrapher::embeddedPath(
 }
 
 
+
+
 void KnitGrapher::buildNextActiveChains(
-	ObjectMesh const& slice,
+	AutoKnitMesh const& slice,
 	std::vector< EmbeddedVertex > const& slice_on_model, //in: vertices of slice (on model)
 	std::vector< std::vector< uint32_t > > const& active_chains,  //in: current active chains (on slice)
 	std::vector< std::vector< Stitch > > const& active_stitches, //in: current active stitches
@@ -4895,9 +4847,9 @@ void KnitGrapher::buildNextActiveChains(
 			float total_length = 0.0f;
 			lengths.emplace_back(total_length);
 			for (uint32_t vi = 1; vi < chain.size(); ++vi) {
-				QVector3D const& a = slice.vertices[chain[vi - 1]];
-				QVector3D const& b = slice.vertices[chain[vi]];
-				total_length += (b - a).length();
+				glm::vec3 const& a = slice.vertices[chain[vi - 1]];
+				glm::vec3 const& b = slice.vertices[chain[vi]];
+				total_length += glm::length(b - a);
 				lengths.emplace_back(total_length);
 			}
 		}
@@ -4908,8 +4860,6 @@ void KnitGrapher::buildNextActiveChains(
 
 	std::vector< std::vector< uint32_t > > next_vertices;
 	next_vertices.reserve(next_chains.size());
-
-
 
 	if (!graph_) {
 		//blank vertex info if no graph:
@@ -5164,7 +5114,6 @@ void KnitGrapher::buildNextActiveChains(
 
 	//Walk through created edges array, creating chains therefrom:
 
-
 	std::vector< std::vector< OnChainStitch > > loops;
 	std::map< std::pair< OnChainStitch, OnChainStitch >, std::vector< OnChainStitch > > partials;
 
@@ -5276,9 +5225,9 @@ void KnitGrapher::buildNextActiveChains(
 			if (!chain.empty()) {
 				assert(ev != chain.back());
 				EmbeddedVertex::common_simplex(chain.back().simplex, ev.simplex); //make sure this works
-				length += (
+				length += glm::length(
 					chain.back().interpolate(slice.vertices) - ev.interpolate(slice.vertices)
-				).length();
+				);
 			}
 			chain.emplace_back(ev);
 		};
@@ -5426,9 +5375,9 @@ void KnitGrapher::buildNextActiveChains(
 			if (ev.simplex.y != -1U) simplex = EmbeddedVertex::common_simplex(simplex, slice_on_model[ev.simplex.y].simplex);
 			if (ev.simplex.z != -1U) simplex = EmbeddedVertex::common_simplex(simplex, slice_on_model[ev.simplex.z].simplex);
 
-			QVector3D weights = ev.weights.x() * slice_on_model[ev.simplex.x].weights_on(simplex);
-			if (ev.simplex.y != -1U) weights += ev.weights.y() * slice_on_model[ev.simplex.y].weights_on(simplex);
-			if (ev.simplex.z != -1U) weights += ev.weights.z() * slice_on_model[ev.simplex.z].weights_on(simplex);
+			glm::vec3 weights = ev.weights.x * slice_on_model[ev.simplex.x].weights_on(simplex);
+			if (ev.simplex.y != -1U) weights += ev.weights.y * slice_on_model[ev.simplex.y].weights_on(simplex);
+			if (ev.simplex.z != -1U) weights += ev.weights.z * slice_on_model[ev.simplex.z].weights_on(simplex);
 
 			ev = EmbeddedVertex::canonicalize(simplex, weights);
 		}
@@ -5554,7 +5503,10 @@ void KnitGrapher::stepButtonClicked()
 			sliceTimes.emplace_back(ev.interpolate(constrained_values));
 		}
 		
-		emit peelSliceDone(&slice, &sliceActiveChains, &sliceNextChains);
+
+		ObjectMesh emittedMesh = slice.toObjMesh();
+
+		emit peelSliceDone(&emittedMesh, &sliceActiveChains, &sliceNextChains);
 	}
 	if (stepCount % 4 == 2) {
 		qDebug() << "[Step "<< stepCount << " ] - link, calling linkChains()-------------------------------------------------------------------";
@@ -5596,12 +5548,18 @@ void KnitGrapher::constructKnitGraph(std::vector<Constraint*> constraints)
 	modelUnitLength = 10.0f;
 	//this->constraints[2]->timeValue = 0.5f;
 
-	generateTriangles();
+	//generateTriangles();
+	
+
+
 	remesh();
 	//printConstrainedValues();
 	interpolateValues();
 	qDebug() << "interpolation done!, emitting...";
-	emit knitGraphInterpolated(newMesh, constrained_values);
+
+	ObjectMesh emittedMesh = newMesh.toObjMesh();
+
+	emit knitGraphInterpolated(emittedMesh, constrained_values);
 }
 void KnitGrapher::setStitchWidth(float width)
 {

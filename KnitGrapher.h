@@ -104,7 +104,10 @@ struct Edge {
 
 
 private:
-	ObjectMesh originalMesh, newMesh;
+
+
+	///////////////class member variables used mainly in remesh and interpolation////////////////
+	AutoKnitMesh originalMesh, newMesh;
 	float stitchWidth;
 	float stitchHeight;		//both float values in mm
 	float modelUnitLength;	//the length of a unit in the model in mm
@@ -116,16 +119,41 @@ private:
 	std::vector<Constraint*> constraints;
 	std::vector<float> constrained_values;
 
-	std::vector<glm::uvec3> oldTriangles;
-	std::vector<glm::uvec3> newTriangles;
+	//std::vector<glm::uvec3> oldTriangles;
+	//std::vector<glm::uvec3> newTriangles;
+
+	void quad(std::vector<glm::uvec3>& new_tris, std::vector<glm::vec3>& verts, uint32_t a, uint32_t b, uint32_t c, uint32_t d);
+	void divide(std::unordered_set< glm::uvec2 > marked,
+		std::vector< glm::vec3 >& verts,
+		std::vector<std::vector<uint32_t>>& paths,
+		std::vector<glm::uvec3>& tris);
+	void remesh();
+	float getMaxEdgeLength();
+	bool degenerateCheck(std::vector<glm::uvec3> tris);
+	//so. much. passing. by. reference. need to make some variables class members.... TODO!!!
+	void unfold(uint32_t depth, uint32_t root, glm::vec2 const& flat_root,
+		uint32_t ai, glm::vec2 const& flat_a,
+		uint32_t bi, glm::vec2 const& flat_b,
+		glm::vec2 const& limit_a, glm::vec2 const& limit_b, std::unordered_map< glm::uvec2, uint32_t >  const& opposite,
+		std::vector<glm::vec3> const& newVertices, std::unordered_map< glm::uvec2, float >& min_dis);
+
+	GLuint lookup(uint32_t a, uint32_t b, std::unordered_map< glm::uvec2, uint32_t >& marked_verts);
+
+	int stepCount = 0;
 
 
+
+	std::vector<GLuint> toIntArray(std::vector<glm::uvec3>);
+
+	void generateTriangles();
+	void interpolateValues();
+	void printConstrainedValues();
 	//////////////////////class member variables used in peeling///////////////////////////////
 	std::vector< std::vector< EmbeddedVertex > > active_chains;
 	std::vector< std::vector< Stitch > > active_stitches;
 	RowColGraph graph;
 
-	ObjectMesh slice;
+	AutoKnitMesh slice;
 	std::vector< EmbeddedVertex > sliceOnModel;
 	std::vector< std::vector< uint32_t > > sliceActiveChains;
 	std::vector< std::vector< uint32_t > > sliceNextChains;
@@ -148,8 +176,9 @@ private:
 
 	std::vector<glm::uvec3> getTriangles(ObjectMesh const& model);
 
+	
 	void extractLevelChains(
-		ObjectMesh const& model, //in: model on which to embed vertices
+		AutoKnitMesh const& model, //in: model on which to embed vertices
 		std::vector< float > const& values, //in: values at vertices
 		float const level, //in: level at which to extract chains
 		std::vector< std::vector< EmbeddedVertex > >* chains_ //chains of edges at given level
@@ -158,21 +187,21 @@ private:
 	//trim the constrained model according to the parameters
 	void trimModel(std::vector< std::vector< EmbeddedVertex > > & left_of,
 		std::vector< std::vector< EmbeddedVertex > > & right_of, 
-		ObjectMesh* clipped_,
+		AutoKnitMesh* clipped_,
 		std::vector< EmbeddedVertex >* clipped_vertices_,
 		std::vector< std::vector< uint32_t > >* left_of_vertices_, //out (optional): indices of vertices corresponding to left_of chains [may be some rounding]
 		std::vector< std::vector< uint32_t > >* right_of_vertices_ //out (optional): indices of vertices corresponding to right_of chains [may be some rounding]
 	);
-
+	
 	void embeddedPathSimple(
-		ObjectMesh const& model,
+		AutoKnitMesh const& model,
 		EmbeddedVertex const& source,
 		EmbeddedVertex const& target,
 		std::vector< EmbeddedVertex >* path_ //out: path; path[0] will be source and path.back() will be target
 	);
 
 	void embeddedPath(
-		ObjectMesh const& model,
+		AutoKnitMesh const& model,
 		EmbeddedVertex const& source,
 		EmbeddedVertex const& target,
 		std::vector< EmbeddedVertex >* path_ //out: path; path[0] will be source and path.back() will be target
@@ -180,7 +209,7 @@ private:
 
 
 	void buildNextActiveChains(
-		ObjectMesh const& slice,
+		AutoKnitMesh const& slice,
 		std::vector< EmbeddedVertex > const& slice_on_model, //in: vertices of slice (on model)
 		std::vector< std::vector< uint32_t > > const& active_chains,  //in: current active chains (on slice)
 		std::vector< std::vector< Stitch > > const& active_stitches, //in: current active stitches
@@ -194,7 +223,7 @@ private:
 	);
 
 
-
+	
 
 
 
@@ -209,20 +238,18 @@ private:
 
 	std::vector<std::vector< Stitch>> nextStitches;
 	std::vector<Link> links;
-
+	
 	bool fillUnassigned(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop);
 	void flatten(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop);
 	void optimalLink(
 		float target_distance, bool do_roll,
-		std::vector< QVector3D > const& source,
+		std::vector< glm::vec3 > const& source,
 		std::vector< bool > const& source_linkone,
-		std::vector< QVector3D > const& target,
+		std::vector< glm::vec3 > const& target,
 		std::vector< bool > const& target_linkone,
 		std::vector< std::pair< uint32_t, uint32_t > >* links_);
-
-
 	void linkChains(
-		ObjectMesh const& slice, //in: slice on which the chains reside
+		AutoKnitMesh const& slice, //in: slice on which the chains reside
 		std::vector< float > const& slice_times, //in: time field (times @ vertices), for slice
 		std::vector< std::vector< uint32_t > > const& active_chains, //in: current active chains (slice vertex #'s)
 		std::vector< std::vector< Stitch > > const& active_stitches, //in: current active stitches, sorted by time
@@ -234,7 +261,7 @@ private:
 	);
 
 
-
+	
 	void sampleChain(
 		float spacing,
 		std::vector< EmbeddedVertex > const& chain,
@@ -243,41 +270,16 @@ private:
 
 
 	void peelSlice(std::vector< std::vector< EmbeddedVertex > > & active_chains,
-		ObjectMesh* slice_,
+		AutoKnitMesh* slice_,
 		std::vector< EmbeddedVertex >* slice_on_model_,
 		std::vector< std::vector< uint32_t > >* slice_active_chains_,
 		std::vector< std::vector< uint32_t > >* slice_next_chains_,
 		std::vector< bool >* used_boundary_);
 
-	int stepCount = 0;
-
-	void quad(std::vector<glm::uvec3>& new_tris, std::vector<QVector3D>& verts, GLuint a, GLuint b, GLuint c, GLuint d);
-	void divide(QSet<QPoint>& marked,
-		std::vector<QVector3D>& verts,
-		std::vector<std::vector<GLuint>>& paths,
-		std::vector<glm::uvec3>& tris);
-	void remesh();
-	float getMaxEdgeLength();
-	bool degenerateCheck(std::vector<glm::uvec3> tris);
-
-	std::vector<GLuint> toIntArray(std::vector<glm::uvec3>);
-
-	void generateTriangles();
-	void interpolateValues();
-	void printConstrainedValues();
-
 	void findFirstActiveChains(std::vector< std::vector< EmbeddedVertex > >* active_chains_,
 		std::vector< std::vector< Stitch > >* active_stitches_,
 		RowColGraph* graph_);
 
-	//so. much. passing. by. reference. need to make some variables class members.... TODO!!!
-	void unfold(GLuint depth, GLuint root, QVector2D const& flat_root,
-		GLuint ai, QVector2D const& flat_a,
-		GLuint bi, QVector2D const& flat_b,
-		QVector2D const& limit_a, QVector2D const& limit_b, QHash< QPoint, GLuint > const& opposite,
-		std::vector<QVector3D> const& newVertices, QHash< QPoint, float >& min_dis);
-
-	GLuint lookup(GLuint a, GLuint b, QHash<QPoint, GLuint>& marked_verts);
 public:
 	KnitGrapher(QObject* parent = nullptr);
 	void constructKnitGraph(std::vector<Constraint*> constraints);

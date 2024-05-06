@@ -407,10 +407,6 @@ void Visualizer::paintPath(QVector3D start, QVector3D end, float r, float g, flo
     else {
         glColor3f(r, g, b);   
     }
-    
-
-
-    
 
     glBegin(GL_LINES);
     glVertex3f(start.x(), start.y(), start.z());

@@ -16,7 +16,6 @@
 #include "glm/glm.hpp"
 
 
-
 #define WEIGHT_SUM  (1024U)
 struct IntegerEmbeddedVertex {
 	glm::uvec3 simplex;
@@ -41,14 +40,14 @@ struct IntegerEmbeddedVertex {
 		return ret;
 	}
 
-	IntegerEmbeddedVertex(EmbeddedVertex& src) : simplex(src.simplex) {
+	IntegerEmbeddedVertex(const EmbeddedVertex& src) : simplex(src.simplex) {
 		assert(simplex.x != -1U);
 		assert(simplex.x < simplex.y);
 		assert((simplex.y == -1U && simplex.z == -1U) || simplex.y < simplex.z);
 
-		float x = src.weights.x();
-		float xy = x + src.weights.y();
-		float xyz = xy + src.weights.z();
+		float x = src.weights.x;
+		float xy = x + src.weights.y;
+		float xyz = xy + src.weights.z;
 
 		int32_t ix = std::round(WEIGHT_SUM * (x / xyz));
 		int32_t ixy = std::round(WEIGHT_SUM * (xy / xyz));
@@ -357,14 +356,14 @@ struct EmbeddedPlanarMap {
 		//if got to this point, no intersections:
 		edges.emplace_back(ai, bi, value);
 	}
-	void add_edge(EmbeddedVertex& a, EmbeddedVertex& b, VALUE& value) {
+	void add_edge(const EmbeddedVertex& a, const EmbeddedVertex& b, VALUE const& value) {
 		uint32_t ai = add_vertex(a);
 		uint32_t bi = add_vertex(b);
 		add_edge(ai, bi, value);
 	}
 
 	void split_triangles(
-		std::vector< QVector3D > const& verts, //in: mesh vertices
+		std::vector< glm::vec3 > const& verts, //in: mesh vertices
 		std::vector< glm::uvec3 > const& tris, //in: mesh triangles
 		std::vector< EmbeddedVertex >* split_verts_, //out: split vertices
 		std::vector< glm::uvec3 >* split_tris_, //out: split triangles
@@ -392,24 +391,22 @@ struct EmbeddedPlanarMap {
 		for (uint32_t i = 0; i < vertices.size(); ++i) {
 			const auto& v = vertices[i];
 			assert(v.simplex.x < verts.size());
-			//assert(v.weights.x + v.weights.y + v.weights.z == WEIGHT_SUM);
+			assert(v.weights.x + v.weights.y + v.weights.z == WEIGHT_SUM);
 			if (v.simplex.y == -1U) {
 				assert(v.simplex.z == -1U);
 				epm_to_split.emplace_back(v.simplex.x);
 			}
 			else if (v.simplex.z == -1U) {
 				assert(v.simplex.y < verts.size());
-				//assert(v.weights.z == 0);
+				assert(v.weights.z == 0);
 				epm_to_split.emplace_back(split_verts.size());
-				QVector3D newVector(v.weights.x, v.weights.y, v.weights.z);
-				split_verts.emplace_back(EmbeddedVertex(v.simplex, newVector / float(WEIGHT_SUM)));
+				split_verts.emplace_back(EmbeddedVertex(v.simplex, glm::vec3(v.weights) / float(WEIGHT_SUM)));
 			}
 			else {
 				assert(v.simplex.y < verts.size());
 				assert(v.simplex.z < verts.size());
 				epm_to_split.emplace_back(split_verts.size());
-				QVector3D newVector(v.weights.x, v.weights.y, v.weights.z);
-				split_verts.emplace_back(EmbeddedVertex(v.simplex, newVector / float(WEIGHT_SUM)));
+				split_verts.emplace_back(EmbeddedVertex(v.simplex, glm::vec3(v.weights) / float(WEIGHT_SUM)));
 			}
 		}
 
@@ -657,8 +654,7 @@ struct EmbeddedPlanarMap {
 			}
 		}
 
-		if (did_reflex) std::cout << "  Note: used reflex-vertex special-case code in " << did_reflex << " of " << (did_reflex + did_simple) << " cases." << std::endl;
+		if (did_reflex) qDebug() << "  Note: used reflex-vertex special-case code in " << did_reflex << " of " << (did_reflex + did_simple) << " cases.";
 
 	}
 };
-
