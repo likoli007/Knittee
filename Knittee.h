@@ -1,13 +1,4 @@
 #pragma once
-
-
-#include "ui_Knittee.h"
-#include "ObjHandler.h"
-#include "Visualizer.h"
-#include "MeshToolBar.h"
-#include "KnitGrapher.h"
-#include "Stitch.h"
-#include "Link.h"
 #include <QtWidgets/QMainWindow>
 #include <QDialog>
 #include <QWidget>
@@ -26,7 +17,13 @@
 #include <QPushButton>
 #include <QTextEdit>
 
-
+#include "ui_Knittee.h"
+#include "ObjHandler.h"
+#include "Visualizer.h"
+#include "MeshToolBar.h"
+#include "KnitGrapher.h"
+#include "Stitch.h"
+#include "Link.h"
 #include "LaceKnitter.h"
 #include "FlatPoint.h"
 
@@ -38,18 +35,21 @@
 */
 
 
-
-
-
+/*
+* This struct is used to define the project types, it is saved into .knittee files and can also be loaded into the program from them
+*/
 struct ProjectInfo {
     int type;    // same as modellingType, will pass the user selected option
     QString objectFilePath; //path of the 3D object/ 2D sheet that is used by the project
     QString projectName; //name of the project
-    //TODO: more options as the program expands
     int width; //width of the sheet
     int height; //height of the sheet
 };
 
+
+/*
+* This class is used to create the new project popup window when the user selects 'new' in the project menu
+*/
 class NewProjectDialog : public QDialog
 {
     Q_OBJECT
@@ -69,8 +69,7 @@ private slots:
 private:
     ProjectInfo projectInfo;
     QRadioButton* sheetRadio;
-    QRadioButton* meshRadio;    //cannot write 3D :C
-
+    QRadioButton* meshRadio;
 
     //3D project option components
     QLabel* meshSelectionLabel;
@@ -85,25 +84,20 @@ private:
     QLabel* sheetSizeSeparator;
     QLineEdit* widthLineEdit;
     QLineEdit* heightLineEdit;
-
-
-
 };
 
 
-
+/*
+* Knittee class is the main 'application' class of the whole project, it includes an instance of most other classes of this project
+*   it is also in charge of helping the different components interface with each other
+*/
 class Knittee : public QMainWindow
 {
     Q_OBJECT
 
-
-
-
 public:
     Knittee(QWidget* parent = nullptr);
     ~Knittee();
-    //void openFile(QString filePath);
-
 
 private slots:
     void setConstraintsMode();
@@ -123,13 +117,10 @@ private:
     ObjHandler object_loader;
     Visualizer* vis;
     KnitGrapher knitGrapher;
-
+    LaceKnitter laceKnitter;
     MeshToolBar* toolsWidget;
-    //QVBoxLayout* mainLayout;
     QHBoxLayout* visualizerLayout;
-
     QString projectPath;
-
     //bottom textedit for messages to user
     QTextEdit* messageTextEdit;
 
@@ -141,20 +132,18 @@ private:
     void openAboutWindow();
     void openNewProjectWindow();
     void handleNewProject(ProjectInfo options);
-    //void openFile(QString filePath);
-    void setUpNew3DProject(ProjectInfo options);
-    void start3DProject(ProjectInfo context);
     void selectProject();
 
+    //3D project functions
+    void setUpNew3DProject(ProjectInfo options);
+    void start3DProject(ProjectInfo context);
     void saveConstraints();
     void loadConstraints();
 
-    LaceKnitter laceKnitter;
-
+    //2D project functions
     void setUpNew2DProject(ProjectInfo options);
     void start2DProject(ProjectInfo context);
     
-
 protected:
     void KeyPressEvent(QKeyEvent* event);
 };

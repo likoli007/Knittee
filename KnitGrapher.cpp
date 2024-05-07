@@ -1,73 +1,86 @@
 #pragma once
 #include "KnitGrapher.h"
-#include "EmbeddedVertex.h"
-#include "EmbeddedPlanarMap.h"
-#include <vector>
-#include <QSet>
-#include <QPair>
-#include <set>
-#include <deque>
-#include <Eigen/SparseCholesky>
-#include <glm/gtx/norm.hpp>
-#include <glm/gtx/hash.hpp>
 
 
+
+//helper global variable defined in originak ak::trim_model as 'edges'
+//in KnitGrapher it is used in trimModel() function
 std::vector<KnitGrapher::Edge> KnitGrapher::globedges;
 
+/*
+*	Constructor: set default parameters of the KnitGrapher during construction
+*		all 'values' are in mm
+*/
 KnitGrapher::KnitGrapher(QObject* parent) : QObject(parent)
 {
-	stitchWidth = 5;
-	stitchHeight = 5;
-	modelUnitLength = 1;
+	stitchWidth = 3.66f;
+	stitchHeight = 1.73f;
+	modelUnitLength = 10.0f;
+	stepCount = 0;
 
 }
 
+/*
+*	Function: set the original mesh that will be used to create the knit graph
+*		this mesh will be remeshed and interpolated to create a new mesh that the AutoKnit algorithms will run on
+*	Parameters: ObjectMesh mesh - the mesh that will be used to create the knit graph
+* 	Return: void
+*	Called: called when the user selects a .obj file through the GUI
+*/
 void KnitGrapher::setOriginalMesh(ObjectMesh mesh)
 {	
-
 	AutoKnitMesh step(mesh);
 	originalMesh = step;
-	
-}
-
-QPair<GLuint, GLuint> qMinMax(GLuint a, GLuint b)
-{
-	if (a < b)
-		return QPair<GLuint, GLuint>(a, b);
-	else
-		return QPair<GLuint, GLuint>(b, a);
 }
 
 
-
-float KnitGrapher::getMaxEdgeLength()
+/*
+*	Function: get the max edge length allowed in the remeshing algorithm
+*		the mathematical function is copied from ak::pipeline.hpp, where its part of the Parameters class
+* 	Return: float - the max edge length
+* 	Called: called at various stages of the algorithm, mainly remesh() and peelSlice()
+*/
+float KnitGrapher::getMaxEdgeLength() const
 {
 	return 0.5f * std::min(stitchWidth, 2.0f * stitchHeight) / modelUnitLength;
 }
 
-
-
-// Dijkstra's algorithm 'visit' function
+/* 
+*	Function: Dijkstra's algorithm 'visit' function
+*	Return: void, but modifies the 'todo' and 'visited' vectors which can be accessed by the calling function
+* 	Called: called in the divide() function, during the constraint embedding of remesh()
+*/ 
 void visit(std::vector< std::pair< float, uint32_t > >& todo,
 	std::vector< std::pair< float, uint32_t > >& visited,
-	uint32_t vertex,
-	float distance,
-	uint32_t from) {
+	uint32_t vertex, float distance, uint32_t from) 
+{
 	if (distance < visited[vertex].first) {
 		visited[vertex] = std::make_pair(distance, from);
 		todo.emplace_back(distance, vertex);
-		std::push_heap(todo.begin(), todo.end(), std::greater< std::pair< float, uint32_t > >());
+		std::push_heap(todo.begin(), todo.end(), std::greater<std::pair<float, uint32_t>>());
 	}
 }
 
-uint32_t KnitGrapher::lookup(uint32_t a, uint32_t b, std::unordered_map< glm::uvec2, uint32_t >& marked_verts) {
+/*
+*	Function: check if a pair of vertices is in the marked set
+*	Return: the second value of the pair if it exists, -1 otherwise
+*	Called: called during the divide() function as part of remesh()
+*/
+uint32_t KnitGrapher::lookup(uint32_t a, uint32_t b, std::unordered_map< glm::uvec2, uint32_t >& marked_verts) const
+{
 	auto f = marked_verts.find((a < b ? glm::uvec2(a, b) : glm::uvec2(b, a)));
 	if (f != marked_verts.end()) return f->second;
 	else return -1U;
 }
 
-// quad not even implemented in my mesh loading, but good to have this here for later use
-void KnitGrapher::quad(std::vector<glm::uvec3>& new_tris, std::vector<glm::vec3>& verts, uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+/*
+*	Function: split a quad in a mesh into 2 triangles
+*	Return: void, but emplaces the newly created triangles into an argument vector
+*	Called: called during the divide() function as part of remesh()
+*/
+void KnitGrapher::quad(std::vector<glm::uvec3>& new_tris, std::vector<glm::vec3> const& verts, 
+	uint32_t a, uint32_t b, uint32_t c, uint32_t d) 
+{
 	float ac = glm::length2(verts[c] - verts[a]);
 	float bd = glm::length2(verts[d] - verts[b]);
 	if (ac < bd) {
@@ -80,13 +93,17 @@ void KnitGrapher::quad(std::vector<glm::uvec3>& new_tris, std::vector<glm::vec3>
 	}
 }
 
-
-void KnitGrapher::divide(std::unordered_set< glm::uvec2 > marked,
-	std::vector< glm::vec3 >& verts,
-	std::vector<std::vector<uint32_t>>& paths,
-	std::vector<glm::uvec3>& tris)
-{
-	//assert(!marked.empty());
+/*
+*	Function: divide the mesh triangles based on their marked edges in various ways
+*	Return: void, but generates a new set of triangles for the mesh
+*	Called: called during the remesh() step
+*/
+void KnitGrapher::divide(std::unordered_set< glm::uvec2 > const &marked,       
+	std::vector< glm::vec3 >& verts,										
+	std::vector<std::vector<uint32_t>>& paths,							
+	std::vector<glm::uvec3>& tris)										
+{	
+	//if no marked edges to divide by, return
 	if (marked.empty()) {
 		qDebug() << "Marked is empty!";
 		return;
@@ -97,20 +114,16 @@ void KnitGrapher::divide(std::unordered_set< glm::uvec2 > marked,
 
 	std::vector< glm::ivec2 > edges(marked.begin(), marked.end());
 
-	//lambda sort, had to change to QPoint 
+	//lambda sort  
 	std::sort(edges.begin(), edges.end(), [](glm::uvec2 const& a, glm::uvec2 const& b) {
 		if (a.x != b.x) return a.x < b.x;
 		else return a.y < b.y;
-		});
+	});
+
 	for (auto const& e : edges) {
 		marked_verts.insert(std::make_pair(e, verts.size()));
 		verts.emplace_back((verts[e.x] + verts[e.y]) / 2.0f);
 	}
-
-	/*
-	auto lookup_func = [&marked_verts](int a, int b) {
-		return lookup(a, b, marked_verts);
-	};*/
 
 	for (auto& path : paths) {
 		std::vector<uint32_t> new_path;
@@ -141,8 +154,6 @@ void KnitGrapher::divide(std::unordered_set< glm::uvec2 > marked,
 			new_tris.emplace_back(glm::uvec3(ab, bc, ca));
 		}
 		else if (ab != -1U && bc != -1U && ca == -1U) {
-			//1 -> 3 subdiv!
-			//NOTE: should consider recursively subdividing to avoid this case
 			quad(new_tris, verts, a, ab, bc, c);
 			new_tris.emplace_back(glm::uvec3(ab, b, bc));
 		}
@@ -168,52 +179,58 @@ void KnitGrapher::divide(std::unordered_set< glm::uvec2 > marked,
 			new_tris.emplace_back(glm::uvec3(b, c, ca));
 		}
 		else {
-			//assert(ab == -1U && bc == -1U && ca == -1U);
-			//no subdiv!
 			new_tris.emplace_back(glm::uvec3(a, b, c));
 		}
 	}
+	//make the tris argument equal to the newly created triangle data
 	tris = std::move(new_tris);
-	//newTriangles = new_tris;
 }
 
-bool is_ccw(glm::vec2 const& a, glm::vec2 const& b, glm::vec2 const& c) {
+
+/*
+*	Function: helper function that checks if the 3 points are in a counter clockwise orientation on a 2D plane
+*	Return: bool, are the points coutner clockwise or not
+*	Called: called during the unfold() function, as part of remesh()
+*/
+bool KnitGrapher::isCcw(glm::vec2 const& a, glm::vec2 const& b, glm::vec2 const& c) 
+{
 	return glm::dot(glm::vec2(-(b.y - a.y), (b.x - a.x)), c - a) > 0.0f;
 };
 
-inline uint qHash(const QVector2D& key)
+/*
+*	Function: get the distance of 2 vertices 'a' and 'b'
+*	Return: float&, the reference to the distance, which will be infinity if the distance is not yet inside 'min_dis'
+*	Called: called during the unfold() function, as part of remesh()
+*/
+float& KnitGrapher::get_dis(uint32_t a, uint32_t b, std::unordered_map< glm::uvec2, float >& min_dis) 
 {
-	return qHash(QPair<float, float>(key.x(), key.y()));
-}
-
-float& get_dis(uint32_t a, uint32_t b, std::unordered_map< glm::uvec2, float >& min_dis) {
 	if (a > b) std::swap(a, b);
 	return min_dis.insert(std::make_pair(glm::uvec2(a, b), std::numeric_limits< float >::infinity())).first->second;
 };
+
+
+/*
+*	Function: 'unfold' the 3D mesh onto a 2D plane, computing vertex distances and creating new triangles if the distance is too large
+*	Return: void, but modifies the min_dis distance saving argument
+*	Called: called during the remesh() function
+*/
 void KnitGrapher::unfold(uint32_t depth, uint32_t root, glm::vec2 const& flat_root,
 	uint32_t ai, glm::vec2 const& flat_a,
 	uint32_t bi, glm::vec2 const& flat_b,
-	glm::vec2 const& limit_a, glm::vec2 const& limit_b, std::unordered_map< glm::uvec2, uint32_t >  const& opposite,
-	std::vector<glm::vec3> const& newVertices, std::unordered_map< glm::uvec2, float >& min_dis) {
-
-	//std::cout << "r: " << root << ": (" << flat_root.x << ", " << flat_root.y << ")" << std::endl; //DEBUG
-				//std::cout << "a: " << ai << ": (" << flat_a.x << ", " << flat_a.y << ")" << std::endl; //DEBUG
-				//std::cout << "b: " << bi << ": (" << flat_b.x << ", " << flat_b.y << ")" << std::endl; //DEBUG
-	//assert(is_ccw(flat_root, flat_a, flat_b));
-	//should go 'a - limit_a - limit_b - b':
-	//assert(flat_a == limit_a || is_ccw(flat_root, flat_a, limit_a));
-	//assert(is_ccw(flat_root, limit_a, limit_b));
-	//assert(flat_b == limit_b || is_ccw(flat_root, limit_b, flat_b));
-
-
-
+	glm::vec2 const& limit_a, 
+	glm::vec2 const& limit_b, std::unordered_map< glm::uvec2, uint32_t >  const& opposite,
+	std::vector<glm::vec3> const& newVertices, std::unordered_map< glm::uvec2, float >& min_dis) 
+{
 
 	uint32_t ci;
 	glm::vec2 flat_c;
-	{ //if there is a triangle over the ai->bi edge, find other vertex and flatten it:
+
+	//if there is a triangle over the ai->bi edge, find other vertex and flatten it:
+	{ 
 		auto f = opposite.find(glm::uvec2(bi, ai));
 		if (f == opposite.end()) return;
 		ci = f->second;
+
 		//figure out c's position along ab and distance from ab:
 		glm::vec3 const& a = newVertices[ai];
 		glm::vec3 const& b = newVertices[bi];
@@ -229,44 +246,23 @@ void KnitGrapher::unfold(uint32_t depth, uint32_t root, glm::vec2 const& flat_ro
 		flat_c = flat_a + flat_ab * along + flat_perp_ab * perp;
 	}
 
-	//std::cout << "c: " << ci << ": (" << flat_c.x << ", " << flat_c.y << ")" << std::endl; //DEBUG
-
-	//flat_a and flat_b should always be outside limit, it seems like we need to test anyway (thanks, numerics)
-
-	bool ccw_rac = is_ccw(flat_root, limit_a, flat_c) && is_ccw(flat_root, flat_a, flat_c);
-	bool ccw_rcb = is_ccw(flat_root, flat_c, limit_b) && is_ccw(flat_root, flat_c, flat_b);
+	bool ccw_rac = isCcw(flat_root, limit_a, flat_c) && isCcw(flat_root, flat_a, flat_c);
+	bool ccw_rcb = isCcw(flat_root, flat_c, limit_b) && isCcw(flat_root, flat_c, flat_b);
 
 	if (ccw_rac && ccw_rcb) {
 		float& dis = get_dis(root, ci, min_dis);
 		dis = std::min(dis, glm::length(flat_root - flat_c));
 
-		//PARANOIA:
-		float dis3 = (newVertices[root] - newVertices[ci]).length();
-
-
-		/*
-		if (dis3 > dis * (1.0f + 1e-6f) + 1e-6f) {
-			qDebug() << "dis3: " << dis3 << " vs flat dis " << dis << " seems bad!" << std::endl;
-			qDebug() << "  ra3: " << glm::length(verts[root] - verts[ai]) << " vs ra: " << glm::length(flat_root - flat_a) << std::endl;
-			qDebug() << "  rb3: " << glm::length(verts[root] - verts[bi]) << " vs rb: " << glm::length(flat_root - flat_b) << std::endl;
-			qDebug() << "  ab3: " << glm::length(verts[ai] - verts[bi]) << " vs ab: " << glm::length(flat_a - flat_b) << std::endl;
-			qDebug() << "  ac3: " << glm::length(verts[ai] - verts[ci]) << " vs ac: " << glm::length(flat_a - flat_c) << std::endl;
-			qDebug() << "  bc3: " << glm::length(verts[bi] - verts[ci]) << " vs bc: " << glm::length(flat_b - flat_c) << std::endl;
-			assert(dis3 < dis + 1e-6);
-		}*/
-
 		if (depth > 1) {
-			//assert(is_ccw(flat_root, flat_a, flat_c));
+			assert(isCcw(flat_root, flat_a, flat_c));
 			unfold(depth - 1, root, flat_root, ai, flat_a, ci, flat_c, limit_a, flat_c, opposite, newVertices, min_dis);
-			//assert(is_ccw(flat_root, flat_c, flat_b));
+			assert(isCcw(flat_root, flat_c, flat_b));
 			unfold(depth - 1, root, flat_root, ci, flat_c, bi, flat_b, flat_c, limit_b, opposite, newVertices, min_dis);
 		}
 	}
+
 	else if (ccw_rac && !ccw_rcb) {
 		if (depth > 1) {
-			//assert(!is_ccw(flat_root, flat_c, limit_b)); //DEBUG
-			//assert(is_ccw(flat_root, limit_b, flat_c)); //DEBUG -- fails sometimes [thanks, numerics]
-			//assert(is_ccw(flat_root, flat_a, flat_c));
 			unfold(depth - 1, root, flat_root, ai, flat_a, ci, flat_c, limit_a, limit_b, opposite, newVertices, min_dis);
 		}
 	}
@@ -276,11 +272,14 @@ void KnitGrapher::unfold(uint32_t depth, uint32_t root, glm::vec2 const& flat_ro
 			unfold(depth - 1, root, flat_root, ci, flat_c, bi, flat_b, limit_a, limit_b, opposite, newVertices, min_dis);
 		}
 	}
-
-
 }
 
-
+/*
+*	Function: the first step of the 3D mesh -> KnitGraph algorithm, remeshes the original model into a higher detail one
+*		done because the parameters may lead to edges of the model being too long, thus the triangles need to be split
+*	Return: void, but modifies the newMesh class variable, along with some others
+*	Called: called when the user selects the 'interpolate' option in the GUI
+*/
 void KnitGrapher::remesh()
 {
 	qDebug() << "Starting remesh()";
@@ -292,8 +291,7 @@ void KnitGrapher::remesh()
 	}
 
 	//extract edges from the model
-	qDebug() << "extracting edges from all triangles...";
-	std::vector< std::vector< std::pair< uint32_t, float > > > adj(originalMesh	.vertices.size());
+	std::vector<std::vector<std::pair<uint32_t, float>>> adj(originalMesh.vertices.size());
 	QSet <QPair<GLuint, GLuint>> edges;
 	{ 
 		std::set< std::pair< uint32_t, uint32_t > > edges;
@@ -311,8 +309,7 @@ void KnitGrapher::remesh()
 
 
 	//find chain paths on original model
-	qDebug() << "finding chain paths on original model... (linking constraint vertices together)";
-	std::vector< std::vector< uint32_t > > paths;
+	std::vector<std::vector<uint32_t>> paths;
 
 	//altough done here, technically my constraints chain has nice 'single jump' vertex chains, so not really necessary
 	//could be coopted in Visualizer for constraint by dijkstra adding...
@@ -354,40 +351,24 @@ void KnitGrapher::remesh()
 		paths.emplace_back(path);
 	}
 
-	qDebug() << "Done!";
-	qDebug() << "Paths:" << paths.size();
 
-	
-	for (std::vector<GLuint> path : paths)
-	{
-		qDebug() << "Path:";
-		for (int vertex : path)
-		{
-			qDebug() << vertex;
-		}
-	}
-
-	// create a higher resolution mesh according to the parameters set by the user
-	// in algorithm is part of the 'Parameters' class, i have those values inside this KnitGrapher class
+	//create a higher resolution mesh according to the parameters set by the user
+	//in algorithm is part of the 'Parameters' class, i have those values inside this KnitGrapher class
 	float maxEdgeLength = getMaxEdgeLength();
-	float minEdgeRatio = 0.3f;
+	float minEdgeRatio = 0.3f;											//allow user to set? probably not wise...
 	float minEdgeRatioSquared = minEdgeRatio * minEdgeRatio;
 	float maxEdgeLengthSquared = maxEdgeLength * maxEdgeLength;
-
-
-	qDebug() << "Max Edge Length:" << maxEdgeLength;
 
 	std::vector< glm::vec3 > verts = originalMesh.vertices;
 	std::vector< glm::uvec3 > tris = originalMesh.triangles;
 
-	// there is degenarate triangle checking in the original algorithm, will do the same here
+	//there is degenarate triangle checking in the original algorithm, will do the same here
 	if (degenerateCheck(tris)) {
 		qDebug() << "Degenerate triangle found, error...";
 		return;
 	}
 
-	qDebug() << "Starting divide() block, oldTris: " << tris.size();
-	// Lambda functions in original code were made into their own functions...
+	//lambda functions in original code were made into their own functions...
 	while (true) {
 		std::unordered_set< glm::uvec2 > marked;
 		auto mark = [&marked](uint32_t a, uint32_t b) {
@@ -410,25 +391,19 @@ void KnitGrapher::remesh()
 			if (len_ca2 > maxEdgeLengthSquared) mark(tri.z, tri.x);
 		}
 		if (marked.empty()) {
-			qDebug() << "No marked edges found, breaking...";
 			break;
 		}
 		divide(marked, verts, paths, tris);
 	}
-	qDebug() << "divide() sleu finished! newTris: " << tris.size();
-
-	//after this while cycle, have newTriangles variable equal to divides newTris...
+	
+	
 	//once again the degenerate triangle check in original algortihm
-	//if (degenerateCheck(newTris)) {
-		//qDebug() << "Degenerate triangle found after remesh! skipping...";
-		//return;
-	//}
+
 
 
 	//extract edges from subdivided model:
-	qDebug() << "extracting edges from subdivided model...";
 	adj.assign(verts.size(), std::vector< std::pair< uint32_t, float > >());
-	{ //extract edges from subdivided model:
+	{ 
 		std::set< std::pair< uint32_t, uint32_t > > edges;
 		for (auto const& tri : tris) {
 			edges.insert(std::minmax(tri.x, tri.y));
@@ -443,8 +418,6 @@ void KnitGrapher::remesh()
 		}
 	}
 
-
-	qDebug() << "Building opposites...";
 	std::unordered_map< glm::uvec2, uint32_t > opposite; //vertex opposite each [oriented] triangle edge
 	opposite.reserve(tris.size() * 3);
 	for (auto const& tri : tris) {
@@ -456,7 +429,7 @@ void KnitGrapher::remesh()
 		assert(ret_zx.second);
 	}
 
-	qDebug() << "build (+ add to adj) extra shortcut edges by unwrapping triangle neighborhoods:";
+	
 	{ //build (+ add to adj) extra "shortcut" edges by unwrapping triangle neighborhoods:
 		std::unordered_map< glm::uvec2, float > min_dis;
 		for (auto const& tri : tris) {
@@ -474,10 +447,9 @@ void KnitGrapher::remesh()
 
 			flat_z = glm::vec2(along, perp);
 
-			//look through edge [ai,bi] from point [root], where edge [ai,bi] is ccw oriented.
 			const constexpr GLuint D = 3; //depth to unfold triangles to for more adjacency information; makes slightly nicer geodesics at the expense of increased compute time.
 			//THIS COULD BE A SETTABLE PARAMETER!
-			//TODO: make this a parameter
+			//TODO: make this a parameter?
 
 			if (D > 0) {
 				unfold(D, tri.x, flat_x, tri.y, flat_y, tri.z, flat_z, flat_y, flat_z, opposite, verts, min_dis);
@@ -500,7 +472,7 @@ void KnitGrapher::remesh()
 
 		adj.assign(verts.size(), std::vector< std::pair< uint32_t, float > >());
 
-		//QHash<QPoint, float>::const_iterator xyd;
+		
 		for (auto const& xyd : min_dis) {
 			assert(xyd.first.x != xyd.first.y);
 			adj[xyd.first.x].emplace_back(xyd.first.y, xyd.second);
@@ -512,19 +484,19 @@ void KnitGrapher::remesh()
 			new_adj += a.size();
 		}
 
-		//std::cout << "Went from " << old_adj << " to " << new_adj << " by unfolding triangles." << std::endl;
+		qDebug() << "Went from " << old_adj << " to " << new_adj << " by unfolding triangles.";
 
 		//for consistency:
 		for (auto& a : adj) {
 			std::sort(a.begin(), a.end());
 		}
 	}
-	qDebug() << "build and unfolding complete!";
+	
 
 	//start creating embedded vertices
 	std::vector< std::vector< EmbeddedVertex > > embedded_chains;
-	qDebug() << "starting embedded_chains building...";
-	// was a big for cycle, but that was because of radius checking, which is not part of my program
+	
+	//was a big for cycle, but that was because of radius checking, which is not part of my program
 	for (auto const& cons : constraints) {
 		if (cons->vertices.size() != 0) {   //checking for dummy constraints, dummy...
 			embedded_chains.emplace_back();
@@ -539,13 +511,10 @@ void KnitGrapher::remesh()
 		}
 	}
 
-	//assert(embedded_chains.size() == constraints.size());
 	qDebug() << "embedded chains size" << embedded_chains.size() << " constraints size (with empty dummy):" << constraints.size();
-
 	
 	EmbeddedPlanarMap< float, SameValue< float >, ReplaceValue< float > > epm;
-	qDebug() << "EmbeddedPlanarMap created!";
-
+	
 	uint32_t total_chain_edges = 0;
 	for (uint32_t c = 0; c < embedded_chains.size(); ++c) {
 		uint32_t first = 0;
@@ -564,139 +533,142 @@ void KnitGrapher::remesh()
 	for (const auto &edges : epm.simplex_edges) {
 		total_simplex_edges += edges.second.size();
 	}
+
 	qDebug() << "EPM has " << epm.vertices.size() << " vertices." ;
 	qDebug() << "EPM has " << epm.simplex_vertices.size() << " simplices with vertices.";
 	qDebug() << "EPM has " << epm.simplex_edges.size() << " simplices with edges (" << total_simplex_edges << " edges from " << total_chain_edges << " chain edges).";
 
 
 	//Build a mesh that is split at the embedded edges:
-		std::vector< EmbeddedVertex > split_evs;
-		std::vector< glm::uvec3 > split_tris;
-		std::vector< uint32_t > epm_to_split;
+	std::vector< EmbeddedVertex > split_evs;
+	std::vector< glm::uvec3 > split_tris;
+	std::vector< uint32_t > epm_to_split;
 
-		epm.split_triangles(verts, tris, &split_evs, &split_tris, &epm_to_split);
+	epm.split_triangles(verts, tris, &split_evs, &split_tris, &epm_to_split);
 
-		std::vector< glm::vec3 > split_verts;
+	std::vector< glm::vec3 > split_verts;
 
-		qDebug() << "populating split_verts...";
-		split_verts.reserve(split_evs.size());
-		for (auto const& ev : split_evs) {
-			split_verts.emplace_back(ev.interpolate(verts));
+	split_verts.reserve(split_evs.size());
+	for (auto const& ev : split_evs) {
+		split_verts.emplace_back(ev.interpolate(verts));
+	}
+
+	//record constrained edges in terms of split_verts:
+	std::unordered_map< glm::uvec2, float > constrained_edges;
+	std::vector< float > split_values(split_verts.size(), std::numeric_limits< float >::quiet_NaN());
+	for (const auto& se : epm.simplex_edges) {
+		for (auto const& e : se.second) {
+			glm::uvec2 ab = glm::uvec2(epm_to_split[e.first], epm_to_split[e.second]);
+			if (ab.x > ab.y) std::swap(ab.x, ab.y);
+			constrained_edges.insert(std::make_pair(ab, e.value));
+			//also grab vertex values:
+			split_values[epm_to_split[e.first]] = e.value;
+			split_values[epm_to_split[e.second]] = e.value;
 		}
+	}
+	qDebug() << constrained_edges.size() << " constrained edges.";
 
-		qDebug() << "record constrained edges in terms of split_verts";
-		//record constrained edges in terms of split_verts:
-		std::unordered_map< glm::uvec2, float > constrained_edges;
-		std::vector< float > split_values(split_verts.size(), std::numeric_limits< float >::quiet_NaN());
-		for (const auto& se : epm.simplex_edges) {
-			for (auto const& e : se.second) {
-				glm::uvec2 ab = glm::uvec2(epm_to_split[e.first], epm_to_split[e.second]);
-				if (ab.x > ab.y) std::swap(ab.x, ab.y);
-				constrained_edges.insert(std::make_pair(ab, e.value));
-				//also grab vertex values:
-				split_values[epm_to_split[e.first]] = e.value;
-				split_values[epm_to_split[e.second]] = e.value;
-			}
+
+	std::vector< uint32_t > tri_component(split_tris.size(), -1U);
+	std::vector< bool > component_keep;
+	{ //mark connected components + delete the "wrong" ones
+		std::unordered_map< glm::uvec2, uint32_t > over;
+		for (const auto& tri : split_tris) {
+			uint32_t ti = &tri - &split_tris[0];
+			auto res = over.insert(std::make_pair(glm::uvec2(tri.x, tri.y), ti));
+			//assert(res.second);
+			res = over.insert(std::make_pair(glm::uvec2(tri.y, tri.z), ti));
+			//assert(res.second);
+			res = over.insert(std::make_pair(glm::uvec2(tri.z, tri.x), ti));
+			//assert(res.second);
 		}
-		qDebug() << constrained_edges.size() << " constrained edges.";
-
-
-		std::vector< uint32_t > tri_component(split_tris.size(), -1U);
-		std::vector< bool > component_keep;
-		{ //mark connected components + delete the "wrong" ones
-			std::unordered_map< glm::uvec2, uint32_t > over;
-			for (const auto& tri : split_tris) {
-				uint32_t ti = &tri - &split_tris[0];
-				auto res = over.insert(std::make_pair(glm::uvec2(tri.x, tri.y), ti));
-				//assert(res.second);
-				res = over.insert(std::make_pair(glm::uvec2(tri.y, tri.z), ti));
-				//assert(res.second);
-				res = over.insert(std::make_pair(glm::uvec2(tri.z, tri.x), ti));
-				//assert(res.second);
-			}
-			for (uint32_t seed = 0; seed < split_tris.size(); ++seed) {
-				if (tri_component[seed] != -1U) continue;
-				//std::cout << "Doing CC with seed " << seed << std::endl; //DEBUG
-				uint32_t component = component_keep.size();
-				tri_component[seed] = component;
-				std::set< float > values;
-				std::vector< uint32_t > todo;
-				todo.emplace_back(seed);
-				auto do_edge = [&](uint32_t a, uint32_t b) {
-					{ //if edge is constrained, don't traverse over:
-						glm::uvec2 e(a, b);
-						if (e.x > e.y) std::swap(e.x, e.y);
-						auto v = constrained_edges.find(e);
-						if (v != constrained_edges.end()) {
-							values.insert(v->second);
-							return;
-						}
+		for (uint32_t seed = 0; seed < split_tris.size(); ++seed) {
+			if (tri_component[seed] != -1U) continue;
+			//std::cout << "Doing CC with seed " << seed << std::endl; //DEBUG
+			uint32_t component = component_keep.size();
+			tri_component[seed] = component;
+			std::set< float > values;
+			std::vector< uint32_t > todo;
+			todo.emplace_back(seed);
+			auto do_edge = [&](uint32_t a, uint32_t b) {
+				{ //if edge is constrained, don't traverse over:
+					glm::uvec2 e(a, b);
+					if (e.x > e.y) std::swap(e.x, e.y);
+					auto v = constrained_edges.find(e);
+					if (v != constrained_edges.end()) {
+						values.insert(v->second);
+						return;
 					}
-					//otherwise, traverse over:
-					auto f = over.find(glm::uvec2(b, a));
-					if (f != over.end()) {
-						if (tri_component[f->second] != component) {
-							assert(tri_component[f->second] == -1U);
-							tri_component[f->second] = component;
-							todo.emplace_back(f->second);
-						}
-					}
-				};
-				while (!todo.empty()) {
-					uint32_t at = todo.back();
-					todo.pop_back();
-					assert(tri_component[at] == component);
-					do_edge(split_tris[at].x, split_tris[at].y);
-					do_edge(split_tris[at].y, split_tris[at].z);
-					do_edge(split_tris[at].z, split_tris[at].x);
 				}
-				component_keep.emplace_back(values.size() > 1);
+				//otherwise, traverse over:
+				auto f = over.find(glm::uvec2(b, a));
+				if (f != over.end()) {
+					if (tri_component[f->second] != component) {
+						assert(tri_component[f->second] == -1U);
+						tri_component[f->second] = component;
+						todo.emplace_back(f->second);
+					}
+				}
+			};
+			while (!todo.empty()) {
+				uint32_t at = todo.back();
+				todo.pop_back();
+				assert(tri_component[at] == component);
+				do_edge(split_tris[at].x, split_tris[at].y);
+				do_edge(split_tris[at].y, split_tris[at].z);
+				do_edge(split_tris[at].z, split_tris[at].x);
 			}
-			qDebug() << "Have " << component_keep.size() << " connected components.";
+			component_keep.emplace_back(values.size() > 1);
 		}
+		qDebug() << "Have " << component_keep.size() << " connected components.";
+	}
 
-
-		//remove any split_verts that aren't used:
-		std::vector< glm::vec3 > compressed_verts;
-		std::vector< float > compressed_values;
-		std::vector< glm::uvec3 > compressed_tris;
-		for (uint32_t ti = 0; ti < split_tris.size(); ++ti) {
-			if (component_keep[tri_component[ti]]) {
-				compressed_tris.emplace_back(split_tris[ti]);
-			}
+	//remove any split_verts that aren't used:
+	std::vector< glm::vec3 > compressed_verts;
+	std::vector< float > compressed_values;
+	std::vector< glm::uvec3 > compressed_tris;
+	for (uint32_t ti = 0; ti < split_tris.size(); ++ti) {
+		if (component_keep[tri_component[ti]]) {
+			compressed_tris.emplace_back(split_tris[ti]);
 		}
-		compressed_verts.reserve(split_verts.size());
-		std::vector< uint32_t > to_compressed(split_verts.size(), -1U);
-		auto add_vert = [&](uint32_t vi) {
-			if (to_compressed[vi] == -1U) {
-				to_compressed[vi] = compressed_verts.size();
-				compressed_verts.emplace_back(split_verts[vi]);
-				compressed_values.emplace_back(split_values[vi]);
-			}
-			return to_compressed[vi];
-		};
-		for (auto& tri : compressed_tris) {
-			tri.x = add_vert(tri.x);
-			tri.y = add_vert(tri.y);
-			tri.z = add_vert(tri.z);
+	}
+	compressed_verts.reserve(split_verts.size());
+	std::vector< uint32_t > to_compressed(split_verts.size(), -1U);
+	auto add_vert = [&](uint32_t vi) {
+		if (to_compressed[vi] == -1U) {
+			to_compressed[vi] = compressed_verts.size();
+			compressed_verts.emplace_back(split_verts[vi]);
+			compressed_values.emplace_back(split_values[vi]);
 		}
+		return to_compressed[vi];
+	};
+	for (auto& tri : compressed_tris) {
+		tri.x = add_vert(tri.x);
+		tri.y = add_vert(tri.y);
+		tri.z = add_vert(tri.z);
+	}
+	qDebug() << "Went from " << tris.size() << " to (via split) " << split_tris.size() << " to (via discard) " << compressed_tris.size() << " triangles."; //DEBUG
 
-		qDebug() << "Went from " << tris.size() << " to (via split) " << split_tris.size() << " to (via discard) " << compressed_tris.size() << " triangles."; //DEBUG
+	newMesh.vertices = compressed_verts;
+	newMesh.triangles = compressed_tris;
+	
+	qDebug() << compressed_values.size() << " constrained values and " << compressed_verts.size() << " vertices";
 
-		newMesh.vertices = compressed_verts;
-		newMesh.triangles = compressed_tris;
-
-		qDebug() << compressed_values.size() << " constrained values and " << compressed_verts.size() << " vertices";
-
-
-		constrained_values = compressed_values;
+	constrained_values = compressed_values;
 }
 
 
 
+/*
+*	Function: find the first active chains that will start the knitgraph construction on the mesh
+*		basically find the 'origin point' from which the knitting should start on the mesh
+*	Return: void, but modifies many variables defined in the class, mainly creates a RowColGraph
+*	Called: called when the user selects the 'step' button in the GUI, but only during the first click
+*/
 void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex > >* active_chains_,
 	std::vector< std::vector< Stitch > >* active_stitches_,
-	RowColGraph* graph_) {
+	RowColGraph* graph_) 
+{
 	
 	assert(active_chains_);
 	auto& active_chains = *active_chains_;
@@ -706,8 +678,7 @@ void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex
 	auto& active_stitches = *active_stitches_;
 	active_stitches.clear();
 
-	//newTriangles = getTriangles(newMesh);
-	//PARANOIA: triangles must reference valid time values:
+	//triangles must reference valid time values:
 	for (glm::uvec3 const& tri : newMesh.triangles) {
 		assert(tri.x < constrained_values.size());
 		assert(tri.y < constrained_values.size());
@@ -716,7 +687,6 @@ void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex
 
 
 	//find boundary loops:
-
 	//build half-edge -> other vertex map:
 	std::unordered_map< glm::uvec2, uint32_t > next_vertex;
 	{
@@ -771,8 +741,6 @@ void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex
 			adj_min = std::min(adj_min, constrained_values[f->second]);
 			adj_max = std::max(adj_max, constrained_values[f->second]);
 		}
-
-		//std::cout << "Considering chain with value range [" << chain_min << ", " << chain_max << "] and neighbor value range [" << adj_min << ", " << adj_max << "]." << std::endl;
 
 		if (chain_min != chain_max) {
 			qDebug() << "WARNING: discarding chain with non-constant value range [" << chain_min << ", " << chain_max << "].";
@@ -874,24 +842,17 @@ void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex
 }
 
 /*
-QVector3D mix(const QVector3D& wa, const QVector3D& wb, float m) {
-	//x* (1.0 - a) + y * a
-	return wa * (1.0 - m) + wb * m;
-	//return wa + m * (wb - wa);
-}*/
-
-
-
+*	Function: sample points along the edges of a chain of embedded vertices at regular intervals based on 'spacing'
+*	Return: void, but also modifies the sampled_chain_ variable
+*	Called: called during peelSlice() as well as findFirstActiveChains()
+*/
 void KnitGrapher::sampleChain(float spacing,
 	std::vector< EmbeddedVertex > const& chain, //in: chain to be sampled
-	std::vector< EmbeddedVertex >* sampled_chain_){
+	std::vector< EmbeddedVertex >* sampled_chain_)
+{
 	
 	auto& sampled_chain = *sampled_chain_;
 	sampled_chain.clear();
-
-	//assert(sampled_flags_);
-	//auto &sampled_flags = *sampled_flags_;
-	//sampled_flags.clear();
 
 	for (uint32_t ci = 0; ci + 1 < chain.size(); ++ci) {
 		sampled_chain.emplace_back(chain[ci]);
@@ -913,15 +874,17 @@ void KnitGrapher::sampleChain(float spacing,
 }
 
 
-
-void KnitGrapher::interpolateValues() {
-	//assert(constraints.size() == model.vertices.size());
-	//assert(values_);
+/*
+*	Function: linearly interpolate time values on the mesh as given by constrained_values
+*	Return: void, but modifies constrained_values time values
+*	Called: called after the remesh() function remeshes the 3D mesh and generates the time values
+*/
+void KnitGrapher::interpolateValues() 
+{
 	if (constrained_values.size() != newMesh.vertices.size()) {
 		qDebug() << "Constraints size does not match model vertices size" << constrained_values.size() << newMesh.vertices.size();
 		return;
 	}
-
 
 	qDebug() << newMesh.vertices.size() << " vertices and " << newMesh.triangles.size() << " triangles.";
 	auto& values = constrained_values;
@@ -941,8 +904,6 @@ void KnitGrapher::interpolateValues() {
 	}
 
 	std::map< std::pair< uint32_t, uint32_t >, float > edge_weights;
-
-
 
 	for (const auto& tri : newMesh.triangles) {
 		const glm::vec3& a = newMesh.vertices[tri.x];
@@ -967,12 +928,11 @@ void KnitGrapher::interpolateValues() {
 
 
 	std::vector< Eigen::Triplet< double > > coefficients;
-	coefficients.reserve(newMesh.triangles.size() * 3); //more than is needed
+	coefficients.reserve(newMesh.triangles.size() * 3);
 	Eigen::VectorXd rhs(total_dofs);
 
 	for (uint32_t i = 0; i < dofs.size(); ++i) {
 		if (dofs[i] == -1U) continue;
-		//sum adj[x] + one * 1 - c * x = 0.0f
 		float sum = 0.0f;
 		float one = 0.0f;
 		for (auto a : adj[i]) {
@@ -990,13 +950,9 @@ void KnitGrapher::interpolateValues() {
 
 	Eigen::SparseMatrix< double > A(total_dofs, total_dofs);
 	A.setFromTriplets(coefficients.begin(), coefficients.end());
-	//A = A * A.transpose();
-	A.makeCompressed(); //redundant?
+	A.makeCompressed(); 
 
-	//Eigen::SparseLU< Eigen::SparseMatrix< double > > solver;
-	//Eigen::SparseQR< Eigen::SparseMatrix< double >, Eigen::COLAMDOrdering< int > > solver;
-	Eigen::SimplicialLDLT< Eigen::SparseMatrix< double > > solver;
-	//Eigen::ConjugateGradient< Eigen::SparseMatrix< double > > solver;
+	Eigen::SimplicialLDLT< Eigen::SparseMatrix< double > > solver;	
 	solver.compute(A);
 	if (solver.info() != Eigen::Success) {
 		qDebug() << "Decomposition failed.";
@@ -1007,9 +963,7 @@ void KnitGrapher::interpolateValues() {
 		qDebug() << "Solving failed.";
 		return;
 	}
-	//std::cout << solver.iterations() << " interations later..." << std::endl; //DEBUG
-	//std::cout << solver.error() << " (estimated error)..." << std::endl; //DEBUG
-
+	
 	values = constrained_values;
 	for (uint32_t i = 0; i < dofs.size(); ++i) {
 		if (dofs[i] != -1U) values[i] = x[dofs[i]];
@@ -1021,7 +975,13 @@ void KnitGrapher::interpolateValues() {
 	}
 }
 
-std::vector<GLuint> KnitGrapher::toIntArray(std::vector<glm::uvec3> triangles) {
+/*
+*	Function: helper function that converts an AutoKnitMesh's 'triangles' class variable into ObjectMesh's 'indices' class variable
+*	Return: a vector array of int values, representing different vertices on the triangle
+*	Called: called whenever an ObjectMesh should be created and passed to the Visualizer class, such as during peelSlice()
+*/
+std::vector<GLuint> KnitGrapher::toIntArray(std::vector<glm::uvec3> triangles) 
+{
 	std::vector<GLuint> result;
 
 	for (auto t : triangles) {
@@ -1032,7 +992,13 @@ std::vector<GLuint> KnitGrapher::toIntArray(std::vector<glm::uvec3> triangles) {
 	return result;
 }
 
-bool KnitGrapher::degenerateCheck(std::vector<glm::uvec3> tris) {
+/*
+*	Function: a checking function that finds if a there is a degenerate triangle in a set
+*	Return: bool, is there such a triangle or not
+*	Called: called during remesh, implies a fault of the loaded .obj file...
+*/
+bool KnitGrapher::degenerateCheck(std::vector<glm::uvec3> tris) 
+{
 	for (auto const& tri : tris) {
 		glm::vec3 const& x = originalMesh.vertices[tri.x];
 		glm::vec3 const& y = originalMesh.vertices[tri.y];
@@ -1052,34 +1018,22 @@ bool KnitGrapher::degenerateCheck(std::vector<glm::uvec3> tris) {
 	return false;
 }
 
-
-std::vector<glm::uvec3> KnitGrapher::getTriangles(ObjectMesh const& mesh) {
-	std::vector<glm::uvec3> result;
-
-	for (int i = 0; i < mesh.indices.size(); i += 3) {
-		glm::uvec3 tri;
-		tri.x = mesh.indices[i];
-		tri.y = mesh.indices[i + 1];
-		tri.z = mesh.indices[i + 2];
-		result.push_back(tri);
-	}
-	return result;
-
-}
-
-
+/*
+*	Function: extract chains of edges at a given level from the mesh based on vertex values. 
+*	Return: void, but generates a vector of EmbeddedVertex objects
+*	Called: called duing peelSlice()
+*/
 void KnitGrapher::extractLevelChains(
 	AutoKnitMesh const& model, //in: model on which to embed vertices
 	std::vector< float > const& values, //in: values at vertices
 	float const level, //in: level at which to extract chains
-	std::vector< std::vector< EmbeddedVertex > >* chains_ //chains of edges at given level
-) {
+	std::vector< std::vector< EmbeddedVertex > >* chains_ ) //chains of edges at given level
+{
 	assert(chains_);
 	auto& chains = *chains_;
 	chains.clear();
 
 	//embed points along all edges that start below level and end at or above it:
-
 	std::vector< glm::vec3 > const& verts = model.vertices;
 	std::vector< glm::uvec3 > const& tris = model.triangles;
 
@@ -1109,11 +1063,9 @@ void KnitGrapher::extractLevelChains(
 			if (values[a] <= values[b] && values[a] <= values[c]) break;
 			uint32_t t = a; a = b; b = c; c = t;
 		}
-		//NOTE: we treat level as "level + epsilon"
+
 		if (values[a] >= level) continue; //all above border
 		assert(values[a] < level);
-		//NOTE: if values increase along +y, chains should be oriented in the +x direction
-		//assuming ccw oriented triangles, this means:
 
 		if (values[b] >= level && values[c] >= level) {
 			//edge is from ca to ab
@@ -1189,20 +1141,21 @@ void KnitGrapher::extractLevelChains(
 	}
 
 	qDebug() << "extract_level_chains found " << found_loops << " loops and " << found_chains << " chains." ;
-
 }
 
-
+/*
+*	Function: trims the mesh so that only relevant portion of it is left
+*	Return: void, but generates the trimmed mesh and passes it through the 'clipped' argument, also generates the set of Embedded vertices
+*		optionally can also return the vertices left of, and right of the clipped mesh
+*	Called: called during the peelSlice() function
+*/
 void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_of,
 	std::vector< std::vector< EmbeddedVertex > >& right_of,
 	AutoKnitMesh* clipped_,
 	std::vector< EmbeddedVertex >* clipped_vertices_,
-	std::vector< std::vector< uint32_t > >* left_of_vertices_, //out (optional): indices of vertices corresponding to left_of chains [may be some rounding]
-	std::vector< std::vector< uint32_t > >* right_of_vertices_ //out (optional): indices of vertices corresponding to right_of chains [may be some rounding]
-) {
-
-	
-
+	std::vector< std::vector< uint32_t > >* left_of_vertices_, 
+	std::vector< std::vector< uint32_t > >* right_of_vertices_) 
+{
 	assert(clipped_);
 	auto& clipped = *clipped_;
 	clipped.clear();
@@ -1211,8 +1164,6 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 	auto& clipped_vertices = *clipped_vertices_;
 	clipped_vertices.clear();
 
-
-	//newTriangles = getTriangles(newMesh);
 	{ //PARANOIA: make sure all chains are loops or edge-to-edge:
 		std::unordered_set< glm::uvec2 > edges;
 		for (auto const& tri : newMesh.triangles) {
@@ -1257,8 +1208,6 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 			assert(on_edge(chain.back()));
 		}
 	}
-
-
 
 	globedges.clear(); //global list used for edge tracking in epm; awkward but should work.
 	EmbeddedPlanarMap< Value, Value::Reverse, Value::Combine, Value::Split > epm;
@@ -1387,11 +1336,9 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 				for (auto const& s : sources[ee.value.edge]) {
 					assert(s.a != s.b);
 					if (s.a < s.b) {
-						//if (s.den > 2) std::cout << s.a << "/" << s.b << " -> [" << ee.first << "-" << ee.second << "] (non-flipped)" << std::endl; //DEBUG
 						edge_subedges[glm::uvec2(s.a, s.b)].emplace_back(ee.first, ee.second, s.num, s.den);
 					}
 					else {
-						//if (s.den > 2) std::cout << s.b << "/" << s.a << " -> [" << ee.second << "-" << ee.first << "] (flipped)" << std::endl; //DEBUG
 						edge_subedges[glm::uvec2(s.b, s.a)].emplace_back(ee.second, ee.first, s.den - s.num, s.den);
 					}
 				}
@@ -1402,17 +1349,8 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 			std::vector< SubEdge >& subedges = ese.second;
 			assert(!subedges.empty());
 			std::stable_sort(subedges.begin(), subedges.end(), [](SubEdge const& a, SubEdge const& b) {
-				//    a.num / a.den < b.num / b.den
-				// => a.num * b.den < b.num * a.den
 				return uint64_t(a.num) * uint64_t(b.den) < uint64_t(b.num) * uint64_t(a.den);
 				});
-			/*if (subedges.size() > 1) {
-				//DEBUG:
-				for (auto &s : subedges) {
-					std::cout << " [" << s.a << "-" << s.b << "]@(" << s.num << "/" << s.den << ")";
-				}
-				std::cout << std::endl;
-			}*/
 			for (uint32_t i = 0; i + 1 < subedges.size(); ++i) {
 				assert(subedges[i].b == subedges[i + 1].a);
 			}
@@ -1556,7 +1494,7 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 				again = true;
 				break;
 			}
-		} //while (again)
+		}
 
 		if (verts_removed) {
 			qDebug() << "Removed " << verts_removed << " vertices (that's " << length_removed << " units; " << length_removed / initial_length * 100.0 << "% of the initial length of " << initial_length << " units).";
@@ -1573,7 +1511,6 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 	for (auto& epm_chain : right_of_epm) {
 		cleanup_chain(epm_chain, -(1 << 8));
 	}
-
 
 	//build split mesh:
 	std::vector< EmbeddedVertex > split_verts;
@@ -1672,7 +1609,6 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 		return split_vert_to_clipped_vertex[v];
 	};
 
-	//std::vector<glm::uvec3> clippedTriangles = getTriangles(clipped);
 	for (auto const& tri : split_tris) {
 		if (!keep[&tri - &split_tris[0]]) continue;
 		clipped.triangles.emplace_back(
@@ -1686,12 +1622,8 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 		clipped.vertices.emplace_back(v.interpolate(newMesh.vertices));
 	}
 
-	//clipped.indices = toIntArray(clippedTriangles);
-
 	qDebug() << "Trimmed model from " << newMesh.triangles.size() << " triangles on " << newMesh.vertices.size() << " vertices to " << clipped.triangles.size() << " triangles on " << clipped.vertices.size() << " vertices.";
 	
-
-
 	auto transform_chain = [&](std::vector< uint32_t > const& epm_chain) {
 		assert(!epm_chain.empty());
 		std::vector< uint32_t > split_chain;
@@ -1713,7 +1645,6 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 		left_of_vertices_->clear();
 		left_of_vertices_->reserve(left_of_epm.size());
 		for (auto const& chain : left_of_epm) {
-			//std::cout << "left_of[" << (&chain - &left_of_epm[0]) << "]:"; //DEBUG
 			left_of_vertices_->emplace_back(transform_chain(chain));
 		}
 	}
@@ -1721,18 +1652,26 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 		right_of_vertices_->clear();
 		right_of_vertices_->reserve(right_of_epm.size());
 		for (auto const& chain : right_of_epm) {
-			//std::cout << "right_of[" << (&chain - &right_of_epm[0]) << "]:"; //DEBUG
 			right_of_vertices_->emplace_back(transform_chain(chain));
 		}
 	}
 }
 
+
+/*
+*	Function: peel a new portion of the mesh that represents the next step of KnitGraph creation
+*		in essence, starting from the current active_chains, work within the length constraint to find the ending active_chains
+*		and create a model that only contains vertices and triangles within this boundary
+*	Return: void, but generates the sliced model and relevant information which is passed through the arguments
+*	Called: called when the user selects the 'step' button in the GUI, is the second step after finding the active chains
+*/
 void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & active_chains,
 	AutoKnitMesh* slice_,
 	std::vector< EmbeddedVertex >* slice_on_model_,
 	std::vector< std::vector< uint32_t > >* slice_active_chains_,
 	std::vector< std::vector< uint32_t > >* slice_next_chains_,
-	std::vector< bool >* used_boundary_) {
+	std::vector< bool >* used_boundary_) 
+{
 
 	//hope to god it works now;
 	assert(slice_);
@@ -1752,7 +1691,6 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 	slice_next_chains.clear();
 
 	{
-		//DEBUG:
 		uint32_t loops = 0;
 		uint32_t lines = 0;
 		for (auto const& chain : active_chains) {
@@ -1772,7 +1710,6 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 
 	//This version of the code just uses the 3D distance to the curve.
 	//might have problems with models that get really close to themselves.
-
 	std::vector< float > values(clipped.vertices.size(), std::numeric_limits< float >::infinity());
 
 	auto do_seg = [&values, &clipped](glm::vec3 const& a, glm::vec3 const& b) {
@@ -1801,7 +1738,6 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 	}
 
 	
-	//std::vector<glm::uvec3> clippedTriangles = getTriangles(clipped);
 	std::vector< std::vector< EmbeddedVertex > > next_chains;
 	{
 		float level = 2.0f * stitchHeight / modelUnitLength;
@@ -1864,7 +1800,6 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 			auto chase_path = [&](glm::uvec2 begin_e, ChainEnd begin_ce) {
 				assert(!begin_ce.is_start); //start at the end of a path, chase to the start of another
 				std::vector< EmbeddedVertex > path;
-				//path.emplace_back(EmbeddedVertex::on_edge(begin_e, begin_ce.along));
 
 				ChainEnd const* end_ce = nullptr;
 
@@ -2002,8 +1937,6 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 		}
 	}
 
-
-
 	trimModel(active_chains, next_chains, &slice, &slice_on_model, &slice_active_chains, &slice_next_chains);
 
 	//sometimes this can combine vertices, in which case the output chains should be trimmed:
@@ -2046,8 +1979,13 @@ void KnitGrapher::peelSlice(std::vector< std::vector< EmbeddedVertex > > & activ
 
 
 
-
-bool KnitGrapher::fillUnassigned(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop) {
+/*
+*	Function: fill in unassigned elements in closest vertex vector based on the weights provided
+*	Return: bool, has the function assigned the values or not
+*	Called: called during the linkChains() function
+*/
+bool KnitGrapher::fillUnassigned(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop) 
+{
 
 	bool have_assigned = false;
 	for (auto c : closest) {
@@ -2128,14 +2066,20 @@ bool KnitGrapher::fillUnassigned(std::vector< uint32_t >& closest, std::vector< 
 }
 
 
-
+/*
+*	Function: find the links between vertices such that the total distance between the points is minimized
+*		in essence is linking the different vectors with a 'knit'
+*	Return: void, but modifies the passed 'links_' argument, which is the resulting links between vertices
+*	Called: called during the linkChains() function 
+*/
 void KnitGrapher::optimalLink(
 	float target_distance, bool do_roll,
 	std::vector< glm::vec3 > const& source,
 	std::vector< bool > const& source_linkone,
 	std::vector< glm::vec3 > const& target,
 	std::vector< bool > const& target_linkone,
-	std::vector< std::pair< uint32_t, uint32_t > >* links_) {
+	std::vector< std::pair< uint32_t, uint32_t > >* links_) 
+{
 
 	assert(source.size() == source_linkone.size());
 	assert(target.size() == target_linkone.size());
@@ -2215,7 +2159,6 @@ void KnitGrapher::optimalLink(
 		return dis * dis;
 	};
 
-	//TODO: could refine this a fair bit & build a table with real link counts
 	auto is_possible = [](State const& state) {
 		if (state.source_remain * 2 < state.target_remain) return false;
 		if (state.target_remain * 2 < state.source_remain) return false;
@@ -2323,8 +2266,13 @@ void KnitGrapher::optimalLink(
 }
 
 
-
-void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop) {
+/*
+*	Function: try to 'flatten' the mesh such that it can be knit on a V-bed machine, but preserving the original mesh structure
+*	Return: void, but modifies the 'closest' argument
+*	Called: called during the linkChains() function
+*/
+void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop) 
+{
 	assert(closest.size() == weights.size());
 	if (closest.empty()) return;
 
@@ -2350,9 +2298,6 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 
 	//(b) early-out in certain easy-to-check conditions:
 	if (symbols.size() == 1) return; //single symbol
-	//DEBUG: don't do these checks; exercise the code a bit more instead:
-	//if (symbols.size() == 2) return; //two symbols without alternation
-	//if (is_loop && symbols.size() == 3 && symbols[0] == symbols.back()) return; //two symbols without alternation (loop version)
 
 	//symbols -> bits
 	std::vector< std::pair< uint16_t, float > > bit_symbols;
@@ -2369,7 +2314,7 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 		bits = symbol_bit.size();
 	}
 
-
+	//helper struct inside the function, could technically be moved to the class definition but unecessary
 	struct State {
 		uint16_t used = 0; //have seen all symbols with bits in used
 		uint8_t min = 0; //symbols that are strictly between min and max have been processed
@@ -2422,7 +2367,6 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 		assert(state.min != from.min || state.max != from.max); //must have done *something*
 
 		(void)bits;
-		//std::cout << state.to_string(bits) << " from " << from.to_string(bits) << " cost " << cost << std::endl; //DEBUG
 
 		if ((state.min != from.min && state.min == from.max)
 			|| (state.max != from.max && state.max == from.min)) {
@@ -2580,12 +2524,10 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 		State state = State::unpack(path[i - 1]);
 		State next = State::unpack(path[i]);
 
-		//std::cout << state.to_string(bits) << " -> " << next.to_string(bits) << ": "; std::cout.flush(); //DEBUG
 		if (state.min != next.min && state.max != next.max) {
 			//a(bc)d -> (abcd), keep 'a' (next.min), 'd' (state.max)
 			assert(bit_symbols[next.min].first == bit_symbols[state.max].first);
 			assert(next.current == bit_symbols[state.min].first);
-			//std::cout << "keep " << int32_t(next.min) << " (\"" << symbols[next.min].first << "\")" << ", " << int32_t(state.max) << " (\"" << symbols[state.max].first << "\")" << std::endl; //DEBUG
 			assert(keep[next.min] == -1);
 			assert(keep[state.max] == -1);
 			keep[next.min] = keep[state.max] = 1;
@@ -2593,12 +2535,10 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 		else if (state.min != next.min) {
 			//a(bc)d -> (abc)d, keep/discard next.min
 			if (bit_symbols[next.min].first == next.current) {
-				//std::cout << "keep " << int32_t(next.min) << " (\"" << symbols[next.min].first << "\")" << std::endl; //DEBUG
 				assert(keep[next.min] == -1);
 				keep[next.min] = 1;
 			}
 			else {
-				//std::cout << "discard " << int32_t(next.min) << " (\"" << symbols[next.min].first << "\")" << std::endl; //DEBUG
 				assert(keep[next.min] == -1);
 				keep[next.min] = 0;
 			}
@@ -2607,12 +2547,10 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 			assert(state.max != next.max);
 			//a(bc)d -> a(bcd), keep/discard state.max
 			if (bit_symbols[state.max].first == next.current) {
-				//std::cout << "keep " << int32_t(state.max) << " (\"" << symbols[state.max].first << "\")" << std::endl; //DEBUG
 				assert(keep[state.max] == -1);
 				keep[state.max] = 1;
 			}
 			else {
-				//std::cout << "discard " << int32_t(state.max) << " (\"" << symbols[state.max].first << "\")" << std::endl; //DEBUG
 				assert(keep[state.max] == -1);
 				keep[state.max] = 0;
 			}
@@ -2639,13 +2577,7 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 			assert(si != symbols.end());
 			assert(si->first == c);
 			relabel.emplace_back(keep[si - symbols.begin()] == 0);
-			//if (relabel.back()) {
-			//	std::cout << ' ' << 'x' << int32_t(c) << 'x'; //DEBUG
-			//} else {
-			//	std::cout << ' ' << ' ' << int32_t(c) << ' '; //DEBUG
-			//}
 		}
-		//std::cout << std::endl; //DEBUG
 		assert(relabel.size() == closest.size());
 		assert(si != symbols.end());
 		++si;
@@ -2662,7 +2594,6 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 		auto relabel_range = [&closest, &weights, &relabel](uint32_t first, uint32_t last) {
 			uint32_t before = (first == 0 ? closest.back() : closest[first - 1]);
 			uint32_t after = (last + 1 == closest.size() ? closest[0] : closest[last + 1]);
-			//std::cout << "Relabelling [" << first << ", " << last << "] using " << before << "/" << after << std::endl; //DEBUG
 
 			assert(!relabel[(first == 0 ? closest.size() : first) - 1]);
 			assert(!relabel[(last + 1 == closest.size() ? 0 : last) + 1]);
@@ -2709,7 +2640,6 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 			relabel_range(first, last);
 		}
 	}
-
 }
 
 
@@ -2727,6 +2657,12 @@ void KnitGrapher::flatten(std::vector< uint32_t >& closest, std::vector< float >
 //        ... (a,b) (a,c) ...
 //     or ... (b,a) (c,a) ...
 //  (depending on which chain is 'from' and which is 'to')
+/*
+*	Function: link the 2 chains (current and next) with new stitches
+*		in essence defines how the knitting operations should continue to get from current row to the next row
+*	Return: void, but modifies a sleu of passed arguments
+*	Called: called when the user selects the 'step' button on the GUI, is the 3rd step after peelSlice()
+*/
 void KnitGrapher::linkChains(
 	AutoKnitMesh const& slice, //in: slice on which the chains reside
 	std::vector< float > const& slice_times, //in: time field (times @ vertices), for slice
@@ -2737,7 +2673,8 @@ void KnitGrapher::linkChains(
 	//need this or slice_times (above) std::vector< std::vector< bool > > const &discard_segments,
 	std::vector< std::vector< Stitch > >* next_stitches_, //out: next active stitches
 	std::vector< Link >* links_ //out: active_chains[from_chain][from_vertex] -> linked_next_chains[to_chain][to_vertex] links
-) {
+) 
+{
 
 
 	assert(slice_times.size() == slice.vertices.size());
@@ -2951,8 +2888,7 @@ void KnitGrapher::linkChains(
 	std::vector< std::vector< uint32_t > > active_closest;
 	std::vector< std::vector< uint32_t > > next_closest;
 
-	//std::vector<glm::uvec3> sliceTriangles = getTriangles(slice);
-
+	
 	{ //find closest pairs:
 
 		std::vector< std::vector< uint32_t > > adj(slice.vertices.size());
@@ -3037,28 +2973,7 @@ void KnitGrapher::linkChains(
 		for (auto& c : next_closest) {
 			if (!c.empty()) c.pop_back();
 		}
-#if 0
-		//DEBUG:
-		for (auto const& ac : active_closest) {
-			std::cout << "active_closest[" << (&ac - &active_closest[0]) << "]:";
-			for (auto c : ac) {
-				std::cout << " " << int32_t(c);
-			}
-			std::cout << "\n";
-		}
-		std::cout.flush();
-		for (auto const& nc : next_closest) {
-			std::cout << "next_closest[" << (&nc - &next_closest[0]) << "]:";
-			for (auto c : nc) {
-				std::cout << " " << int32_t(c);
-			}
-			std::cout << "\n";
-		}
-		std::cout.flush();
-#endif
 	}
-
-
 
 	auto discard_nonmutual = [&]() {
 		std::vector< std::set< uint32_t > > active_refs; active_refs.reserve(active_closest.size());
@@ -3100,7 +3015,6 @@ void KnitGrapher::linkChains(
 	//start by removing any non-mutual links:
 	discard_nonmutual();
 
-
 	//fill discarded areas with adjacent information, and process further to make sure the result can be flattened:
 	while (true) {
 		for (auto& closest : active_closest) {
@@ -3141,7 +3055,7 @@ void KnitGrapher::linkChains(
 		}
 	}
 
-
+	//helper structs
 	struct BeginEnd {
 		BeginEnd(float begin_, float end_) : begin(begin_), end(end_) { }
 		float begin;
@@ -3179,11 +3093,8 @@ void KnitGrapher::linkChains(
 			uint32_t end = begin + 1;
 			while (end < closest.size() && closest[end] == closest[begin]) ++end;
 			assert(end < lengths.size());
-			//std::cout << "[" << begin << ", " << end << ") becomes "; //DEBUG
 			matches[std::make_pair(ai, closest[begin])].active.emplace_back(lengths[begin] / lengths.back(), lengths[end] / lengths.back(), closest[begin]);
 			auto m = matches[std::make_pair(ai, closest[begin])].active;
-			//std::cout << "[" << m.back().begin << ", " << m.back().end << ')'; //DEBUG
-			//std::cout << " = [" << lengths[begin] << ", " << lengths[end] << ") / " << lengths.back() << std::endl; //DEBUG
 			begin = end;
 		}
 	}
@@ -3216,7 +3127,6 @@ void KnitGrapher::linkChains(
 			for (auto& bse : anm.second.active) {
 				assert(bse.next == anm.first.second); //'next' should be set correctly!
 				active_segments[anm.first.first].emplace_back(&bse);
-				//std::cout << "match[" << int32_t(anm.first.first) << "," << int32_t(anm.first.second) << "] gives segment [" << bse.begin << ',' << bse.end << ')' << std::endl; //DEBUG
 			}
 		}
 
@@ -3229,12 +3139,6 @@ void KnitGrapher::linkChains(
 				return a->begin < b->begin;
 				});
 
-			//DEBUG:
-			//std::cout << "active[" << ai << "] segments:";
-			//for (auto seg : segments) {
-			//	std::cout << ' ' << '[' << seg->begin << ',' << seg->end << ')';
-			//}
-			//std::cout << std::endl;
 
 			//segments should partition [0.0, 1.0):
 			assert(!segments.empty());
@@ -3485,10 +3389,6 @@ void KnitGrapher::linkChains(
 
 			if (old_back != new_back || old_front != new_front) {
 				qDebug() << "Balanced a merge: old: " << old_back << old_front << " new: " << new_back  << new_front;
-				//std::cout.flush();
-				//} else {
-				//if (old_back == new_back && old_front == new_front) {
-					//std::cout << "NOTE: merge was already balanced." << std::endl;
 			}
 
 		}
@@ -3537,15 +3437,15 @@ void KnitGrapher::linkChains(
 		Match& match = anm.second;
 
 		if (match.active.empty()) {
-			std::cout << "Ignoring match with empty active chain." << std::endl;
+			qDebug() << "Ignoring match with empty active chain.";
 			continue;
 		}
 		else if (match.next.empty()) {
 			if (active_matches[anm.first.first] == 1) {
-				std::cout << "WARNING: active chain matches nothing at all; will not be linked and will thus be discarded." << std::endl;
+				qDebug() << "WARNING: active chain matches nothing at all; will not be linked and will thus be discarded.";
 			}
 			else {
-				std::cout << "Ignoring match with empty next chain." << std::endl;
+				qDebug() << "Ignoring match with empty next chain.";
 			}
 
 			continue;
@@ -3603,9 +3503,7 @@ void KnitGrapher::linkChains(
 		assert(anm.first.second < next_lengths.size());
 		std::vector< float > const& lengths = next_lengths[anm.first.second];
 		float total_length = 0.0f;
-		//std::cout << "Matching to"; //DEBUG
 		for (auto const& be : match.next) {
-			//	std::cout << " [" << be.begin << ", " << be.end << ")"; std::cout.flush(); //DEBUG
 			if (be.begin <= be.end) {
 				total_length += be.end - be.begin;
 			}
@@ -3733,7 +3631,7 @@ void KnitGrapher::linkChains(
 					else {
 						assert(t < match.next[a.bi].end || match.next[a.bi].begin <= t);
 					}
-					match.next[a.bi].stitches += 1; //.emplace_back(next_stitches[anm.first.second].size() + new_stitches.size() - 1); //track stitch index
+					match.next[a.bi].stitches += 1; 
 				}
 			}
 		}
@@ -3902,10 +3800,6 @@ void KnitGrapher::linkChains(
 
 			if (old_back != new_back || old_front != new_front) {
 				qDebug() << "Balanced a split: " << "old: " << old_back << old_front  << " new: " << new_back << new_front;
-				//std::cout.flush();
-				//} else {
-				//if (old_back == new_back && old_front == new_front) {
-				//	std::cout << "NOTE: split was already balanced." << std::endl;
 			}
 
 
@@ -4114,101 +4008,6 @@ void KnitGrapher::linkChains(
 				&best_links);
 			(void)best_cost; //unused!
 #endif
-#ifdef USE_EVEN
-			auto try_links_even = [&](uint32_t roll_active, uint32_t roll_new) {
-				std::vector< std::pair< uint32_t, uint32_t > > possible_links;
-
-				if (active_stitch_locations.size() <= next_stitch_locations.size()) {
-					//evenly distribute increases among the non-linkone stitches:
-					uint32_t total = 0;
-					for (auto l : active_stitch_linkones) {
-						if (!l) ++total;
-					}
-					uint32_t increases = next_stitch_locations.size() - active_stitch_locations.size();
-					std::vector< bool > inc(total, false);
-					for (uint32_t i = 0; i < increases; ++i) {
-						assert(inc[i * total / increases] == false);
-						inc[i * total / increases] = true;
-					}
-					uint32_t n = 0;
-					uint32_t i = 0;
-					for (uint32_t a = 0; a < active_stitch_locations.size(); ++a) {
-						uint32_t ra = (a + roll_active) % active_stitch_locations.size();
-						uint32_t rn = (n + roll_new) % next_stitch_locations.size();
-						possible_links.emplace_back(ra, rn);
-						++n;
-						if (!active_stitch_linkones[ra]) {
-							assert(i < inc.size());
-							if (inc[i]) {
-								rn = (n + roll_new) % next_stitch_locations.size();
-								possible_links.emplace_back(ra, rn);
-								++n;
-							}
-							++i;
-						}
-					}
-					assert(i == total);
-					assert(n == next_stitch_locations.size());
-				}
-				else if (active_stitch_locations.size() > next_stitch_locations.size()) {
-					//evenly distribute decreases among the non-linkone stitches:
-					uint32_t total = 0;
-					for (auto l : next_stitch_linkones) {
-						if (!l) ++total;
-					}
-					assert(total > 0);
-					uint32_t decreases = active_stitch_locations.size() - next_stitch_locations.size();
-					std::vector< bool > dec(total, false);
-					for (uint32_t i = 0; i < decreases; ++i) {
-						assert(dec[i * total / decreases] == false);
-						dec[i * total / decreases] = true;
-					}
-					uint32_t a = 0;
-					uint32_t i = 0;
-					for (uint32_t n = 0; n < next_stitch_locations.size(); ++n) {
-						uint32_t ra = (a + roll_active) % active_stitch_locations.size();
-						uint32_t rn = (n + roll_new) % next_stitch_locations.size();
-						possible_links.emplace_back(ra, rn);
-						++a;
-						if (!next_stitch_linkones[rn]) {
-							assert(i < dec.size());
-							if (dec[i]) {
-								ra = (a + roll_active) % active_stitch_locations.size();
-								possible_links.emplace_back(ra, rn);
-								++a;
-							}
-							++i;
-						}
-					}
-					assert(i == total);
-					assert(a == active_stitch_locations.size());
-				}
-				float const row_height = 2.0f * parameters.stitch_height_mm / parameters.model_units_mm;
-				float cost = 0.0f;
-				for (auto const& p : possible_links) {
-					float len = glm::length(next_stitch_locations[p.second] - active_stitch_locations[p.first]);
-					cost += (len - row_height) * (len - row_height);
-				}
-
-				if (cost < best_cost) {
-					best_cost = cost;
-					best_links = possible_links;
-				}
-			};
-
-
-			if (active_stitch_locations.size() >= next_stitch_locations.size()) {
-				for (uint32_t roll_active = 0; roll_active < active_stitch_locations.size(); ++roll_active) {
-					try_links_even(roll_active, 0);
-				}
-			}
-			else {
-				for (uint32_t roll_new = 0; roll_new < next_stitch_locations.size(); ++roll_new) {
-					try_links_even(0, roll_new);
-				}
-			}
-#endif //USE_EVEN
-
 			for (auto const& p : best_links) {
 				Link link;
 				link.from_chain = anm.first.first;
@@ -4257,13 +4056,18 @@ void KnitGrapher::linkChains(
 
 
 
-
+/*
+*	Function: compute the shortest path from a source vertex to a target vertex
+*	Return: void, but the path between the vertices is passed through the path_ argument
+*	Called: called during the buildNextActiveChains() function
+*/
 void KnitGrapher::embeddedPathSimple(
 	AutoKnitMesh const& model,
 	EmbeddedVertex const& source,
 	EmbeddedVertex const& target,
 	std::vector< EmbeddedVertex >* path_ //out: path; path[0] will be source and path.back() will be target
-) {
+) 
+{
 
 	assert(source != target);
 
@@ -4462,6 +4266,12 @@ void KnitGrapher::embeddedPathSimple(
 
 }
 
+/*
+*	Function: compute a path from source to target estimating the distance between the source and target 
+*		and then trimming the mesh to include only the triangles that could be traversed by the path.
+*	Return: void, but the path between the source and target is passed through the path_ argument
+*	Called: called during the builNextActiveChain() function
+*/
 void KnitGrapher::embeddedPath(
 	AutoKnitMesh const& model,
 	EmbeddedVertex const& source,
@@ -4582,7 +4392,6 @@ void KnitGrapher::embeddedPath(
 	assert(from_trimmed.size() == trimmed.vertices.size());
 
 
-
 	embeddedPathSimple(
 		trimmed,
 		trimmed_source,
@@ -4600,7 +4409,12 @@ void KnitGrapher::embeddedPath(
 
 
 
-
+/*
+*	Function: build the new active chains that will serve as the jumping off point for the next find active->peel slice->link->build iteration
+*	Return: void, but modifies the next active_chains variable to include the info of the next iteration
+*		also changes the RowColGraph
+*	Called: called when the user clicks the 'step' button in the GUI, is the 4th step after linkChains()
+*/
 void KnitGrapher::buildNextActiveChains(
 	AutoKnitMesh const& slice,
 	std::vector< EmbeddedVertex > const& slice_on_model, //in: vertices of slice (on model)
@@ -4613,7 +4427,8 @@ void KnitGrapher::buildNextActiveChains(
 	std::vector< std::vector< EmbeddedVertex > >* next_active_chains_, //out: next active chains (on model)
 	std::vector< std::vector< Stitch > >* next_active_stitches_, //out: next active stitches
 	RowColGraph* graph_ //in/out (optional): graph to update
-) {
+) 
+{
 
 	
 	for (auto const& chain : active_chains) {
@@ -5004,7 +4819,6 @@ void KnitGrapher::buildNextActiveChains(
 					std::make_pair(prev_ocs, cur_ocs),
 					next_ocs
 				));
-				//std::cout << "Inserted [" << ret.first->first.first << ", " << ret.first->first.second << "] -> " << ret.first->second << std::endl; //DEBUG
 				assert(ret.second);
 			}
 		}
@@ -5052,7 +4866,6 @@ void KnitGrapher::buildNextActiveChains(
 					std::make_pair(prev_ocs, cur_ocs),
 					next_ocs
 				));
-				//std::cout << "Inserted [" << ret.first->first.first << ", " << ret.first->first.second << "] -> " << ret.first->second << std::endl; //DEBUG
 				assert(ret.second);
 			}
 			else {
@@ -5071,7 +4884,6 @@ void KnitGrapher::buildNextActiveChains(
 							std::make_pair(prev_ocs, cur_ocs),
 							OnChainStitch(OnChainStitch::OnNext, n.chain, n.stitch)
 						));
-						//std::cout << "Inserted [" << ret.first->first.first << ", " << ret.first->first.second << "] -> " << ret.first->second << std::endl; //DEBUG
 						assert(ret.second);
 					}
 					else {
@@ -5096,7 +4908,6 @@ void KnitGrapher::buildNextActiveChains(
 							std::make_pair(OnChainStitch(OnChainStitch::OnNext, n.chain, n.stitch), cur_ocs),
 							next_ocs
 						));
-						//std::cout << "Inserted [" << ret.first->first.first << ", " << ret.first->first.second << "] -> " << ret.first->second << std::endl; //DEBUG
 						assert(ret.second);
 					}
 					else {
@@ -5122,7 +4933,7 @@ void KnitGrapher::buildNextActiveChains(
 		chain.emplace_back(next_vertex.begin()->first.first);
 		chain.emplace_back(next_vertex.begin()->first.second);
 		chain.emplace_back(next_vertex.begin()->second);
-		//assert(chain[0] != chain[1] && chain[0] != chain[2] && chain[1] != chain[2]); //<-- not always true in two-stitch-loop cases (do we want two-stitch loops? Probably not.)
+		
 		next_vertex.erase(next_vertex.begin());
 		while (true) {
 			auto f = next_vertex.find(std::make_pair(chain[chain.size() - 2], chain[chain.size() - 1]));
@@ -5186,18 +4997,16 @@ void KnitGrapher::buildNextActiveChains(
 			std::vector< Stitch > const& src_stitches = (ocs.on == OnChainStitch::OnActive ? active_stitches : next_stitches)[ocs.chain];
 			assert(!src_chain.empty());
 			assert(src_lengths.size() == src_chain.size());
-			//std::cout << (path_evs.size()-1) << " " << ocs << " "; //DEBUG
+			
 			if (ocs.type == OnChainStitch::TypeBegin) {
 				assert(src_chain[0] != src_chain.back());
 				path_evs.emplace_back(EmbeddedVertex::on_vertex(src_chain[0]));
 				path_lefts.emplace_back(0);
-				//std::cout << "Begin: " << src_chain[0] << std::endl; //DEBUG
 			}
 			else if (ocs.type == OnChainStitch::TypeEnd) {
 				assert(src_chain[0] != src_chain.back());
 				path_evs.emplace_back(EmbeddedVertex::on_vertex(src_chain.back()));
 				path_lefts.emplace_back(src_chain.size() - 2);
-				//std::cout << "End: " << src_chain.back() << std::endl; //DEBUG
 			}
 			else {
 				assert(ocs.type == OnChainStitch::TypeStitch);
@@ -5211,7 +5020,6 @@ void KnitGrapher::buildNextActiveChains(
 				assert(i > 0);
 				path_evs.emplace_back(EmbeddedVertex::on_edge(src_chain[i - 1], src_chain[i], m));
 				path_lefts.emplace_back(i - 1);
-				//std::cout << "Stitch: " << src_chain[i-1] << "-" << src_chain[i] << " at " << m << std::endl; //DEBUG
 			}
 		}
 
@@ -5221,7 +5029,6 @@ void KnitGrapher::buildNextActiveChains(
 		float length = 0.0f;
 
 		auto append_ev = [&chain, &slice, &length](EmbeddedVertex const& ev, char const* why) {
-			//std::cout << ev << ": " << why << std::endl; //DEBUG
 			if (!chain.empty()) {
 				assert(ev != chain.back());
 				EmbeddedVertex::common_simplex(chain.back().simplex, ev.simplex); //make sure this works
@@ -5244,10 +5051,7 @@ void KnitGrapher::buildNextActiveChains(
 			std::vector< uint32_t > const& b_chain = (b.on == OnChainStitch::OnActive ? active_chains : next_chains).at(b.chain);
 			assert(b_left + 1 < b_chain.size());
 
-			//check_ocs(a); //DEBUG
-			//check_ocs(b); //DEBUG
-			//std::cout << "From " << a << " to " << b << std::endl; //DEBUG
-
+			
 			if (pi == 0) append_ev(a_ev, "first a");
 			else assert(!chain.empty() && chain.back() == a_ev);
 			if (a.type == OnChainStitch::TypeBegin) {
@@ -5293,7 +5097,6 @@ void KnitGrapher::buildNextActiveChains(
 				}
 			}
 			else {
-				//std::cout << "Building embedded path." << std::endl; //DEBUG
 				//find an embedded path between a and b:
 				std::vector< EmbeddedVertex > ab;
 				embeddedPath(slice, a_ev, b_ev, &ab);
@@ -5435,44 +5238,41 @@ void KnitGrapher::buildNextActiveChains(
 
 }
 
-void KnitGrapher::clearPeeling() {
-	//peel_step = 0;
-	//peel_action = PeelBegin;
-	//stepCount = 0;
 
+/*
+*	Function: cleaning function that is called after an iteration of the 4 main steps (find, slice, link, build) is completed
+*	Return: void, but clears a lot of class member variables
+*	Called: called before the find step of the algorithm, is called when the user clicks the 'step' button on the GUI at least 4 times
+*/
+void KnitGrapher::clearPeeling() {
 	graph.clear();
-	
 	active_chains.clear();
 	active_stitches.clear();
-	
-
 	slice.clear();
 	sliceOnModel.clear();
 	sliceActiveChains.clear();
 	sliceNextChains.clear();
 	nextUsedBoundary.clear();
 	sliceTimes.clear();
-	
-
 	nextStitches.clear();
 	links.clear();
-	
-
 	nextActiveChains.clear();
 	nextActiveStitches.clear();
-	
 }
 
+
+/*
+*	Function: a SLOT function that is warned that the user clicked the 'step' button, does a different action based on which step is current
+*	Return: void, starts the different autknit algorithms
+*	Called: is a SLOT function, called when the user clicks the 'step' button
+*/
 void KnitGrapher::stepButtonClicked()
 {
 	if (stepCount % 4 == 0) {
-		//auto old_peel_step = stepCount;
-		//auto old_peel_action = peel_action;
 		auto old_next_active_chains = nextActiveChains;
 		auto old_next_active_stitches = nextActiveStitches;
 		auto old_rowcol_graph = graph;
 		clearPeeling();
-		
 		
 		graph = old_rowcol_graph;
 		if (stepCount == 0) {
@@ -5487,15 +5287,13 @@ void KnitGrapher::stepButtonClicked()
 			active_stitches = old_next_active_stitches;
 		}
 
-		//qDebug() << "emitting the firstActiveChainsCreated signal...";
 		emit firstActiveChainsCreated(&active_chains, &active_stitches, &graph);
 	}
 	if (stepCount % 4 == 1) {
 		qDebug() << "[Step " << stepCount << " ] - slice, calling peelSlice()-------------------------------------------------------";
-		//peel_slice(parameters, constrained_model, active_chains, &slice, &slice_on_model, &slice_active_chains, &slice_next_chains, &slice_next_used_boundary);
+		
 		peelSlice(active_chains, &slice, &sliceOnModel, &sliceActiveChains, &sliceNextChains, &nextUsedBoundary);
 		
-
 		qDebug() << "sliceonmodel size" << sliceOnModel.size();
 		sliceTimes.clear();
 		sliceTimes.reserve(sliceOnModel.size());
@@ -5503,64 +5301,45 @@ void KnitGrapher::stepButtonClicked()
 			sliceTimes.emplace_back(ev.interpolate(constrained_values));
 		}
 		
-
 		ObjectMesh emittedMesh = slice.toObjMesh();
-
 		emit peelSliceDone(&emittedMesh, &sliceActiveChains, &sliceNextChains);
 	}
 	if (stepCount % 4 == 2) {
 		qDebug() << "[Step "<< stepCount << " ] - link, calling linkChains()-------------------------------------------------------------------";
 		linkChains(slice, sliceTimes, sliceActiveChains, active_stitches, sliceNextChains, nextUsedBoundary, &nextStitches, &links);
 		emit linkChainsDone(&nextStitches, &links);
-
 	}
 	if (stepCount % 4 == 3) {
 		qDebug() << "[Step " << stepCount << " ] - build, calling buildNextActiveChains()------------------------------------------------------------";
 		buildNextActiveChains(slice, sliceOnModel, sliceActiveChains, active_stitches, sliceNextChains, nextStitches, nextUsedBoundary, links, &nextActiveChains, &nextActiveStitches, &graph);
-
 		emit nextActiveChainsDone(&nextActiveChains);
 	}
-
 	stepCount++;
-	
-	//emit activeChainsFound(data);
 }
 
-void KnitGrapher::printConstrainedValues()
-{
-	for (float val : constrained_values) {
-		qDebug() << val;
-	}
-	// get size of constrained values
-	qDebug() << "Constrained Values Size:" << constrained_values.size();
-}
 
-void KnitGrapher::constructKnitGraph(std::vector<Constraint*> constraints)
+/*
+*	Function: construct the mesh that will be used in the autoknit algorithms 
+*	Return: void, but creates the newMesh class variable
+*	Called: called after the user selects the 'interpolate' button in the GUI
+*/
+void KnitGrapher::constructNewMesh(std::vector<Constraint*> constraints)
 {
-	qDebug() << "Constructing Knit Graph, sizes:" << stitchWidth << stitchHeight << modelUnitLength;
-	// Step 1: create a new mesh that conforms to the constraints and stitch size given by the user
+	qDebug() << "Constructing new mesh, sizes:" << stitchWidth << stitchHeight << modelUnitLength;
+	//create a new mesh that conforms to the constraints and stitch size given by the user
 	qDebug() << "Constraints:" << constraints.size();
-
 	this->constraints = constraints;   
-
-	stitchWidth = 3.66f;
-	stitchHeight = 1.73f;
-	modelUnitLength = 10.0f;
-	//this->constraints[2]->timeValue = 0.5f;
-
-	//generateTriangles();
 	
-
-
 	remesh();
-	//printConstrainedValues();
 	interpolateValues();
-	qDebug() << "interpolation done!, emitting...";
-
+	
 	ObjectMesh emittedMesh = newMesh.toObjMesh();
-
 	emit knitGraphInterpolated(emittedMesh, constrained_values);
 }
+
+/*
+*	Function: the following 3 functions are SLOT functions that change the class parameters based on users input in the GUI
+*/
 void KnitGrapher::setStitchWidth(float width)
 {
 	qDebug() << "Setting stitch width to " << width;

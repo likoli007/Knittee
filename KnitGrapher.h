@@ -1,20 +1,35 @@
 #pragma once
+#define GLM_ENABLE_EXPERIMENTAL	
+
+#include <vector>
+#include <QSet>
+#include <QPair>
+#include <set>
+#include <deque>
+#include <Eigen/SparseCholesky>
+#include <glm/gtx/norm.hpp>
+#include <glm/gtx/hash.hpp>
+#include <glm/glm.hpp>
+#include <QVector3D>
+
+
+
 
 #include "ObjectMesh.h"
 #include "Visualizer.h"
-//#include "myQVectors.h"
-
-#include <glm/glm.hpp>
-#include <QVector3D>
 #include "Stitch.h"
 #include "RowColGraph.h"
 #include "EmbeddedVertex.h"
-//#include "Constraint.h"
 #include "EmbeddedPlanarMap.h"
 #include "RowColGraph.h"
-
 #include "Link.h"
+#include "EmbeddedVertex.h"
+#include "EmbeddedPlanarMap.h"
 
+
+/*
+* Helper class used in the autoknit algorithms, does not require its own .h file...
+*/
 struct OnChainStitch {
 	enum On : uint8_t { OnNone, OnActive, OnNext } on;
 	uint32_t chain;
@@ -90,93 +105,57 @@ struct Edge {
 		};
 	};
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 private:
-
-
-	///////////////class member variables used mainly in remesh and interpolation////////////////
-	AutoKnitMesh originalMesh, newMesh;
+	/////////////////////////////////parameter values/////////////////////////////////////////////
 	float stitchWidth;
 	float stitchHeight;		//both float values in mm
 	float modelUnitLength;	//the length of a unit in the model in mm
+	int stepCount;
 
-	const float minEdgeRatio = 0.3f; //'smallest allowed smallest-to-largest edge ratio in a triangle' 
-	const float minEdgeRatioSquared = minEdgeRatio * minEdgeRatio;
-	//maybe let them be set by the user?
-
+	///////////class member variables and functions used mainly in remesh and interpolation///////
+	AutoKnitMesh originalMesh, newMesh;
 	std::vector<Constraint*> constraints;
 	std::vector<float> constrained_values;
 
-	//std::vector<glm::uvec3> oldTriangles;
-	//std::vector<glm::uvec3> newTriangles;
-
-	void quad(std::vector<glm::uvec3>& new_tris, std::vector<glm::vec3>& verts, uint32_t a, uint32_t b, uint32_t c, uint32_t d);
-	void divide(std::unordered_set< glm::uvec2 > marked,
+	void quad(std::vector<glm::uvec3>& new_tris, std::vector<glm::vec3> const& verts, uint32_t a, uint32_t b, uint32_t c, uint32_t d);
+	void divide(std::unordered_set< glm::uvec2 >const& marked,
 		std::vector< glm::vec3 >& verts,
 		std::vector<std::vector<uint32_t>>& paths,
 		std::vector<glm::uvec3>& tris);
 	void remesh();
-	float getMaxEdgeLength();
+	float getMaxEdgeLength() const;
 	bool degenerateCheck(std::vector<glm::uvec3> tris);
-	//so. much. passing. by. reference. need to make some variables class members.... TODO!!!
+
+	//so. much. passing. by. reference...
 	void unfold(uint32_t depth, uint32_t root, glm::vec2 const& flat_root,
 		uint32_t ai, glm::vec2 const& flat_a,
 		uint32_t bi, glm::vec2 const& flat_b,
 		glm::vec2 const& limit_a, glm::vec2 const& limit_b, std::unordered_map< glm::uvec2, uint32_t >  const& opposite,
 		std::vector<glm::vec3> const& newVertices, std::unordered_map< glm::uvec2, float >& min_dis);
 
-	GLuint lookup(uint32_t a, uint32_t b, std::unordered_map< glm::uvec2, uint32_t >& marked_verts);
-
-	int stepCount = 0;
-
-
-
-	std::vector<GLuint> toIntArray(std::vector<glm::uvec3>);
-
-	void generateTriangles();
+	GLuint lookup(uint32_t a, uint32_t b, std::unordered_map< glm::uvec2, uint32_t >& marked_verts) const;
+	bool isCcw(glm::vec2 const& a, glm::vec2 const& b, glm::vec2 const& c);
+	float& get_dis(uint32_t a, uint32_t b, std::unordered_map< glm::uvec2, float >& min_dis);
 	void interpolateValues();
-	void printConstrainedValues();
-	//////////////////////class member variables used in peeling///////////////////////////////
+
+	/////////////class member variables and functions used mainly in find step////////////////////
+	void findFirstActiveChains(std::vector< std::vector< EmbeddedVertex > >* active_chains_,
+		std::vector< std::vector< Stitch > >* active_stitches_,
+		RowColGraph* graph_);
+
+	///////////////class member variables and functions used mainly in peeling////////////////////
 	std::vector< std::vector< EmbeddedVertex > > active_chains;
 	std::vector< std::vector< Stitch > > active_stitches;
 	RowColGraph graph;
-
 	AutoKnitMesh slice;
 	std::vector< EmbeddedVertex > sliceOnModel;
 	std::vector< std::vector< uint32_t > > sliceActiveChains;
 	std::vector< std::vector< uint32_t > > sliceNextChains;
 	std::vector< bool > nextUsedBoundary;
 	std::vector <float> sliceTimes;
-
 	std::vector< std::vector< EmbeddedVertex > > nextActiveChains;
 	std::vector< std::vector< Stitch > > nextActiveStitches;
 
-	void clearPeeling();
-
-	float getChainSampleSpacing() const {
-		return 0.25f * stitchWidth / modelUnitLength;
-	
-	}
-
-	float getMaxPathSampleSpacing() const {
-		return 0.02f * std::min(stitchWidth, 2.0f * stitchHeight) / modelUnitLength;
-	}
-
-	std::vector<glm::uvec3> getTriangles(ObjectMesh const& model);
-
-	
 	void extractLevelChains(
 		AutoKnitMesh const& model, //in: model on which to embed vertices
 		std::vector< float > const& values, //in: values at vertices
@@ -184,15 +163,51 @@ private:
 		std::vector< std::vector< EmbeddedVertex > >* chains_ //chains of edges at given level
 	);
 
-	//trim the constrained model according to the parameters
-	void trimModel(std::vector< std::vector< EmbeddedVertex > > & left_of,
-		std::vector< std::vector< EmbeddedVertex > > & right_of, 
+	void trimModel(std::vector< std::vector< EmbeddedVertex > >& left_of,
+		std::vector< std::vector< EmbeddedVertex > >& right_of,
 		AutoKnitMesh* clipped_,
 		std::vector< EmbeddedVertex >* clipped_vertices_,
 		std::vector< std::vector< uint32_t > >* left_of_vertices_, //out (optional): indices of vertices corresponding to left_of chains [may be some rounding]
 		std::vector< std::vector< uint32_t > >* right_of_vertices_ //out (optional): indices of vertices corresponding to right_of chains [may be some rounding]
 	);
-	
+	void sampleChain(
+		float spacing,
+		std::vector< EmbeddedVertex > const& chain,
+		std::vector< EmbeddedVertex >* sampled_chain_//in: chain to be sampled
+	);
+	void peelSlice(std::vector< std::vector< EmbeddedVertex > >& active_chains,
+		AutoKnitMesh* slice_,
+		std::vector< EmbeddedVertex >* slice_on_model_,
+		std::vector< std::vector< uint32_t > >* slice_active_chains_,
+		std::vector< std::vector< uint32_t > >* slice_next_chains_,
+		std::vector< bool >* used_boundary_);
+
+	///////////////class member variables and functions used mainly in linking/////////////////////////////////////
+	std::vector<std::vector< Stitch>> nextStitches;
+	std::vector<Link> links;
+
+	bool fillUnassigned(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop);
+	void flatten(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop);
+	void optimalLink(
+		float target_distance, bool do_roll,
+		std::vector< glm::vec3 > const& source,
+		std::vector< bool > const& source_linkone,
+		std::vector< glm::vec3 > const& target,
+		std::vector< bool > const& target_linkone,
+		std::vector< std::pair< uint32_t, uint32_t > >* links_);
+	void linkChains(
+		AutoKnitMesh const& slice, //in: slice on which the chains reside
+		std::vector< float > const& slice_times, //in: time field (times @ vertices), for slice
+		std::vector< std::vector< uint32_t > > const& active_chains, //in: current active chains (slice vertex #'s)
+		std::vector< std::vector< Stitch > > const& active_stitches, //in: current active stitches, sorted by time
+		std::vector< std::vector< uint32_t > > const& next_chains, //in: current next chains (slice vertex #'s)
+		std::vector< bool > const& next_used_boundary, //in: did next chain use boundary? (forces no discard)
+		//need this or slice_times (above) std::vector< std::vector< bool > > const &discard_segments,
+		std::vector< std::vector< Stitch > >* next_stitches, //out: next active stitches
+		std::vector< Link >* links //out: active_chains[from_chain][from_vertex] -> linked_next_chains[to_chain][to_vertex] links
+	);
+
+	///////////////////////////class member variables and functions used mainly in building////////////////
 	void embeddedPathSimple(
 		AutoKnitMesh const& model,
 		EmbeddedVertex const& source,
@@ -221,68 +236,25 @@ private:
 		std::vector< std::vector< Stitch > >* next_active_stitches_, //out: next active stitches
 		RowColGraph* graph_ //in/out (optional): graph to update
 	);
+	////////////////////////////////helper functions///////////////////////////////////////////////////////
+	void clearPeeling();
 
-
+	float getChainSampleSpacing() const {
+		return 0.25f * stitchWidth / modelUnitLength;
 	
+	}
 
+	float getMaxPathSampleSpacing() const {
+		return 0.02f * std::min(stitchWidth, 2.0f * stitchHeight) / modelUnitLength;
+	}
 
-
-
-
-
-
-
-
-
-
-
-	std::vector<std::vector< Stitch>> nextStitches;
-	std::vector<Link> links;
+	std::vector<glm::uvec3> getTriangles(ObjectMesh const& model);
+	std::vector<GLuint> toIntArray(std::vector<glm::uvec3>);
 	
-	bool fillUnassigned(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop);
-	void flatten(std::vector< uint32_t >& closest, std::vector< float > const& weights, bool is_loop);
-	void optimalLink(
-		float target_distance, bool do_roll,
-		std::vector< glm::vec3 > const& source,
-		std::vector< bool > const& source_linkone,
-		std::vector< glm::vec3 > const& target,
-		std::vector< bool > const& target_linkone,
-		std::vector< std::pair< uint32_t, uint32_t > >* links_);
-	void linkChains(
-		AutoKnitMesh const& slice, //in: slice on which the chains reside
-		std::vector< float > const& slice_times, //in: time field (times @ vertices), for slice
-		std::vector< std::vector< uint32_t > > const& active_chains, //in: current active chains (slice vertex #'s)
-		std::vector< std::vector< Stitch > > const& active_stitches, //in: current active stitches, sorted by time
-		std::vector< std::vector< uint32_t > > const& next_chains, //in: current next chains (slice vertex #'s)
-		std::vector< bool > const& next_used_boundary, //in: did next chain use boundary? (forces no discard)
-		//need this or slice_times (above) std::vector< std::vector< bool > > const &discard_segments,
-		std::vector< std::vector< Stitch > >* next_stitches, //out: next active stitches
-		std::vector< Link >* links //out: active_chains[from_chain][from_vertex] -> linked_next_chains[to_chain][to_vertex] links
-	);
-
-
-	
-	void sampleChain(
-		float spacing,
-		std::vector< EmbeddedVertex > const& chain,
-		std::vector< EmbeddedVertex >* sampled_chain_//in: chain to be sampled
-		);
-
-
-	void peelSlice(std::vector< std::vector< EmbeddedVertex > > & active_chains,
-		AutoKnitMesh* slice_,
-		std::vector< EmbeddedVertex >* slice_on_model_,
-		std::vector< std::vector< uint32_t > >* slice_active_chains_,
-		std::vector< std::vector< uint32_t > >* slice_next_chains_,
-		std::vector< bool >* used_boundary_);
-
-	void findFirstActiveChains(std::vector< std::vector< EmbeddedVertex > >* active_chains_,
-		std::vector< std::vector< Stitch > >* active_stitches_,
-		RowColGraph* graph_);
-
+//signals and slots, public functions, all 'interface' with the rest of the program	
 public:
 	KnitGrapher(QObject* parent = nullptr);
-	void constructKnitGraph(std::vector<Constraint*> constraints);
+	void constructNewMesh(std::vector<Constraint*> constraints);
 public slots:
 	void setStitchWidth(float width);
 	void setStitchHeight(float height);

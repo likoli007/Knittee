@@ -338,8 +338,8 @@ void Visualizer::pickFromMesh() {
         chosenVertex = mesh.indices[id * 3 + max];
     }
     selectedFace = id;
-    qDebug() << "Selected face: " << selectedFace;
-    qDebug() << "Chosen vertex: " << chosenVertex;
+    //qDebug() << "Selected face: " << selectedFace;
+    //qDebug() << "Chosen vertex: " << chosenVertex;
 }
 
 
@@ -424,7 +424,7 @@ void Visualizer::paintConstraints() {
 
     for (Constraint* c : constraints) {
         if (c->vertices.size() > 1) {
-            qDebug() << c->timeValue;
+            //qDebug() << c->timeValue;
             float r = c->timeValue > 0.0 ? c->timeValue : 0.0;
             float b = c->timeValue < 0.0 ? c->timeValue : 0.0;
             for (int i = 0; i < c->vertices.size() - 1; i++) {

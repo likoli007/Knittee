@@ -7,6 +7,17 @@
 #include <QLabel>
 #include <QSlider>
 #include <qobject.h>
+#include <qspinbox.h>
+
+
+//TODO: the following
+/*TODO
+autostep, edit knitgraph
+perhaps a saving of the different steps such that it can be replayed?
+generate knitout
+output to a machine file
+*/
+
 
 class MeshToolBar : public QWidget {
     Q_OBJECT
@@ -27,58 +38,51 @@ private slots:
         emit stepButtonClicked();
     }
     
+    void onWidthValueChanged(float v) {
+        qDebug() << "width changed!";
+        emit widthChanged(v);
+    }
+    void onHeightValueChanged(float v) {
+        qDebug() << "height changed!";
+        emit heightChanged(v);
+    }
+    void onUnitValueChanged(float v) {
+        qDebug() << "unit changed!";
+        emit unitChanged(v);
+    }
+
     void onConstraintsButtonClicked() {
         qDebug() << "Constraints button clicked";
-        emit constraintsButtonClicked();
-    }
-    void onDoneButtonClicked() {
-        qDebug() << "Done button clicked";
-        emit doneButtonClicked();
+
+        if (constraintChoice != 1) {
+            constraintsModeButton->setText("Cancel Constraint Adding");
+            constraintChoice = 1;
+            emit constraintsButtonClicked();
+        }
+        else {
+            constraintsModeButton->setText("Add Constraints");
+            constraintChoice = -1;
+            emit doneButtonClicked();
+        }
+
+        
     }
     void onRemeshButtonClicked() {
         qDebug() << "Remesh button clicked";
+        stepButton->setDisabled(false);
         emit remeshButtonClicked();
     }
-    void onWidthSliderReleased() {
-        qDebug() << "Width slider released";
-
-        int value = widthSlider->value();
-
-        // Map the value from 0 to 100 as a value of float from 1.0f to 6.0f
-        float width = (value / 100.0f) * 5.0f + 1.0f;
-
-        emit widthChanged(width);
-    }
-    void onHeightSliderReleased() {
-        qDebug() << "Height slider released";
-        int value = heightSlider->value();
-
-        // Map the value from 0 to 100 as a value of float from 1.0f to 6.0f
-        float height = (value / 100.0f) * 5.0f + 1.0f;
-
-        emit heightChanged(height);
-
-    }
-    void onUnitSliderReleased() {
-        qDebug() << "Unit slider released";
-        int value = unitSlider->value();
-
-        // Map the value from 0 to 100 as a value of float from 1.0f to 6.0f
-        float unit = (value / 100.0f) * 5.0f + 1.0f;
-
-        emit unitChanged(unit);
-
-    }
-
 private:
     // Will have a slew of functions that pass the user specified options to the visualizer/algorithm program
     QPushButton* constraintsModeButton;
     QPushButton* stepButton;
-    QPushButton* doneButton;
-    QSlider* widthSlider;
-    QSlider* heightSlider;
-    QSlider* unitSlider;
     QPushButton* remeshButton;
+
+
+    QDoubleSpinBox* widthSpinBox;
+    QDoubleSpinBox* heightSpinBox;
+    QDoubleSpinBox* unitSpinBox;
+
 
     // Max values for the stitch width and height, will be used to scale the values
     // Might need to change these values later to something more appropriate
@@ -86,5 +90,8 @@ private:
     const float widthMax = 10;
     const float heightMin = 1;
     const float heightMax = 10;
+
+
+    int constraintChoice = 0;
 
 };

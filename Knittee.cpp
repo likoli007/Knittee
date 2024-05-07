@@ -33,19 +33,10 @@ Knittee::Knittee(QWidget* parent)
     projectMenu->addAction(exitAction);
     projectMenu->setTitle("Project");
 
-    //populate the options menu
-    //QAction* optionAction = new QAction("&Options", optionsMenu);
-    //QAction* optionAction = optionsMenu->addAction("&options");
-    //optionsMenu->addAction(optionAction);
+
     optionsMenu->setTitle("Options");
 
-    //populate the help menu
-    //helpMenu->setTitle("Help");
-
-    //aboutAction->setTitle("About");
-
     toolsWidget = new MeshToolBar(this);
-
 
     topMenu->addMenu(projectMenu);
     topMenu->addMenu(optionsMenu);
@@ -55,26 +46,15 @@ Knittee::Knittee(QWidget* parent)
     setMenuBar(topMenu);
 
 
-
-
-
     QObject::connect(newProjectAction, &QAction::triggered, this, &Knittee::openNewProjectWindow);
     QObject::connect(loadAction, &QAction::triggered, this, &Knittee::selectProject);
     QObject::connect(exitAction, &QAction::triggered, this, &QApplication::quit);
     QObject::connect(optionsMenu, &QMenu::triggered, this, &Knittee::openOptionsWindow);
     QObject::connect(helpAction, &QAction::triggered, this, &Knittee::openHelpWindow);
     QObject::connect(aboutAction, &QAction::triggered, this, &Knittee::openAboutWindow);
-    //connect(sub, &SubClass::buttonClicked, this, &MainClass::buttonClicked);
     QObject::connect(toolsWidget, SIGNAL(constraintsButtonClicked()), this, SLOT(setConstraintsMode()));
     QObject::connect(toolsWidget, SIGNAL(doneButtonClicked()), this, SLOT(handleToolbarDone()));
-
-    //QObject::connect(toolsWidget, SIGNAL(widthChanged()), &knitGrapher, SLOT(setStitchWidth()));
-    //QObject::connect(toolsWidget, SIGNAL(doneButtonClicked()), this, SLOT(handleToolbarDone()));
-    //QObject::connect(toolsWidget, SIGNAL(widthChanged()), &knitGrapher, SLOT( &KnitGrapher::setStitchWidth));
-    //QObject::connect(toolsWidget, SIGNAL(heightChanges()), &knitGrapher, SLOT(&KnitGrapher::setStitchHeight));
-    //QObject::connect(toolsWidget, SIGNAL(unitChanged()), &knitGrapher, SLOT(&KnitGrapher::setModelUnitLength));
     QObject::connect(toolsWidget, SIGNAL(remeshButtonClicked()), this, SLOT(startRemeshing()));
-    //QObject::connect(toolsWidget, SIGNAL(&MeshToolBar::widthChanged), &knitGrapher, SLOT(&KnitGrapher::setStitchWidth));
     QObject::connect(toolsWidget, SIGNAL(widthChanged(float)), &knitGrapher, SLOT(setStitchWidth(float)));
     QObject::connect(toolsWidget, SIGNAL(heightChanged(float)), &knitGrapher, SLOT(setStitchHeight(float)));
     QObject::connect(toolsWidget, SIGNAL(unitChanged(float)), &knitGrapher, SLOT(setModelUnitLength(float)));
@@ -86,15 +66,6 @@ Knittee::Knittee(QWidget* parent)
 
     visualizerLayout = new QHBoxLayout(this);
     QVBoxLayout* optionsLayout = new QVBoxLayout(this);
-
-    //QLabel* optionsLabel = new QLabel("Options about the visualization will be displayed here");
-    //QWidget* spacer = new QWidget;
-    //spacer->setMinimumSize(50, 0); 
-    //toolsWidget = new QWidget(this);
-    // Add the label and spacer to the layout
-    //optionsLayout->addWidget(toolsWidget);
-    //optionsLayout->addWidget(spacer);
-
 
 
     vis = new Visualizer(this); // Set the parent to be the main window
@@ -108,8 +79,6 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(&knitGrapher, SIGNAL(peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > >*, std::vector< std::vector< uint32_t > >*)), this, SLOT(peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > > *, std::vector< std::vector< uint32_t > >*)));
     QObject::connect(&knitGrapher, SIGNAL(linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*)), this, SLOT(linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*)));
     QObject::connect(&knitGrapher, SIGNAL(nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*)), this, SLOT(nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*)));
-
-
     QObject::connect(&laceKnitter, SIGNAL(sheetChanged(std::vector<std::vector<FlatPoint>>*)), vis, SLOT(sheetChanged(std::vector<std::vector<FlatPoint>>*)));
 
 
@@ -165,7 +134,7 @@ void Knittee::startRemeshing() {
     messageTextEdit->setText("Remeshing caught...");
     std::vector<Constraint*> constraints = vis->getConstraints();
 
-    knitGrapher.constructKnitGraph(constraints);
+    knitGrapher.constructNewMesh(constraints);
 }
 
 
@@ -311,24 +280,13 @@ void Knittee::start3DProject(ProjectInfo context)
 void Knittee::start2DProject(ProjectInfo context)
 {
     qDebug() << "starting 2D project: " << context.width << "x" << context.height;
-
     vis->projectType = 1;
 
     laceKnitter.setDimensions(context.width, context.height);
     laceKnitter.loadFromFile(projectPath);
 
-    
-    
-    
-
     visualizerLayout->removeItem(visualizerLayout->itemAt(0));
     visualizerLayout->insertWidget(0, toolsWidget);
-
-
-
-    //vis->set2DMode(context.height, context.width);
-
-
 }
 
 void Knittee::openOptionsWindow()
