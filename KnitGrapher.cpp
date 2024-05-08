@@ -3098,6 +3098,7 @@ void KnitGrapher::linkChains(
 			begin = end;
 		}
 	}
+	qDebug() << "matches size " << matches.size();
 
 	for (auto& closest : next_closest) {
 		uint32_t ni = &closest - &next_closest[0];
@@ -3449,13 +3450,12 @@ void KnitGrapher::linkChains(
 			}
 
 			continue;
-		}
+		}	
 		assert(!match.active.empty());
 		assert(!match.next.empty());
-
 		bool is_split_or_merge = (active_matches[anm.first.first] > 1 || next_matches[anm.first.second] > 1);
 		//if is_split_or_merge will only link 1-1
-
+		
 		//compute min/max totals from assigned stitches:
 		uint32_t active_ones = 0;
 		uint32_t active_anys = 0;
@@ -3470,14 +3470,14 @@ void KnitGrapher::linkChains(
 				}
 			}
 		}
-
+		
 		//compute number of ones based on discard segments:
 		//Ideally we'd like this to be true (saves on discarded stitches):
 		//  discarded segments contain at least one stitch marked 'LinkOne'
 		//  while kept segments contain at least two stitches marked 'LinkOne'
 		//What we're doing below actually puts two stitches in discarded segments as well.
 		uint32_t next_ones = 0;
-
+		
 		bool next_is_loop = (next_chains[anm.first.second][0] == next_chains[anm.first.second].back());
 		auto const& discard_after = next_discard_after[anm.first.second];
 		{ //compute next_ones:
@@ -3642,8 +3642,9 @@ void KnitGrapher::linkChains(
 
 
 	{ //balance new stitch allocations for merges:
-		//sort ranges from matches back to nexts:
+
 		std::vector< std::vector< BeginEndStitches2* > > next_segments(next_chains.size());
+
 		for (auto& anm : matches) {
 			if (anm.first.second == -1U) {
 				assert(anm.second.next.empty());
@@ -3654,7 +3655,6 @@ void KnitGrapher::linkChains(
 				next_segments[anm.first.second].emplace_back(&bse);
 			}
 		}
-
 		for (uint32_t ni = 0; ni < next_chains.size(); ++ni) {
 			auto& segments = next_segments[ni];
 			assert(!segments.empty());
@@ -3812,7 +3812,6 @@ void KnitGrapher::linkChains(
 			return a.t < b.t;
 			});
 	}
-
 	auto make_stitch_info = [&slice](
 		std::vector< uint32_t > const& chain,
 		std::vector< float > const& lengths,
@@ -3849,7 +3848,6 @@ void KnitGrapher::linkChains(
 				stitch_linkones.emplace_back(si->flag == Stitch::FlagLinkOne);
 			}
 	};
-
 	std::vector< std::vector< glm::vec3 > > all_active_stitch_locations(active_chains.size());
 	std::vector< std::vector< bool > > all_active_stitch_linkones(active_chains.size());
 
@@ -3865,7 +3863,6 @@ void KnitGrapher::linkChains(
 			&all_active_stitch_locations[ai],
 			&all_active_stitch_linkones[ai]);
 	}
-
 	for (uint32_t ni = 0; ni < next_chains.size(); ++ni) {
 		assert(ni < next_stitches.size());
 		make_stitch_info(
@@ -3876,18 +3873,37 @@ void KnitGrapher::linkChains(
 			&all_next_stitch_linkones[ni]);
 	}
 
-
 	//PARANOIA:
 	std::vector< std::unordered_set< uint32_t > > all_next_claimed(next_chains.size());
 	std::vector< std::unordered_set< uint32_t > > all_active_claimed(active_chains.size());
 
+	std::vector< std::unordered_set< uint32_t > > empty_dummy(2);
+	qDebug() << "check matches " << matches.size();
+
 	for (auto const& anm : matches) {
+		qDebug() << "start of loop";
+
 		Match const& match = anm.second;
 
 		std::vector< uint32_t > next_stitch_indices;
 		std::vector< glm::vec3 > next_stitch_locations;
 		std::vector< bool > next_stitch_linkones;
-		std::unordered_set< uint32_t >& next_claimed = all_next_claimed[anm.first.second];
+		qDebug() << "vars inited" << anm.first.second;
+
+		/*
+		if (match.active.empty()) {
+			qDebug() << "Ignoring match with empty active chain.";
+			continue;
+		}
+		else if (match.next.empty()) {
+			qDebug() << "Ignoring match with empty next chain.";
+			continue;
+		}*/
+		//hacky hacky hacky hack ahcahfavughv
+		qDebug() << next_chains.empty() << active_chains.empty();
+		std::unordered_set< uint32_t >& next_claimed = anm.first.second == -1U ? empty_dummy[0] : all_next_claimed[anm.first.second];
+		
+
 		auto do_range = [&](float begin, float end) {
 			//std::cout << "do_range [" << begin << ", " << end << "): "; //DEBUG
 			assert(begin <= end);
@@ -3920,7 +3936,7 @@ void KnitGrapher::linkChains(
 			}
 			assert(count == be.stitches); //should have found the right number of stitches
 		}
-
+		qDebug() << "wowee";
 		{ //PARANOIA: because of the care we took in the look-up above, should have (at most one) decrease in t-coord in the next_stitches:
 			uint32_t decreases = 0;
 			for (uint32_t i = 0; i < next_stitch_indices.size(); ++i) {
@@ -3937,7 +3953,7 @@ void KnitGrapher::linkChains(
 			assert(decreases <= 1);
 		}
 
-
+		qDebug() << "check6";
 		std::vector< uint32_t > active_stitch_indices;
 		std::vector< glm::vec3 > active_stitch_locations;
 		std::vector< bool > active_stitch_linkones;
@@ -4020,11 +4036,13 @@ void KnitGrapher::linkChains(
 				links.emplace_back(link);
 				}
 			}
-		}
+	}
 
 
 		//PARANOIA: every stitch should have been claimed
+	
 		for (uint32_t ai = 0; ai < active_chains.size(); ++ai) {
+			qDebug() << all_active_claimed[ai].size() << " vs " << active_stitches[ai].size();
 			assert(all_active_claimed[ai].size() == active_stitches[ai].size());
 		}
 		for (uint32_t ni = 0; ni < next_chains.size(); ++ni) {
@@ -5286,10 +5304,14 @@ void KnitGrapher::stepButtonClicked()
 			active_chains = old_next_active_chains;
 			active_stitches = old_next_active_stitches;
 		}
-
-		emit firstActiveChainsCreated(&active_chains, &active_stitches, &graph);
+		if (!active_chains.empty())
+			emit firstActiveChainsCreated(&active_chains, &active_stitches, &graph);
+		else {
+			stepCount--;
+			emit firstActiveChainsCreated(&active_chains, &active_stitches, &graph);
+		}
 	}
-	if (stepCount % 4 == 1) {
+	else if (stepCount % 4 == 1) {
 		qDebug() << "[Step " << stepCount << " ] - slice, calling peelSlice()-------------------------------------------------------";
 		
 		peelSlice(active_chains, &slice, &sliceOnModel, &sliceActiveChains, &sliceNextChains, &nextUsedBoundary);
@@ -5304,12 +5326,14 @@ void KnitGrapher::stepButtonClicked()
 		ObjectMesh emittedMesh = slice.toObjMesh();
 		emit peelSliceDone(&emittedMesh, &sliceActiveChains, &sliceNextChains);
 	}
-	if (stepCount % 4 == 2) {
+	else if (stepCount % 4 == 2) {
 		qDebug() << "[Step "<< stepCount << " ] - link, calling linkChains()-------------------------------------------------------------------";
+		
+		qDebug() << "slice size" << sliceNextChains.size();
 		linkChains(slice, sliceTimes, sliceActiveChains, active_stitches, sliceNextChains, nextUsedBoundary, &nextStitches, &links);
 		emit linkChainsDone(&nextStitches, &links);
 	}
-	if (stepCount % 4 == 3) {
+	else if (stepCount % 4 == 3) {
 		qDebug() << "[Step " << stepCount << " ] - build, calling buildNextActiveChains()------------------------------------------------------------";
 		buildNextActiveChains(slice, sliceOnModel, sliceActiveChains, active_stitches, sliceNextChains, nextStitches, nextUsedBoundary, links, &nextActiveChains, &nextActiveStitches, &graph);
 		emit nextActiveChainsDone(&nextActiveChains);

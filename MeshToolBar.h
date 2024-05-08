@@ -8,11 +8,12 @@
 #include <QSlider>
 #include <qobject.h>
 #include <qspinbox.h>
-
+#include <qtimer.h>
+#include <qeventloop.h>
 
 //TODO: the following
 /*TODO
-autostep, edit knitgraph
+autostep DONE, edit knitgraph
 perhaps a saving of the different steps such that it can be replayed?
 generate knitout
 output to a machine file
@@ -33,6 +34,20 @@ signals:
     void remeshButtonClicked();
     void stepButtonClicked();
 private slots:
+    void onAutoStepButtonClicked() {
+        stepButton->setDisabled(true);
+        autoStepButton->setDisabled(true);
+        qDebug() << "Auto Step button clicked";
+        for (int i = 0; i < stepSpinBox->value(); i++) {
+			emit stepButtonClicked();
+            QEventLoop loop;
+            QTimer::singleShot(200, &loop, &QEventLoop::quit); // Wait for 1000 milliseconds (1 second)
+            loop.exec();
+		}
+        stepButton->setDisabled(false);
+        autoStepButton->setDisabled(false);
+    }
+
     void onStepButtonClicked() {
         qDebug() << "Step button clicked";
         emit stepButtonClicked();
@@ -70,6 +85,7 @@ private slots:
     void onRemeshButtonClicked() {
         qDebug() << "Remesh button clicked";
         stepButton->setDisabled(false);
+        autoStepButton->setDisabled(false);
         emit remeshButtonClicked();
     }
 private:
@@ -83,6 +99,9 @@ private:
     QDoubleSpinBox* heightSpinBox;
     QDoubleSpinBox* unitSpinBox;
 
+
+    QSpinBox* stepSpinBox;
+    QPushButton* autoStepButton;
 
     // Max values for the stitch width and height, will be used to scale the values
     // Might need to change these values later to something more appropriate

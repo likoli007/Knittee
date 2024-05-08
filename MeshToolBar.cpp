@@ -5,12 +5,13 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     QHBoxLayout* widthLayout = new QHBoxLayout(this);
     QHBoxLayout* heightLayout = new QHBoxLayout(this);
     QHBoxLayout* unitLayout = new QHBoxLayout(this);
+    QHBoxLayout* stepLayout = new QHBoxLayout(this);
 
     widthSpinBox = new QDoubleSpinBox();
     widthSpinBox->setDecimals(2);
     widthSpinBox->setSingleStep(1.0);
     widthSpinBox->setMinimum(0.05);
-    widthSpinBox->setMaximum(10.0);
+    widthSpinBox->setMaximum(20.0);
     widthSpinBox->setValue(3.66f);
     widthSpinBox->setSuffix(" mm");
 
@@ -18,7 +19,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     heightSpinBox->setDecimals(2);
     heightSpinBox->setSingleStep(1.0);
     heightSpinBox->setMinimum(0.05);
-    heightSpinBox->setMaximum(10.0);
+    heightSpinBox->setMaximum(20.0);
     heightSpinBox->setValue(1.73f);
     heightSpinBox->setSuffix(" mm");
 
@@ -26,7 +27,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     unitSpinBox->setDecimals(2);
     unitSpinBox->setSingleStep(1.0);
     unitSpinBox->setMinimum(0.05);
-    unitSpinBox->setMaximum(10.0);
+    unitSpinBox->setMaximum(20.0);
     unitSpinBox->setValue(10.0f);
     unitSpinBox->setSuffix(" mm");
 
@@ -47,7 +48,22 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     stepButton = new QPushButton("Step", this);
     stepButton->setDisabled(true);
 
- 
+
+
+
+    autoStepButton = new QPushButton("Auto Step", this);
+    autoStepButton->setDisabled(true);
+
+    stepSpinBox = new QSpinBox();
+    stepSpinBox->setMinimum(1);
+    stepSpinBox->setMaximum(150);
+    stepSpinBox->setValue(1);
+    stepSpinBox->setSuffix(" steps");
+
+    stepLayout->addWidget(stepSpinBox);
+    stepLayout->addWidget(autoStepButton);
+
+    QObject::connect(autoStepButton, &QPushButton::clicked, this, &MeshToolBar::onAutoStepButtonClicked);
     QObject::connect(constraintsModeButton, &QPushButton::clicked, this, &MeshToolBar::onConstraintsButtonClicked);
     QObject::connect(remeshButton, &QPushButton::clicked, this, &MeshToolBar::onRemeshButtonClicked);
     QObject::connect(stepButton, &QPushButton::clicked, this, &MeshToolBar::onStepButtonClicked);
@@ -66,6 +82,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     mainLayout->addWidget(constraintsModeButton);
     mainLayout->addWidget(remeshButton);
     mainLayout->addWidget(stepButton);
+    mainLayout->addLayout(stepLayout);
     mainLayout->addWidget(label3);
     setLayout(mainLayout);
     setMinimumSize(300, 100);
