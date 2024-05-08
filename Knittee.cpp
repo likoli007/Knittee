@@ -59,7 +59,7 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(toolsWidget, SIGNAL(heightChanged(float)), &knitGrapher, SLOT(setStitchHeight(float)));
     QObject::connect(toolsWidget, SIGNAL(unitChanged(float)), &knitGrapher, SLOT(setModelUnitLength(float)));
     QObject::connect(toolsWidget, SIGNAL(stepButtonClicked()), &knitGrapher, SLOT(stepButtonClicked()));
-
+    QObject::connect(toolsWidget, SIGNAL(traceButtonClicked()), &knitGrapher, SLOT(traceButtonClicked()));
     
 
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
@@ -80,7 +80,7 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(&knitGrapher, SIGNAL(linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*)), this, SLOT(linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*)));
     QObject::connect(&knitGrapher, SIGNAL(nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*)), this, SLOT(nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*)));
     QObject::connect(&laceKnitter, SIGNAL(sheetChanged(std::vector<std::vector<FlatPoint>>*)), vis, SLOT(sheetChanged(std::vector<std::vector<FlatPoint>>*)));
-
+    QObject::connect(&knitGrapher, SIGNAL(knitGraphCreated()), this, SLOT(knitGraphCreated()));
 
     messageTextEdit = new QTextEdit(this);
     messageTextEdit->setReadOnly(true);
@@ -93,6 +93,11 @@ Knittee::Knittee(QWidget* parent)
     QWidget* centralWidget = new QWidget(this);
     centralWidget->setLayout(mainLayout);
     setCentralWidget(centralWidget);
+}
+
+void Knittee::knitGraphCreated()
+{
+    toolsWidget->knitGraphCreated();
 }
 
 void Knittee::nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >* active_chains) {
@@ -225,7 +230,7 @@ void Knittee::loadConstraints() {
 
     qDebug() << "loading constraints";
     std::vector<Constraint*> constraints;
-
+    qDebug() << "project path: " << projectPath;
     QString filePath = projectPath + "/constraints";
     QFile file(filePath);
     if (file.exists()) {
@@ -378,7 +383,7 @@ void Knittee::setUpNew3DProject(ProjectInfo context)
     object_loader.copyObjFileToProject(context.projectName);
 
     context.objectFilePath = projectFolderPath + "/mesh.obj";
-
+    projectPath = projectFolderPath;
 
     start3DProject(context);
 }
@@ -446,6 +451,23 @@ Knittee::~Knittee()
 {}
 
 
+void NewProjectDialog::onPreformRadioClicked() {
+    meshSelectionButton->setVisible(false);
+    meshSelectionLabel->setVisible(false);
+    meshSelectionLineEdit->setVisible(false);
+
+    preformSelectionLabel->setVisible(true);
+    preformSelectionComboBox->setVisible(true);
+}
+
+void NewProjectDialog::onMeshSelectionRadioClicked() {
+	preformSelectionLabel->setVisible(false);
+	preformSelectionComboBox->setVisible(false);
+
+	meshSelectionButton->setVisible(true);
+	meshSelectionLabel->setVisible(true);
+	meshSelectionLineEdit->setVisible(true);
+}
 
 NewProjectDialog::NewProjectDialog(QWidget* parent) : QDialog(parent)
 {
@@ -464,8 +486,8 @@ NewProjectDialog::NewProjectDialog(QWidget* parent) : QDialog(parent)
 
 
     QHBoxLayout* projectTypeRadioLayout = new QHBoxLayout(this);
-    meshRadio = new QRadioButton("3D Mesh editing", this);
-    sheetRadio = new QRadioButton("2D Sheet editing", this);
+    meshRadio = new QRadioButton("3D Mesh editing");
+    sheetRadio = new QRadioButton("2D Sheet editing");
 
     projectTypeRadioLayout->addWidget(meshRadio);
     projectTypeRadioLayout->addWidget(sheetRadio);
@@ -495,11 +517,28 @@ NewProjectDialog::NewProjectDialog(QWidget* parent) : QDialog(parent)
     * TODO: add other options once the 3D portion grows more robust
     *       add a 'preform' option, package some basic .obj files with the program
     */
+
+    //QString projectTypeLabelText = "Select Your Project Type:";
+    meshTypeLabel = new QLabel("Project Mesh Type:", this);
+
+    QHBoxLayout* meshTypeRadioLayout = new QHBoxLayout(this);
+    preformSelectionRadio = new QRadioButton("Knittee Preforms");
+    meshSelectionRadio = new QRadioButton("Custom Mesh");
+
+    meshTypeRadioLayout->addWidget(preformSelectionRadio);
+    meshTypeRadioLayout->addWidget(meshSelectionRadio);
+
+    QObject::connect(preformSelectionRadio, &QRadioButton::clicked, this, &NewProjectDialog::onPreformRadioClicked);
+    QObject::connect(meshSelectionRadio, &QRadioButton::clicked, this, &NewProjectDialog::onMeshSelectionRadioClicked);
+
+
+
     meshSelectionLabel = new QLabel("Enter the path to the 3D mesh file (.obj):", this);
     meshSelectionLineEdit = new QLineEdit(this);
     meshSelectionButton = new QPushButton("Browse", this);
     meshSelectionLabel->setVisible(false);
     meshSelectionLineEdit->setVisible(false);
+    meshSelectionButton->setVisible(false);
 
     meshSelectionLayout = new QHBoxLayout(this);
     meshSelectionLayout->addWidget(meshSelectionLineEdit);
@@ -507,6 +546,30 @@ NewProjectDialog::NewProjectDialog(QWidget* parent) : QDialog(parent)
     QObject::connect(meshSelectionButton, &QPushButton::clicked, this, &NewProjectDialog::openUserFile);
 
 
+    preformSelectionLabel = new QLabel("Select a preform to start with:", this);
+    preformSelectionComboBox = new QComboBox(this);
+
+    QString meshFolderPath = QCoreApplication::applicationDirPath() + "/Meshes/";
+    QDir meshDirectory(meshFolderPath);
+    QStringList files = meshDirectory.entryList(QStringList() << "*.obj", QDir::Files);
+    //QStringList files = meshDirectory.entryList(QStringList() << "*.obj", QDir::Files);
+    for (QString& file : files) {
+        file = QFileInfo(file).baseName();
+        preformSelectionComboBox->addItem(file);
+    }
+    
+    QButtonGroup *projectTypeGroup = new QButtonGroup(this);
+    QButtonGroup *meshTypeGroup = new QButtonGroup(this);
+
+    // Add radio buttons to their respective groups
+    projectTypeGroup->addButton(meshRadio);
+    projectTypeGroup->addButton(sheetRadio);
+
+    meshTypeGroup->addButton(preformSelectionRadio);
+    meshTypeGroup->addButton(meshSelectionRadio);
+
+    //projectTypeGroup->setExclusive(false);
+    //meshTypeGroup->setExclusive(false);
 
     /*Start of 2D project options
     * As the 2D portion gets developed, more options will be shown here, for now it is a simple sheet width/height set...
@@ -538,6 +601,10 @@ NewProjectDialog::NewProjectDialog(QWidget* parent) : QDialog(parent)
     mainLayout->addWidget(projectNameLineEdit);
     mainLayout->addWidget(projectTypeLabel);
     mainLayout->addLayout(projectTypeRadioLayout);
+    mainLayout->addWidget(meshTypeLabel);
+    mainLayout->addLayout(meshTypeRadioLayout);
+    mainLayout->addWidget(preformSelectionLabel);
+    mainLayout->addWidget(preformSelectionComboBox);
     mainLayout->addWidget(meshSelectionLabel);
     mainLayout->addLayout(meshSelectionLayout);
     mainLayout->addWidget(sheetSizeLabel);
@@ -545,6 +612,7 @@ NewProjectDialog::NewProjectDialog(QWidget* parent) : QDialog(parent)
     mainLayout->addLayout(projectConfirmDenyLayout);
     setLayout(mainLayout);
     meshRadio->setChecked(true);
+    preformSelectionRadio->setChecked(true);
     onMeshRadioClicked();
 
     qDebug() << "Shown Help Menu...";
@@ -564,7 +632,15 @@ void NewProjectDialog::onConfirm()
 
     if (meshRadio->isChecked()) {
         projectInfo.type = 0;
-        projectInfo.objectFilePath = meshSelectionLineEdit->text();
+        if (meshSelectionRadio->isChecked()) {
+            projectInfo.objectFilePath = meshSelectionLineEdit->text();
+        }
+        else {
+            projectInfo.objectFilePath = QCoreApplication::applicationDirPath() + "/Meshes/" + preformSelectionComboBox->currentText() + ".obj";
+        }
+
+        
+        
     }
     else if (sheetRadio->isChecked()) {
         projectInfo.type = 1;
@@ -583,14 +659,21 @@ void NewProjectDialog::onCancel()
 }
 void NewProjectDialog::onMeshRadioClicked()
 {
-    meshSelectionLabel->setVisible(true);
-    meshSelectionLineEdit->setVisible(true);
-    meshSelectionButton->setVisible(true);
+    //meshSelectionLabel->setVisible(true);
+    //meshSelectionLineEdit->setVisible(true);
+    //meshSelectionButton->setVisible(true);
     sheetSizeLabel->setVisible(false);
     widthLineEdit->setVisible(false);
     heightLineEdit->setVisible(false);
     sheetSizeSeparator->setVisible(false);
+    preformSelectionRadio->setVisible(true);
+    meshSelectionRadio->setVisible(true);
 
+    //preformSelectionRadio->setVisible(false);
+    //meshSelectionRadio->setVisible(false);
+    meshTypeLabel->setVisible(true);
+    preformSelectionRadio->setChecked(true);
+    onPreformRadioClicked();
 }
 
 void NewProjectDialog::onSheetRadioClicked()
@@ -602,6 +685,12 @@ void NewProjectDialog::onSheetRadioClicked()
     meshSelectionLabel->setVisible(false);
     meshSelectionLineEdit->setVisible(false);
     meshSelectionButton->setVisible(false);
+    preformSelectionComboBox->setVisible(false);
+    preformSelectionLabel->setVisible(false);
+    preformSelectionRadio->setVisible(false);
+    meshSelectionRadio->setVisible(false);
+    meshTypeLabel->setVisible(false);
+
 }
 
 

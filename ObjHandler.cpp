@@ -103,7 +103,7 @@ void ObjHandler::parseLine(QString line)
 			list = line.simplified().split(' ');
 
 			QVector3D vertex3(list[1].toFloat(), list[2].toFloat(), list[3].toFloat());
-			qDebug() << list;
+			//qDebug() << list;
 			//vertex3.normalize();
 			vertex_list.push_back(vertex3);
 		}
@@ -124,20 +124,89 @@ void ObjHandler::parseLine(QString line)
 		}
 		// face information, store in Face object format
 		else if (line.startsWith("f ")) {
-			Face face;
-			int vertex_index;
+			//Face face;
+			//int vertex_index;
+
+			int vertices = line.split(" ").size()-1;
 
 			// most basic format, 'f a b c' where a,b,c is an index of the vertex in the file starting from 1
-			if (!line.contains("/")) {
+			if (vertices == 3) {
+				//qDebug() << "triangle";
+				addTriangle(line);
+				/*list = line.split(" ");
+				face.indices.push_back(list[1].toInt());
+				face.indices.push_back(list[2].toInt());
+				face.indices.push_back(list[3].toInt());
+				faces.push_back(face);*/
+			}
+			else if (vertices == 4) {
+				addQuad(line);
+
+				/*
 				list = line.split(" ");
 				face.indices.push_back(list[1].toInt());
 				face.indices.push_back(list[2].toInt());
 				face.indices.push_back(list[3].toInt());
-				faces.push_back(face);
+				face.indices.push_back(list[4].toInt());
+				faces.push_back(face);*/
+			}
+			else {
+				qDebug() << "non triangle or quad!";
 			}
 		}
 	}
 }
+
+void ObjHandler::addTriangle(QString line) {
+	Face face;
+	QStringList list = line.split(" ");
+	if (list.size() == 4) {
+		QString a = list[1];
+		QString b = list[2];
+		QString c = list[3];
+
+		QStringList a_list = a.split("/");
+		QStringList b_list = b.split("/");
+		QStringList c_list = c.split("/");
+
+		face.indices.push_back(a_list[0].toInt());
+		face.indices.push_back(b_list[0].toInt());
+		face.indices.push_back(c_list[0].toInt());
+	}
+	faces.push_back(face);
+}
+
+void ObjHandler::addQuad(QString line) {
+	Face face1, face2;
+	QStringList list = line.split(" ");
+	if (list.size() == 5) {
+		QString a = list[1];
+		QString b = list[2];
+		QString c = list[3];
+		QString d = list[4];
+
+		QStringList a_list = a.split("/");
+		QStringList b_list = b.split("/");
+		QStringList c_list = c.split("/");
+		QStringList d_list = d.split("/");
+
+		face1.indices.push_back(a_list[0].toInt());
+		face1.indices.push_back(b_list[0].toInt());
+		face1.indices.push_back(c_list[0].toInt());
+
+		face2.indices.push_back(a_list[0].toInt());
+		face2.indices.push_back(c_list[0].toInt());
+		face2.indices.push_back(d_list[0].toInt());
+
+		//qDebug() << "face1" << face1.indices[0] << face1.indices[1] << face1.indices[2];
+		//qDebug() << "face2" << face2.indices[0] << face2.indices[1] << face2.indices[2];
+
+		faces.push_back(face1);
+		faces.push_back(face2);
+	}
+}
+
+
 
 /*
 	Function: generate an ObjectMesh object from the information already loaded into the loader

@@ -16,6 +16,8 @@
 #include <QFileDialog>
 #include <QPushButton>
 #include <QTextEdit>
+#include <QComboBox>
+#include <qbuttongroup.h>
 
 #include "ui_Knittee.h"
 #include "ObjHandler.h"
@@ -65,6 +67,8 @@ private slots:
     void onMeshRadioClicked();
     void onSheetRadioClicked();
     void openUserFile();
+    void onMeshSelectionRadioClicked();
+    void onPreformRadioClicked();
 
 private:
     ProjectInfo projectInfo;
@@ -84,6 +88,14 @@ private:
     QLabel* sheetSizeSeparator;
     QLineEdit* widthLineEdit;
     QLineEdit* heightLineEdit;
+
+    QRadioButton* meshSelectionRadio;
+    QRadioButton* preformSelectionRadio;
+    QComboBox* preformSelectionComboBox;
+    QLabel* preformSelectionLabel;
+    QLabel* meshTypeLabel;
+    //QHBoxLayout* meshTypeLayout;
+    //QSeparator preformSelectionSeparator;
 };
 
 
@@ -110,6 +122,7 @@ private slots:
     void peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > > *, std::vector< std::vector< uint32_t > >*);
     void linkChainsDone(std::vector< std::vector< Stitch > >* , std::vector< Link >* );
     void nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*);
+    void knitGraphCreated();
 private:
     int modellingType = 0; //is the user operating on a 3D model (0) or a 2D sheet? (1), perhaps could be an enum?
 

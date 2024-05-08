@@ -17,7 +17,7 @@
 
 #include "ObjectMesh.h"
 #include "Visualizer.h"
-#include "Stitch.h"
+//#include "Stitch.h"
 #include "RowColGraph.h"
 #include "EmbeddedVertex.h"
 #include "EmbeddedPlanarMap.h"
@@ -26,6 +26,35 @@
 #include "EmbeddedVertex.h"
 #include "EmbeddedPlanarMap.h"
 
+
+
+
+
+struct TracedStitch {
+	uint32_t yarn = -1U; //yarn ID (why is this on a yarn_in? I guess the schedule.cpp code will tell me someday.
+	//ins and outs are in construction order (OLD was: CW direction):
+	uint32_t ins[2] = { -1U, -1U };
+	uint32_t outs[2] = { -1U, -1U };
+	enum Type : char {
+		None = '\0',
+		Start = 's',
+		End = 'e',
+		Tuck = 't',
+		Miss = 'm',
+		Knit = 'k',
+		//I am going to add these because the scheduling re-write cares about them, though I'm not sure if they are a good idea to have in a general sense:
+		Increase = 'i',
+		Decrease = 'd',
+	} type = None;
+	enum Dir : char {
+		CW = 'c', Clockwise = CW,
+		AC = 'a', Anticlockwise = AC, CCW = AC, Counterclocwise = AC,
+	} dir = AC;
+
+	//useful for debugging and visualization:
+	uint32_t vertex = -1U; //vertex of rowcolgraph where created
+	glm::vec3 at = glm::vec3(std::numeric_limits< float >::quiet_NaN());
+};
 
 /*
 * Helper class used in the autoknit algorithms, does not require its own .h file...
@@ -57,6 +86,8 @@ struct OnChainStitch {
 class KnitGrapher : public QObject
 {
 	Q_OBJECT
+
+
 
 //for now defining helper classes inside KnitGrapher, may be moved in the future
 //EPM value that can track edge splits:
@@ -236,6 +267,15 @@ private:
 		std::vector< std::vector< Stitch > >* next_active_stitches_, //out: next active stitches
 		RowColGraph* graph_ //in/out (optional): graph to update
 	);
+	///////////////////////class variables and functions used for graph tracing/////////////////////////////
+	std::vector< TracedStitch > tracedMesh;
+	void traceGraph(
+		RowColGraph const& graph, //in: row-column graph
+		std::vector< TracedStitch >* traced_, //out:traced list of stitches
+		AutoKnitMesh* DEBUG_model_ //in (optional): model
+	);
+
+
 	////////////////////////////////helper functions///////////////////////////////////////////////////////
 	void clearPeeling();
 
@@ -251,6 +291,9 @@ private:
 	std::vector<glm::uvec3> getTriangles(ObjectMesh const& model);
 	std::vector<GLuint> toIntArray(std::vector<glm::uvec3>);
 	
+
+
+
 //signals and slots, public functions, all 'interface' with the rest of the program	
 public:
 	KnitGrapher(QObject* parent = nullptr);
@@ -261,6 +304,7 @@ public slots:
 	void setModelUnitLength(float length);
 	void setOriginalMesh(ObjectMesh mesh);
 	void stepButtonClicked();
+	void traceButtonClicked();
 signals:
 	void knitGraphInterpolated(ObjectMesh mesh, std::vector<float> values);
 	void firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
@@ -269,5 +313,6 @@ signals:
 	void peelSliceDone(ObjectMesh* slice_, std::vector< std::vector< uint32_t > >* slice_active_chains_, std::vector< std::vector< uint32_t > >* slice_next_chains_);
 	void linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*);
 	void nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*);
+	void knitGraphCreated();
 };
 

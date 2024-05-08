@@ -11,7 +11,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     widthSpinBox->setDecimals(2);
     widthSpinBox->setSingleStep(1.0);
     widthSpinBox->setMinimum(0.05);
-    widthSpinBox->setMaximum(20.0);
+    widthSpinBox->setMaximum(2000.0);
     widthSpinBox->setValue(3.66f);
     widthSpinBox->setSuffix(" mm");
 
@@ -19,7 +19,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     heightSpinBox->setDecimals(2);
     heightSpinBox->setSingleStep(1.0);
     heightSpinBox->setMinimum(0.05);
-    heightSpinBox->setMaximum(20.0);
+    heightSpinBox->setMaximum(2000.0);
     heightSpinBox->setValue(1.73f);
     heightSpinBox->setSuffix(" mm");
 
@@ -27,7 +27,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     unitSpinBox->setDecimals(2);
     unitSpinBox->setSingleStep(1.0);
     unitSpinBox->setMinimum(0.05);
-    unitSpinBox->setMaximum(20.0);
+    unitSpinBox->setMaximum(2000.0);
     unitSpinBox->setValue(10.0f);
     unitSpinBox->setSuffix(" mm");
 
@@ -56,12 +56,15 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
 
     stepSpinBox = new QSpinBox();
     stepSpinBox->setMinimum(1);
-    stepSpinBox->setMaximum(150);
+    stepSpinBox->setMaximum(500);
     stepSpinBox->setValue(1);
     stepSpinBox->setSuffix(" steps");
 
     stepLayout->addWidget(stepSpinBox);
     stepLayout->addWidget(autoStepButton);
+
+    traceButton = new QPushButton("Trace Graph", this);
+    traceButton->setDisabled(true);
 
     QObject::connect(autoStepButton, &QPushButton::clicked, this, &MeshToolBar::onAutoStepButtonClicked);
     QObject::connect(constraintsModeButton, &QPushButton::clicked, this, &MeshToolBar::onConstraintsButtonClicked);
@@ -73,6 +76,9 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
         this, &MeshToolBar::onHeightValueChanged);
     QObject::connect(unitSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
         this, &MeshToolBar::onUnitValueChanged);
+    QObject::connect(traceButton, &QPushButton::clicked, this, &MeshToolBar::onTraceButtonClicked);
+
+
 
     QLabel* label3 = new QLabel("Further Options...", this);
 
@@ -83,7 +89,12 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     mainLayout->addWidget(remeshButton);
     mainLayout->addWidget(stepButton);
     mainLayout->addLayout(stepLayout);
+    mainLayout->addWidget(traceButton);
     mainLayout->addWidget(label3);
     setLayout(mainLayout);
     setMinimumSize(300, 100);
+}
+
+void MeshToolBar::knitGraphCreated() {
+    traceButton->setDisabled(false);
 }

@@ -25,6 +25,7 @@ class MeshToolBar : public QWidget {
 
 public:
     MeshToolBar(QWidget* parent = nullptr);
+    void knitGraphCreated();
 signals:
     void constraintsButtonClicked();
     void doneButtonClicked();
@@ -33,6 +34,7 @@ signals:
     void unitChanged(float unit);
     void remeshButtonClicked();
     void stepButtonClicked();
+    void traceButtonClicked();
 private slots:
     void onAutoStepButtonClicked() {
         stepButton->setDisabled(true);
@@ -88,12 +90,16 @@ private slots:
         autoStepButton->setDisabled(false);
         emit remeshButtonClicked();
     }
+    void onTraceButtonClicked() {
+        emit traceButtonClicked();
+    }
+
 private:
     // Will have a slew of functions that pass the user specified options to the visualizer/algorithm program
     QPushButton* constraintsModeButton;
     QPushButton* stepButton;
     QPushButton* remeshButton;
-
+    QPushButton* traceButton;
 
     QDoubleSpinBox* widthSpinBox;
     QDoubleSpinBox* heightSpinBox;

@@ -28,5 +28,7 @@ public:
 	ObjectMesh generateMesh();
 private:
 	void flushArrays();
+	void addTriangle(QString line);
+	void addQuad(QString line);
 };
 
