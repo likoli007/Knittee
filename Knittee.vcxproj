@@ -107,6 +107,7 @@
     <ClCompile Include="EmbeddedVertex.cpp" />
     <ClCompile Include="FlatPoint.cpp" />
     <ClCompile Include="KnitGrapher.cpp" />
+    <ClCompile Include="KnitOutStitch.cpp" />
     <ClCompile Include="LaceKnitter.cpp" />
     <ClCompile Include="Link.cpp" />
     <ClCompile Include="MeshToolBar.cpp" />
@@ -136,6 +137,7 @@
     <QtMoc Include="MeshToolBar.h" />
     <ClInclude Include="FlatPoint.h" />
     <QtMoc Include="LaceKnitter.h" />
+    <ClInclude Include="KnitOutStitch.h" />
     <ClInclude Include="Link.h" />
     <ClInclude Include="ObjectMesh.h" />
     <ClInclude Include="ObjHandler.h" />

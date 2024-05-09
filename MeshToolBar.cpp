@@ -66,6 +66,23 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     traceButton = new QPushButton("Trace Graph", this);
     traceButton->setDisabled(true);
 
+
+    showInterpolatedCheck = new QCheckBox("Mesh");
+    showGraphCheck = new QCheckBox("Graph");
+    showTracedCheck = new QCheckBox("Traced");
+
+    // Set the buttons to be checkable
+    showInterpolatedCheck->setDisabled(true);
+    showGraphCheck->setDisabled(true);
+    showTracedCheck->setDisabled(true);
+
+    // Create a layout for the radio buttons
+    QHBoxLayout* showLayout = new QHBoxLayout;
+    showLayout->addWidget(showInterpolatedCheck);
+    showLayout->addWidget(showGraphCheck);
+    showLayout->addWidget(showTracedCheck);
+
+
     QObject::connect(autoStepButton, &QPushButton::clicked, this, &MeshToolBar::onAutoStepButtonClicked);
     QObject::connect(constraintsModeButton, &QPushButton::clicked, this, &MeshToolBar::onConstraintsButtonClicked);
     QObject::connect(remeshButton, &QPushButton::clicked, this, &MeshToolBar::onRemeshButtonClicked);
@@ -77,7 +94,9 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     QObject::connect(unitSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
         this, &MeshToolBar::onUnitValueChanged);
     QObject::connect(traceButton, &QPushButton::clicked, this, &MeshToolBar::onTraceButtonClicked);
-
+    QObject::connect(showInterpolatedCheck, &QCheckBox::stateChanged, this, &MeshToolBar::onShowInterpolatedButtonClicked);
+    QObject::connect(showGraphCheck, &QCheckBox::stateChanged, this, &MeshToolBar::onShowGraphButtonClicked);
+    QObject::connect(showTracedCheck, &QCheckBox::stateChanged, this, &MeshToolBar::onShowTracedButtonClicked);
 
 
     QLabel* label3 = new QLabel("Further Options...", this);
@@ -91,6 +110,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     mainLayout->addLayout(stepLayout);
     mainLayout->addWidget(traceButton);
     mainLayout->addWidget(label3);
+    mainLayout->addLayout(showLayout);
     setLayout(mainLayout);
     setMinimumSize(300, 100);
 }

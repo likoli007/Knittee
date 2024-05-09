@@ -82,6 +82,9 @@
     <ClCompile Include="LaceKnitter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="KnitOutStitch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ObjHandler.h">
@@ -109,6 +112,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="FlatPoint.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="KnitOutStitch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

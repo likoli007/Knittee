@@ -93,9 +93,6 @@ void Visualizer::generateTimeTexture() {
 */
 void Visualizer::initializeGL()
 {
-
-
-
     initializeOpenGLFunctions();
 
     glEnable(GL_DEPTH_TEST);
@@ -631,7 +628,7 @@ void Visualizer::paintSphere(QVector3D center, float radius) {
 }
 
 void Visualizer::peelSliceDone(ObjectMesh* slice, std::vector< std::vector< uint32_t > >* slice_active_chains_, std::vector< std::vector< uint32_t > >* slice_next_chains_) {
-    showInterpolated = false;
+    //showInterpolated = false;
     qDebug() << "slice arrived at visualizer";
     sliceMesh = *slice;
     sliceActiveChains = *slice_active_chains_;
@@ -1310,7 +1307,7 @@ void Visualizer::wheelEvent(QWheelEvent* event)
     QPoint angleDelta = event->angleDelta();
     if (!angleDelta.isNull()) {
         //qDebug() << zoomLevel;
-        float zoomFactor = 0.3f;
+        float zoomFactor = 0.03f;
         if (angleDelta.y() > 0) {
             zoomLevel -= zoomFactor;
         }
@@ -1341,3 +1338,32 @@ void Visualizer::timerEvent(QTimerEvent* event)
         update();
     }
 }
+
+void Visualizer::showInterpolatedChanged(int state) {
+    qDebug() << "arrived";
+    if (state == Qt::Checked) {
+        showInterpolated = true;
+    }
+    else if (state == Qt::Unchecked) {
+        showInterpolated = false;
+    }
+}
+
+void Visualizer::showGraphChanged(int state) {
+    if (state == Qt::Checked) {
+		showGraph = true;
+	}
+    else if (state == Qt::Unchecked) {
+		showGraph = false;
+	}
+}
+
+void Visualizer::showTracedChanged(int state) {
+    if (state == Qt::Checked) {
+		showTraced = true;
+	}
+    else if (state == Qt::Unchecked) {
+		showTraced = false;
+	}
+}
+

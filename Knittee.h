@@ -28,6 +28,7 @@
 #include "Link.h"
 #include "LaceKnitter.h"
 #include "FlatPoint.h"
+#include "KnitOutStitch.h"
 
 /*
 * This is the main class that will be used to create the GUI for the program
@@ -123,7 +124,11 @@ private slots:
     void linkChainsDone(std::vector< std::vector< Stitch > >* , std::vector< Link >* );
     void nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*);
     void knitGraphCreated();
+    void knitGraphTraced(std::vector< TracedStitch >*);
 private:
+    void saveTraced(std::vector< TracedStitch >*);
+
+
     int modellingType = 0; //is the user operating on a 3D model (0) or a 2D sheet? (1), perhaps could be an enum?
 
     Ui::KnitteeClass ui;

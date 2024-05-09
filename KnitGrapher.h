@@ -314,5 +314,6 @@ signals:
 	void linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*);
 	void nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*);
 	void knitGraphCreated();
+	void knitGraphTraced(std::vector< TracedStitch >* traced_);
 };
 

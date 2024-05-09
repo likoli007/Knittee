@@ -5894,6 +5894,7 @@ void KnitGrapher::traceButtonClicked()
 {
 	qDebug() << "trace arrived at knitgrapher";
 	traceGraph(graph, &tracedMesh, &newMesh);
+	emit knitGraphTraced(&tracedMesh);
 }
 /*
 *	Function: construct the mesh that will be used in the autoknit algorithms 

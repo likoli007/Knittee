@@ -10,6 +10,8 @@
 #include <qspinbox.h>
 #include <qtimer.h>
 #include <qeventloop.h>
+#include <qradiobutton.h>
+#include <qcheckbox.h>
 
 //TODO: the following
 /*TODO
@@ -35,7 +37,15 @@ signals:
     void remeshButtonClicked();
     void stepButtonClicked();
     void traceButtonClicked();
+    void showInterpolatedChanged(int state);
+    void showGraphChanged(int state);
+    void showTracedChanged(int state);
 private slots:
+    void knitGraphTraced() {
+        qDebug() << "mesh toolbar received knit graph traced signal";
+
+    }
+
     void onAutoStepButtonClicked() {
         stepButton->setDisabled(true);
         autoStepButton->setDisabled(true);
@@ -88,10 +98,23 @@ private slots:
         qDebug() << "Remesh button clicked";
         stepButton->setDisabled(false);
         autoStepButton->setDisabled(false);
+        showInterpolatedCheck->setDisabled(false);
+        showInterpolatedCheck->setChecked(true);
         emit remeshButtonClicked();
     }
     void onTraceButtonClicked() {
         emit traceButtonClicked();
+    }
+
+    void onShowInterpolatedButtonClicked(int state) {
+        qDebug() << "emitting";
+        emit showInterpolatedChanged(state);
+	}
+    void onShowGraphButtonClicked(int state) {
+        emit showGraphChanged(state);
+	}
+    void onShowTracedButtonClicked(int state) {
+        emit showTracedChanged(state);
     }
 
 private:
@@ -108,6 +131,10 @@ private:
 
     QSpinBox* stepSpinBox;
     QPushButton* autoStepButton;
+
+    QCheckBox* showInterpolatedCheck;
+    QCheckBox* showGraphCheck;
+    QCheckBox* showTracedCheck;
 
     // Max values for the stitch width and height, will be used to scale the values
     // Might need to change these values later to something more appropriate

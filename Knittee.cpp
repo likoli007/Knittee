@@ -81,6 +81,14 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(&knitGrapher, SIGNAL(nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*)), this, SLOT(nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*)));
     QObject::connect(&laceKnitter, SIGNAL(sheetChanged(std::vector<std::vector<FlatPoint>>*)), vis, SLOT(sheetChanged(std::vector<std::vector<FlatPoint>>*)));
     QObject::connect(&knitGrapher, SIGNAL(knitGraphCreated()), this, SLOT(knitGraphCreated()));
+   
+    QObject::connect(&knitGrapher, SIGNAL(knitGraphTraced(std::vector< TracedStitch >*)), this, SLOT(knitGraphTraced(std::vector< TracedStitch >*)));
+    QObject::connect(&knitGrapher, SIGNAL(knitGraphTraced(std::vector< TracedStitch >*)), toolsWidget, SLOT(knitGraphTraced()));
+    //QObject::connect(&knitGrapher, SIGNAL)
+    QObject::connect(toolsWidget, SIGNAL(showInterpolatedChanged(int)), vis, SLOT(showInterpolatedChanged(int)));
+    QObject::connect(toolsWidget, SIGNAL(showGraphChanged(int)), vis, SLOT(showGraphChanged(int)));
+    QObject::connect(toolsWidget, SIGNAL(showTracedChanged(int)), vis, SLOT(showTracedChanged(int)));
+
 
     messageTextEdit = new QTextEdit(this);
     messageTextEdit->setReadOnly(true);
@@ -93,6 +101,49 @@ Knittee::Knittee(QWidget* parent)
     QWidget* centralWidget = new QWidget(this);
     centralWidget->setLayout(mainLayout);
     setCentralWidget(centralWidget);
+}
+
+void Knittee::knitGraphTraced(std::vector< TracedStitch >* traced_stitches) {
+	//vis->knitGraphTraced(traced_stitches);
+
+    qDebug() << "saving knitgraph to file";
+
+    saveTraced(traced_stitches);
+
+    qDebug() << "sending traced to visualizer";
+}
+
+void Knittee::saveTraced(std::vector< TracedStitch >* traced_stitches) {
+    qDebug() << "Saving, traced size: " << traced_stitches->size();
+
+
+
+	QString filePath = projectPath + "/traced";
+	QFile file(filePath);
+
+    if (!file.open(QIODevice::WriteOnly))
+    {
+        qDebug() << "could not open file";
+        return;
+    }
+   
+    QTextStream out(&file);
+    //KnitOutStitch* stitch;
+
+    for (auto const& ts : *traced_stitches)
+    {
+        //stitch = new KnitOutStitch();
+        out << ts.yarn
+            << ' ' << ts.type
+            << ' ' << ts.dir
+            << ' ' << (int32_t)ts.ins[0]
+            << ' ' << (int32_t)ts.ins[1]
+            << ' ' << (int32_t)ts.outs[0]
+            << ' ' << (int32_t)ts.outs[1]
+            << ' ' << ts.at.x << ' ' << ts.at.y << ' ' << ts.at.z << '\n';
+    }
+
+    file.close();
 }
 
 void Knittee::knitGraphCreated()

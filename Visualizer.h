@@ -43,7 +43,9 @@ public slots:
         std::vector< std::vector< Stitch > >* active_stitches,
         RowColGraph* graph);
     void sheetChanged(std::vector<std::vector<FlatPoint>>*);
-
+    void showInterpolatedChanged(int state);
+    void showGraphChanged(int state);
+    void showTracedChanged(int state);
 protected:
     std::vector<std::vector<FlatPoint>> sheet;
     
@@ -91,6 +93,11 @@ protected:
     GLuint colorBuffer;
     GLuint coordsBuffer;
 
+    GLuint originalVao, originalVbo, originalIndexBuffer;
+    GLuint interpolatedVao, interpolatedVbo, interpolatedIndexBuffer;
+    GLuint sliceVao, sliceVbo, sliceIndexBuffer;
+
+
     int selectedFace = -1;
     int chosenVertex = -1;
     QVector3D rayDir;
@@ -132,6 +139,8 @@ protected:
     bool showLinks = false;
     bool showNextChains = false;
     bool showSliceChains = false;
+    bool showGraph = false;
+    bool showTraced = false;
 
     float translateX = 0.0f;
     float translateY = 0.0f;
