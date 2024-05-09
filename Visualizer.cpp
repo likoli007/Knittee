@@ -93,6 +93,9 @@ void Visualizer::generateTimeTexture() {
 */
 void Visualizer::initializeGL()
 {
+
+
+
     initializeOpenGLFunctions();
 
     glEnable(GL_DEPTH_TEST);
@@ -418,19 +421,26 @@ void Visualizer::paintPath(QVector3D start, QVector3D end, float r, float g, flo
 *   Function: paints all the constraints of different constraint sets iteratively
 */
 void Visualizer::paintConstraints() {
-
     for (Constraint* c : constraints) {
         if (c->vertices.size() > 1) {
-            //qDebug() << c->timeValue;
-            float r = c->timeValue > 0.0 ? c->timeValue : 0.0;
-            float b = c->timeValue < 0.0 ? c->timeValue : 0.0;
+            //select a color of the constraint based on the time value
+            QColor color = timeColor(c->timeValue);
+            int red = color.red();
+            int green = color.green();
+            int blue = color.blue();
+
+
+            float r = static_cast<float>(red) / 255.0f;
+            float g = static_cast<float>(green) / 255.0f;
+            float b = static_cast<float>(blue) / 255.0f;
+
+            
             for (int i = 0; i < c->vertices.size() - 1; i++) {
-                // Get the 2 vertices of the constraint and perform the mvp matrix transformations on them
+                //a constraint is a set of vertices, paint a line between each pair of vertices
                 QVector3D vertex1 = mesh.vertices[c->vertices[i]];
                 QVector3D vertex2 = mesh.vertices[c->vertices[i + 1]];
-                
 
-                paintPath(vertex1, vertex2, r, 0.0f, b);
+                paintPath(vertex1, vertex2, r, g, b);
             }
         }
     }
@@ -440,16 +450,34 @@ void Visualizer::paintConstraints() {
 *   Function: allow the user to set constraints in the visualizer, in the future
 *       will disable a different mode selected by the user previously
 */
-void Visualizer::setConstraintsMode() {
-    qDebug() << "Setting constraints mode...";
-    addingConstraints = true;
-    showConstraints = true;
+void Visualizer::setConstraintsMode(bool type) {
+    addingConstraints = type;
+    showConstraints = type;
+
+    //if constraints mode is enabled, create a new constraint set
+    if (type == true) {
+        pushConstraints();
+    }
+
+    //if constraints mode is disabled, save them through Knittee
+    if (type == false) {
+        
+        //traverse the constraint list and delete the ones that are empty or singular
+        for (int i = 0; i < constraints.size(); i++) {
+            if (constraints[i]->vertices.size() < 2) {
+				constraints.erase(constraints.begin() + i);
+				i--;
+			}
+		}
+
+        emit requestConstraintsSave();
+    }
 }
 
 /*
 *   Function: paint the current 3D mesh with all transformations
 */
-void Visualizer::paintMesh()
+void Visualizer::paintOriginalMesh()
 {
     // General OpenGL set up
     glClearColor(0.0f, 0.0f, 0.5451f, 1.0f);
@@ -535,6 +563,135 @@ void Visualizer::paintInterpolatedMesh() {
 
 }
 
+void Visualizer:: paintCube(QVector3D center, float sideLength) {
+    float halfSide = sideLength;
+    halfSide = 0.05f;
+    buildmvpMatrix();
+    center = mvpMatrix.map(center);
+    
+    qDebug() << sideLength;
+
+    float x = center.x();
+    float y = center.y();
+    float z = center.z();
+    
+    glBegin(GL_QUADS);
+
+    glColor3f(1.0f, 1.0f, 1.0f);
+    // Front face
+    glVertex3f(x - halfSide, y - halfSide, z + halfSide);
+    glVertex3f(x + halfSide, y - halfSide, z + halfSide);
+    glVertex3f(x + halfSide, y + halfSide, z + halfSide);
+    glVertex3f(x - halfSide, y + halfSide, z + halfSide);
+
+    // Back face
+    glVertex3f(x - halfSide, y - halfSide, z - halfSide);
+    glVertex3f(x - halfSide, y + halfSide, z - halfSide);
+    glVertex3f(x + halfSide, y + halfSide, z - halfSide);
+    glVertex3f(x + halfSide, y - halfSide, z - halfSide);
+
+    // Top face
+    glVertex3f(x - halfSide, y + halfSide, z - halfSide);
+    glVertex3f(x - halfSide, y + halfSide, z + halfSide);
+    glVertex3f(x + halfSide, y + halfSide, z + halfSide);
+    glVertex3f(x + halfSide, y + halfSide, z - halfSide);
+
+    // Bottom face
+    glVertex3f(x - halfSide, y - halfSide, z - halfSide);
+    glVertex3f(x + halfSide, y - halfSide, z - halfSide);
+    glVertex3f(x + halfSide, y - halfSide, z + halfSide);
+    glVertex3f(x - halfSide, y - halfSide, z + halfSide);
+
+    // Right face
+    glVertex3f(x + halfSide, y - halfSide, z - halfSide);
+    glVertex3f(x + halfSide, y + halfSide, z - halfSide);
+    glVertex3f(x + halfSide, y + halfSide, z + halfSide);
+    glVertex3f(x + halfSide, y - halfSide, z + halfSide);
+
+    // Left face
+    glVertex3f(x - halfSide, y - halfSide, z - halfSide);
+    glVertex3f(x - halfSide, y - halfSide, z + halfSide);
+    glVertex3f(x - halfSide, y + halfSide, z + halfSide);
+    glVertex3f(x - halfSide, y + halfSide, z - halfSide);
+
+    glEnd();
+}
+
+void Visualizer::paintTraced() {
+    std::vector<glm::vec3> colors = { glm::vec3(1.0f,0.0f,0.0f), glm::vec3(0.0f, 1.0f, 0.0f),
+        glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(1.0f, 0.0f, 1.0f), glm::vec3(0.0f, 1.0f, 1.0f),
+    glm::vec3(1.0f, 1.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f)};
+    
+    int yarnColor = 0;
+
+    for (int i = 1; i < tracedMesh.size(); i++) {
+        if (tracedMesh[i].yarn != tracedMesh[i - 1].yarn) {
+            yarnColor = (yarnColor + 1) % colors.size();
+            continue;
+        }
+        QVector3D start = QVector3D(tracedMesh[i - 1].at.x, tracedMesh[i - 1].at.y, tracedMesh[i - 1].at.z);
+        QVector3D end = QVector3D(tracedMesh[i].at.x, tracedMesh[i].at.y, tracedMesh[i].at.z);
+        paintPath(
+            start, end,
+            colors[yarnColor].x, colors[yarnColor].y, colors[yarnColor].z);
+    }
+    for (int i = 0; i < tracedMesh.size(); i++) {
+        glm::vec3 const& at = tracedMesh[i].at;
+        if (tracedMesh[i].ins[0] != -1U && tracedMesh[i].ins[1] != -1U) {
+            glm::vec3 const& in0 = tracedMesh[tracedMesh[i].ins[0]].at;
+            glm::vec3 const& in1 = tracedMesh[tracedMesh[i].ins[1]].at;
+            
+            QVector3D start = QVector3D(0.5f * (at.x + in0.x), 0.5f * (at.y + in0.y), 0.5f * (at.z + in0.z));
+            QVector3D end = QVector3D(0.5f * (at.x + in1.x), 0.5f * (at.y + in1.y), 0.5f * (at.z + in1.z));
+
+            paintPath(
+				start, end,
+				0.33f, 0.33f, 0.33f);
+            paintPath(start, end, 0.8, 0.8, 0.8);
+        }
+        if (tracedMesh[i].outs[0] != -1U && tracedMesh[i].outs[1] != -1U) {
+            glm::vec3 const& out0 = tracedMesh[tracedMesh[i].outs[0]].at;
+            glm::vec3 const& out1 = tracedMesh[tracedMesh[i].outs[1]].at;
+
+            QVector3D start = QVector3D(0.5f * (at.x + out0.x), 0.5f * (at.y + out0.y), 0.5f * (at.z + out0.z));
+            QVector3D end = QVector3D(0.5f * (at.x + out1.x), 0.5f * (at.y + out1.y), 0.5f * (at.z + out1.z));
+
+            paintPath(
+                start, end,
+                0.26f, 0.26f, 0.26f);
+            paintPath(start, end, 0.73, 0.73, 0.73);
+        }
+        if (tracedMesh[i].ins[0] != -1U && tracedMesh[i].ins[1] == -1U) {
+            glm::vec3 const& in0 = tracedMesh[tracedMesh[i].ins[0]].at;
+
+            QVector3D start = QVector3D(0.5f * (at.x + in0.x), 0.5f * (at.y + in0.y), 0.5f * (at.z + in0.z));
+            QVector3D end = QVector3D(at.x, at.y, at.z);
+
+            paintPath(
+				start, end,
+				0.53f, 0.53f, 0.53f);
+
+        }
+        if (tracedMesh[i].outs[0] != -1U && tracedMesh[i].outs[1] == -1U) {
+            glm::vec3 const& out0 = tracedMesh[tracedMesh[i].outs[0]].at;
+
+            QVector3D start = QVector3D(0.5f * (at.x + out0.x), 0.5f * (at.y + out0.y), 0.5f * (at.z + out0.z));
+            QVector3D end = QVector3D(at.x, at.y, at.z);
+
+            paintPath(
+				start, end,
+				0.46f, 0.46f, 0.46f);
+        }
+    }
+}
+
+void Visualizer::knitGraphTraced(std::vector< TracedStitch >* t) {
+    tracedMesh = *t;
+    showTraced = true;
+    showFirstChains = false;
+    showInterpolated = false;
+}
+
 void Visualizer::paintFirstActiveChains() {
     std::vector< QVector3D > locations;
     locations.reserve(rowColGraph.vertices.size());
@@ -542,8 +699,21 @@ void Visualizer::paintFirstActiveChains() {
         locations.emplace_back(v.at.interpolate(interpolatedMesh.vertices));
     }
 
+    
+    //TODO: get parameters from knitgrapher
+    float radius = 1.5f * 0.075f * 3.66f * 10.0f;
     for (uint32_t vi = 0; vi < rowColGraph.vertices.size(); ++vi) {
         auto const& v = rowColGraph.vertices[vi];
+
+
+       /*
+        paintSphere(
+            locations[vi],
+            radius
+        );*/
+
+        //paintCube(locations[vi], radius);
+
         if (v.row_in != -1U) {
             //qDebug() << "i have row_in";
             paintPath(
@@ -596,10 +766,18 @@ void Visualizer::paintSphere(QVector3D center, float radius) {
     const int slices = 15;
     const int stacks = 15;
 
-
+    radius = 0.04f / zoomLevel;
+    //glClear(GL_DEPTH_BUFFER_BIT);
+    
+    //qDebug() << "drawing stuff";
+    buildmvpMatrix();
     center = mvpMatrix.map(center);
 
     glBegin(GL_TRIANGLE_STRIP);
+    
+    //set white color
+    glColor3f(0.0f, 0.57f, 1.0f);
+    glEnable(GL_DEPTH_TEST);
     for (int i = 0; i <= stacks; ++i)
     {
         float phi = M_PI * i / stacks;
@@ -628,7 +806,7 @@ void Visualizer::paintSphere(QVector3D center, float radius) {
 }
 
 void Visualizer::peelSliceDone(ObjectMesh* slice, std::vector< std::vector< uint32_t > >* slice_active_chains_, std::vector< std::vector< uint32_t > >* slice_next_chains_) {
-    //showInterpolated = false;
+    showInterpolated = false;
     qDebug() << "slice arrived at visualizer";
     sliceMesh = *slice;
     sliceActiveChains = *slice_active_chains_;
@@ -963,7 +1141,6 @@ void Visualizer::paintYarn(int ax, int ay, int bx, int by) {
 */
 void Visualizer::paintGL()
 {
-
     if (projectType == 0) {
         // Set up
         buildmvpMatrix();
@@ -979,7 +1156,7 @@ void Visualizer::paintGL()
             paintPickFrame();
             pickFromMesh();
             glFinish();
-            paintMesh();
+            paintOriginalMesh();
             paintConstraints();
         }
         if (showInterpolated) {
@@ -987,6 +1164,9 @@ void Visualizer::paintGL()
             paintInterpolatedMesh();
         }
         if (showFirstChains) {
+            //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            //glEnable(GL_DEPTH_TEST);
+            //paintInterpolatedMesh();
             //qDebug() << "drawing first active chains";
             paintFirstActiveChains();
         }
@@ -999,6 +1179,9 @@ void Visualizer::paintGL()
         if (showNextChains) {
             paintNextChains();
         }
+        if (showTraced) {
+			paintTraced();
+		}
     }
     else {
         paintSheet();
@@ -1121,7 +1304,6 @@ void Visualizer::increaseConstraintValue() {
     if (closestConstraint != -1 && constraints[closestConstraint]->timeValue < 1.0) {
 		constraints[closestConstraint]->timeValue += 0.1f;
 	}
-    qDebug() << "Constraint value: " << constraints[closestConstraint]->timeValue;
 }
 
 void Visualizer::decreaseConstraintValue() {
@@ -1129,31 +1311,42 @@ void Visualizer::decreaseConstraintValue() {
     if (closestConstraint != -1 && constraints[closestConstraint]->timeValue > -1.0) {
 		constraints[closestConstraint]->timeValue -= 0.1f;
 	}
-    qDebug() << "Constraint value: " << constraints[closestConstraint]->timeValue;
+}
+
+void Visualizer::deleteConstraint() {
+    int closestConstraint = getClosestConstraint();
+    if (closestConstraint != -1) {
+		constraints.erase(constraints.begin() + closestConstraint);
+    }
 }
 
 void Visualizer::keyPressEvent(QKeyEvent* event)
 {
-    qDebug() << "Key pressed: " << event->key();
+    //if 'c', user wants to add a vertex
     if (event->key() == Qt::Key_C && addingConstraints) {
         qDebug() << "Adding constraint vertex..";
         addConstraintVertex();
     }
+    //if 'enter', user wants to finish adding constraint vertices
     if (event->key() == Qt::Key_Return && addingConstraints) {
         qDebug() << "Pushing constraints..";
         pushConstraints();
     }
-    //if '+', call increaseConstraintValue()
+    //if '+', user wants to increase time value
     if (event->key() == Qt::Key_Plus ) {
 		qDebug() << "Increasing constraint value..";
 		increaseConstraintValue();
 	}
-    //if '-', call decreaseConstraintValue()
+    //if '-', user wants to delete time value
     if (event->key() == Qt::Key_Minus) {
-        qDebug() << "Decreasing constraint value..";
         decreaseConstraintValue();
     }
+    //if 'delete', user wants to delete the constraint
+    if (event->key() == Qt::Key_Delete) {
+        deleteConstraint();
+    }
 
+    //if 'ctrl-z', user wants to delete the last constraint vertex
     if (event->modifiers() == Qt::ControlModifier && event->key() == Qt::Key_Z)
     {
         qDebug() << "Ctrl+Z pressed";
@@ -1340,7 +1533,6 @@ void Visualizer::timerEvent(QTimerEvent* event)
 }
 
 void Visualizer::showInterpolatedChanged(int state) {
-    qDebug() << "arrived";
     if (state == Qt::Checked) {
         showInterpolated = true;
     }

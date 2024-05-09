@@ -1,6 +1,19 @@
 #include "MeshToolBar.h"
 
 MeshToolBar::MeshToolBar(QWidget* parent) {
+
+    QFrame* meshSeparator = new QFrame();
+    meshSeparator->setFrameShape(QFrame::HLine);
+    meshSeparator->setFrameShadow(QFrame::Raised);
+
+    QFrame* sizeSeparator = new QFrame();
+    sizeSeparator->setFrameShape(QFrame::HLine);
+    sizeSeparator->setFrameShadow(QFrame::Raised);
+
+    QFrame* exportSeparator = new QFrame();
+    exportSeparator->setFrameShape(QFrame::HLine);
+    exportSeparator->setFrameShadow(QFrame::Raised);
+
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
     QHBoxLayout* widthLayout = new QHBoxLayout(this);
     QHBoxLayout* heightLayout = new QHBoxLayout(this);
@@ -31,6 +44,8 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     unitSpinBox->setValue(10.0f);
     unitSpinBox->setSuffix(" mm");
 
+    //QIcon icon = QIcon::fromTheme("help-about");
+
     QLabel* label = new QLabel("Stitch Width:", this);
     QLabel* label2 = new QLabel("Stitch Height:", this);
     QLabel* label4 = new QLabel("Unit Length:", this);
@@ -43,7 +58,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     unitLayout->addWidget(unitSpinBox);
 
 
-    constraintsModeButton = new QPushButton("Add Constraints", this);
+    constraintsModeButton = new QPushButton("Constraints Mode", this);
     remeshButton = new QPushButton("Interpolate Mesh", this);
     stepButton = new QPushButton("Step", this);
     stepButton->setDisabled(true);
@@ -78,9 +93,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
 
     // Create a layout for the radio buttons
     QHBoxLayout* showLayout = new QHBoxLayout;
-    showLayout->addWidget(showInterpolatedCheck);
-    showLayout->addWidget(showGraphCheck);
-    showLayout->addWidget(showTracedCheck);
+    
 
 
     QObject::connect(autoStepButton, &QPushButton::clicked, this, &MeshToolBar::onAutoStepButtonClicked);
@@ -99,17 +112,68 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     QObject::connect(showTracedCheck, &QCheckBox::stateChanged, this, &MeshToolBar::onShowTracedButtonClicked);
 
 
-    QLabel* label3 = new QLabel("Further Options...", this);
+  
 
+   QLabel* label3 = new QLabel("Show:", this);
+   label3->setStyleSheet("QLabel { padding: 0px; }");
+   //QLabel* label = new QLabel("Label");
+   // label3->setContentsMargins(0, 0, 0, 0);
+
+
+   QLabel* parameterLabel = new QLabel("Parameters", this);
+   parameterLabel->setAlignment(Qt::AlignCenter);
+   //parameterLabel->setStyleSheet("QLabel { padding: 0px; }");
+   //parameterLabel->setContentsMargins(0, 0, 0, 0);
+   parameterLabel->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+
+   QLabel* remeshLabel = new QLabel("Remesh Model", this);
+   remeshLabel->setAlignment(Qt::AlignCenter);
+   remeshLabel->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+
+   QLabel* buildLabel = new QLabel("Build KnitGraph", this);
+   buildLabel->setAlignment(Qt::AlignCenter);
+   buildLabel->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+
+   QLabel* ExportLabel = new QLabel("Export Instructions", this);
+   ExportLabel->setAlignment(Qt::AlignCenter);
+   ExportLabel->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+
+
+
+    generateKnitoutButton = new QPushButton("Generate Knitout");
+    generateKnitoutButton->setDisabled(true);
+
+    QWidget* spacer = new QWidget();
+    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+    showLayout->addWidget(label3);
+    showLayout->addWidget(showInterpolatedCheck);
+    showLayout->addWidget(showGraphCheck);
+    showLayout->addWidget(showTracedCheck);
+    showLayout->setContentsMargins(0, 0, 0, 0);
+    
+
+    //mainLayout->addWidget(icon);
+    mainLayout->addWidget(parameterLabel);
     mainLayout->addLayout(widthLayout);
     mainLayout->addLayout(heightLayout);
     mainLayout->addLayout(unitLayout);
+    mainLayout->addWidget(sizeSeparator);
+    mainLayout->addWidget(remeshLabel);
     mainLayout->addWidget(constraintsModeButton);
     mainLayout->addWidget(remeshButton);
+    mainLayout->addWidget(meshSeparator);
+    mainLayout->addWidget(buildLabel);
     mainLayout->addWidget(stepButton);
     mainLayout->addLayout(stepLayout);
     mainLayout->addWidget(traceButton);
-    mainLayout->addWidget(label3);
+    mainLayout->addWidget(exportSeparator);
+    mainLayout->addWidget(ExportLabel);
+    mainLayout->addWidget(generateKnitoutButton);
+
+
+    mainLayout->addWidget(spacer);
+    //mainLayout->addWidget(label3);
     mainLayout->addLayout(showLayout);
     setLayout(mainLayout);
     setMinimumSize(300, 100);
@@ -118,3 +182,4 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
 void MeshToolBar::knitGraphCreated() {
     traceButton->setDisabled(false);
 }
+

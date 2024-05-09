@@ -103,18 +103,27 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="EmbedDAG.cpp" />
     <ClCompile Include="EmbeddedPlanarMap.cpp" />
     <ClCompile Include="EmbeddedVertex.cpp" />
     <ClCompile Include="FlatPoint.cpp" />
+    <ClCompile Include="HelperText.cpp" />
     <ClCompile Include="KnitGrapher.cpp" />
+    <ClCompile Include="KnitoutSheduler.cpp" />
     <ClCompile Include="KnitOutStitch.cpp" />
     <ClCompile Include="LaceKnitter.cpp" />
     <ClCompile Include="Link.cpp" />
     <ClCompile Include="MeshToolBar.cpp" />
     <ClCompile Include="ObjectMesh.cpp" />
     <ClCompile Include="ObjHandler.cpp" />
+    <ClCompile Include="PlanTransfers.cpp" />
+    <ClCompile Include="PlanTransfersHelpers.cpp" />
     <ClCompile Include="RowColGraph.cpp" />
+    <ClCompile Include="ScheduleCost.cpp" />
+    <ClCompile Include="Shape.cpp" />
     <ClCompile Include="Stitch.cpp" />
+    <ClCompile Include="TracedStitch.cpp" />
+    <ClCompile Include="Typeset.cpp" />
     <ClCompile Include="Visualizer.cpp" />
     <None Include="fragment_shader.glsl" />
     <None Include="geometry_shader.glsl" />
@@ -130,9 +139,18 @@
     <ResourceCompile Include="Knittee.rc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="EmbedDAG.h" />
     <ClInclude Include="EmbeddedPlanarMap.h" />
     <ClInclude Include="EmbeddedVertex.h" />
     <ClInclude Include="Face.h" />
+    <QtMoc Include="KnitoutSheduler.h" />
+    <ClInclude Include="HelperText.h" />
+    <ClInclude Include="PlanTransfers.h" />
+    <ClInclude Include="PlanTransfersHelpers.h" />
+    <ClInclude Include="ScheduleCost.h" />
+    <ClInclude Include="Shape.h" />
+    <ClInclude Include="TracedStitch.h" />
+    <ClInclude Include="Typeset.h" />
     <QtMoc Include="KnitGrapher.h" />
     <QtMoc Include="MeshToolBar.h" />
     <ClInclude Include="FlatPoint.h" />

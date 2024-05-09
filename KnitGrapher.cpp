@@ -282,11 +282,10 @@ void KnitGrapher::unfold(uint32_t depth, uint32_t root, glm::vec2 const& flat_ro
 */
 void KnitGrapher::remesh()
 {
-	qDebug() << "Starting remesh()";
-
 	//check if constraints are empty, no way to remesh without them
-	if (constraints.size() == 0) {
-		qDebug() << "No Constraints found! exiting remesh()...";
+	if (constraints.size() < 2) {
+		emit helpBoxCommunication("Insufficient constraints count! Cannot interpolate...");
+		//qDebug() << "No Constraints found! exiting remesh()...";
 		return;
 	}
 
@@ -316,7 +315,7 @@ void KnitGrapher::remesh()
 	for (Constraint* constraint : constraints)
 	{
 		if (constraint->vertices.empty()) {
-			qDebug() << "Constraint has no vertices, skipping...";
+			//qDebug() << "Constraint has no vertices, skipping...";
 			continue;
 		}
 		std::vector<uint32_t> path;
@@ -341,7 +340,8 @@ void KnitGrapher::remesh()
 			}
 			while (path.back() != goal) {
 				if (visited[path.back()].second == -1) {
-					qDebug() << "ERROR: constraint chain moves between connected components.";
+					emit helpBoxCommunication("ERROR: constraint chain moves between connected components.");
+					//qDebug() << "ERROR: constraint chain moves between connected components.";
 					break;
 				}
 				path.emplace_back(visited[path.back()].second);
@@ -364,7 +364,8 @@ void KnitGrapher::remesh()
 
 	//there is degenarate triangle checking in the original algorithm, will do the same here
 	if (degenerateCheck(tris)) {
-		qDebug() << "Degenerate triangle found, error...";
+		emit helpBoxCommunication("Degenerate triangle found! Your mesh is not suitable for Knittee...");
+		//qDebug() << "Degenerate triangle found, error...";
 		return;
 	}
 
@@ -484,7 +485,7 @@ void KnitGrapher::remesh()
 			new_adj += a.size();
 		}
 
-		qDebug() << "Went from " << old_adj << " to " << new_adj << " by unfolding triangles.";
+		//qDebug() << "Went from " << old_adj << " to " << new_adj << " by unfolding triangles.";
 
 		//for consistency:
 		for (auto& a : adj) {
@@ -511,7 +512,7 @@ void KnitGrapher::remesh()
 		}
 	}
 
-	qDebug() << "embedded chains size" << embedded_chains.size() << " constraints size (with empty dummy):" << constraints.size();
+	//qDebug() << "embedded chains size" << embedded_chains.size() << " constraints size (with empty dummy):" << constraints.size();
 	
 	EmbeddedPlanarMap< float, SameValue< float >, ReplaceValue< float > > epm;
 	
@@ -534,9 +535,9 @@ void KnitGrapher::remesh()
 		total_simplex_edges += edges.second.size();
 	}
 
-	qDebug() << "EPM has " << epm.vertices.size() << " vertices." ;
-	qDebug() << "EPM has " << epm.simplex_vertices.size() << " simplices with vertices.";
-	qDebug() << "EPM has " << epm.simplex_edges.size() << " simplices with edges (" << total_simplex_edges << " edges from " << total_chain_edges << " chain edges).";
+	//qDebug() << "EPM has " << epm.vertices.size() << " vertices." ;
+	//qDebug() << "EPM has " << epm.simplex_vertices.size() << " simplices with vertices.";
+	//qDebug() << "EPM has " << epm.simplex_edges.size() << " simplices with edges (" << total_simplex_edges << " edges from " << total_chain_edges << " chain edges).";
 
 
 	//Build a mesh that is split at the embedded edges:
@@ -566,7 +567,7 @@ void KnitGrapher::remesh()
 			split_values[epm_to_split[e.second]] = e.value;
 		}
 	}
-	qDebug() << constrained_edges.size() << " constrained edges.";
+	//qDebug() << constrained_edges.size() << " constrained edges.";
 
 
 	std::vector< uint32_t > tri_component(split_tris.size(), -1U);
@@ -620,7 +621,7 @@ void KnitGrapher::remesh()
 			}
 			component_keep.emplace_back(values.size() > 1);
 		}
-		qDebug() << "Have " << component_keep.size() << " connected components.";
+		//qDebug() << "Have " << component_keep.size() << " connected components.";
 	}
 
 	//remove any split_verts that aren't used:
@@ -647,12 +648,18 @@ void KnitGrapher::remesh()
 		tri.y = add_vert(tri.y);
 		tri.z = add_vert(tri.z);
 	}
-	qDebug() << "Went from " << tris.size() << " to (via split) " << split_tris.size() << " to (via discard) " << compressed_tris.size() << " triangles."; //DEBUG
+
+	//qDebug() << "Went from " << tris.size() << " to (via split) " << split_tris.size() << " to (via discard) " << compressed_tris.size() << " triangles."; //DEBUG
+
+	QString message = "Original mesh had " + QString::number(originalMesh.triangles.size()) + 
+		" triangles, Remeshed mesh has " + QString::number(compressed_tris.size()) + " triangles.";
+
+	emit helpBoxCommunication(message);
 
 	newMesh.vertices = compressed_verts;
 	newMesh.triangles = compressed_tris;
 	
-	qDebug() << compressed_values.size() << " constrained values and " << compressed_verts.size() << " vertices";
+	//qDebug() << compressed_values.size() << " constrained values and " << compressed_verts.size() << " vertices";
 
 	constrained_values = compressed_values;
 }
@@ -789,7 +796,9 @@ void KnitGrapher::findFirstActiveChains(std::vector< std::vector< EmbeddedVertex
 	}
 
 	assert(active_chains.size() == active_stitches.size());
-	qDebug() << "Found " << active_chains.size() << " first active chains.";
+	qDebug() << "Found " << active_chains.size() << " active chains.";
+
+	emit helpBoxCommunication("Found " + QString::number(active_chains.size()) + " active chains.");
 
 	if (graph_) {
 		for (uint32_t ci = 0; ci < active_chains.size(); ++ci) {
@@ -882,7 +891,8 @@ void KnitGrapher::sampleChain(float spacing,
 void KnitGrapher::interpolateValues() 
 {
 	if (constrained_values.size() != newMesh.vertices.size()) {
-		qDebug() << "Constraints size does not match model vertices size" << constrained_values.size() << newMesh.vertices.size();
+		emit helpBoxCommunication("Constraints size does not match model vertices size: " + QString::number(constrained_values.size()) + " " + QString::number(newMesh.vertices.size()));
+		//qDebug() << "Constraints size does not match model vertices size: " << constrained_values.size() << newMesh.vertices.size();
 		return;
 	}
 
@@ -1622,8 +1632,12 @@ void KnitGrapher::trimModel(std::vector< std::vector< EmbeddedVertex > >& left_o
 		clipped.vertices.emplace_back(v.interpolate(newMesh.vertices));
 	}
 
+	
 	qDebug() << "Trimmed model from " << newMesh.triangles.size() << " triangles on " << newMesh.vertices.size() << " vertices to " << clipped.triangles.size() << " triangles on " << clipped.vertices.size() << " vertices.";
 	
+	emit helpBoxCommunication("Trimmed model from " + QString::number(newMesh.triangles.size()) + " triangles on " + QString::number(newMesh.vertices.size()) + " vertices to " + QString::number(clipped.triangles.size()) + " triangles on " + QString::number(clipped.vertices.size()) + " vertices.");
+
+
 	auto transform_chain = [&](std::vector< uint32_t > const& epm_chain) {
 		assert(!epm_chain.empty());
 		std::vector< uint32_t > split_chain;
@@ -4068,7 +4082,11 @@ void KnitGrapher::linkChains(
 				++total;
 			}
 		}
-	qDebug() << "Marked " << marked << " of " << total << " newly created stitches as 'discard'.";
+
+
+		emit helpBoxCommunication("Created " + QString::number(total) + " stitches in total, of which " + QString::number(marked) + " were marked as 'discard'.");
+		qDebug() << "Marked " << marked << " of " << total << " newly created stitches as 'discard'.";
+	
 
 }
 
@@ -5253,7 +5271,7 @@ void KnitGrapher::buildNextActiveChains(
 		}
 	}
 	
-
+	emit helpBoxCommunication("Built new active chains from next chains.");
 }
 
 
@@ -5304,10 +5322,13 @@ void KnitGrapher::stepButtonClicked()
 			active_chains = old_next_active_chains;
 			active_stitches = old_next_active_stitches;
 		}
-		if (!active_chains.empty())
+		if (!active_chains.empty()) {
+			emit helpBoxCommunication("New active chains were created.");
 			emit firstActiveChainsCreated(&active_chains, &active_stitches, &graph);
+		}
 		else {
 			stepCount--;
+			emit helpBoxCommunication("Mesh has no active chains, you can now start tracing the graph.");
 			emit firstActiveChainsCreated(&active_chains, &active_stitches, &graph);
 			emit knitGraphCreated();
 		}

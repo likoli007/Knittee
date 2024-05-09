@@ -29,6 +29,8 @@
 #include "LaceKnitter.h"
 #include "FlatPoint.h"
 #include "KnitOutStitch.h"
+#include "TracedStitch.h"
+#include "KnitoutSheduler.h"
 
 /*
 * This is the main class that will be used to create the GUI for the program
@@ -125,6 +127,8 @@ private slots:
     void nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*);
     void knitGraphCreated();
     void knitGraphTraced(std::vector< TracedStitch >*);
+    void helpBoxCommunication(QString);
+    void saveConstraints();
 private:
     void saveTraced(std::vector< TracedStitch >*);
 
@@ -135,6 +139,7 @@ private:
     ObjHandler object_loader;
     Visualizer* vis;
     KnitGrapher knitGrapher;
+    KnitoutScheduler knitoutScheduler;
     LaceKnitter laceKnitter;
     MeshToolBar* toolsWidget;
     QHBoxLayout* visualizerLayout;
@@ -155,7 +160,7 @@ private:
     //3D project functions
     void setUpNew3DProject(ProjectInfo options);
     void start3DProject(ProjectInfo context);
-    void saveConstraints();
+    
     void loadConstraints();
 
     //2D project functions

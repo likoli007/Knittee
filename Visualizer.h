@@ -11,6 +11,7 @@
 #include "RowColGraph.h"
 #include "Link.h"
 #include "FlatPoint.h"
+#include "TracedStitch.h"
 
 struct Constraint
 {
@@ -27,7 +28,7 @@ public:
     Visualizer(QWidget* parent = nullptr);
     ~Visualizer();
     void loadMesh(ObjectMesh loaded_mesh);
-    void setConstraintsMode();
+    
     std::vector<Constraint*> getConstraints();
     void setConstraints(std::vector<Constraint*>);
     void peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > >*, std::vector< std::vector< uint32_t > >*);
@@ -37,7 +38,11 @@ public:
     //could be getted and setted in the future
     int projectType = 0; //is the user operating on a 3D model (0) or a 2D sheet? (1)
 
+signals:
+    void requestConstraintsSave();
+
 public slots:
+    void setConstraintsMode(bool);
     void meshInterpolated(ObjectMesh mesh, std::vector<float> values);
     void firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
         std::vector< std::vector< Stitch > >* active_stitches,
@@ -46,6 +51,7 @@ public slots:
     void showInterpolatedChanged(int state);
     void showGraphChanged(int state);
     void showTracedChanged(int state);
+    void knitGraphTraced(std::vector< TracedStitch >*);
 protected:
     std::vector<std::vector<FlatPoint>> sheet;
     
@@ -97,6 +103,10 @@ protected:
     GLuint interpolatedVao, interpolatedVbo, interpolatedIndexBuffer;
     GLuint sliceVao, sliceVbo, sliceIndexBuffer;
 
+    QOpenGLVertexArrayObject originalVaoObj;
+    QOpenGLBuffer originalVboObj{ QOpenGLBuffer::VertexBuffer };
+    QOpenGLBuffer originalIndexBufferObj{ QOpenGLBuffer::IndexBuffer };
+    QOpenGLBuffer originalShaddig;
 
     int selectedFace = -1;
     int chosenVertex = -1;
@@ -104,7 +114,7 @@ protected:
     QPointF wpos;
 
 
-
+    std::vector< TracedStitch > tracedMesh;
     std::vector< std::vector< EmbeddedVertex > > activeChains;
     std::vector< std::vector< Stitch > > activeStitches;
     RowColGraph rowColGraph;
@@ -160,13 +170,14 @@ protected:
     void paintPickFrame();
     void paintPath(QVector3D, QVector3D, float, float, float);
     void paintPickedFace(int);
-    void paintMesh();
+    void paintOriginalMesh();
     void paintInterpolatedMesh();
     void paintFirstActiveChains();
     void paintSliceMesh();
     void paintSphere(QVector3D, float);
     void paintLinks();
     void paintNextChains();
+    void paintTraced();
 
     void buildmvpMatrix();
     void mousePressEvent(QMouseEvent* event);
@@ -190,8 +201,8 @@ protected:
     void decreaseConstraintValue();
     int getClosestConstraint();
 
-
-
-
+    //temp function, will be deleted later
+    void paintCube(QVector3D, float sideLen);
+    void deleteConstraint();
 };
 

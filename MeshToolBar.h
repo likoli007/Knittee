@@ -13,14 +13,8 @@
 #include <qradiobutton.h>
 #include <qcheckbox.h>
 
-//TODO: the following
-/*TODO
-autostep DONE, edit knitgraph
-perhaps a saving of the different steps such that it can be replayed?
-generate knitout
-output to a machine file
-*/
 
+#include "HelperText.h"
 
 class MeshToolBar : public QWidget {
     Q_OBJECT
@@ -29,7 +23,7 @@ public:
     MeshToolBar(QWidget* parent = nullptr);
     void knitGraphCreated();
 signals:
-    void constraintsButtonClicked();
+    void constraintsButtonClicked(bool);
     void doneButtonClicked();
     void widthChanged(float width);
     void heightChanged(float height);
@@ -40,6 +34,7 @@ signals:
     void showInterpolatedChanged(int state);
     void showGraphChanged(int state);
     void showTracedChanged(int state);
+    void helpBoxCommunication(QString message);
 private slots:
     void knitGraphTraced() {
         qDebug() << "mesh toolbar received knit graph traced signal";
@@ -79,27 +74,28 @@ private slots:
     }
 
     void onConstraintsButtonClicked() {
-        qDebug() << "Constraints button clicked";
-
         if (constraintChoice != 1) {
-            constraintsModeButton->setText("Cancel Constraint Adding");
+            constraintsModeButton->setText("Cancel Constraints Mode");
             constraintChoice = 1;
-            emit constraintsButtonClicked();
+            emit helpBoxCommunication(HelperText::constraintText);
+            emit constraintsButtonClicked(true);
         }
         else {
-            constraintsModeButton->setText("Add Constraints");
+            constraintsModeButton->setText("Constraints Mode");
             constraintChoice = -1;
-            emit doneButtonClicked();
+            emit helpBoxCommunication(HelperText::constraintEndText);
+            emit constraintsButtonClicked(false);
         }
 
         
     }
     void onRemeshButtonClicked() {
-        qDebug() << "Remesh button clicked";
+        emit helpBoxCommunication(HelperText::interpolateText);
         stepButton->setDisabled(false);
         autoStepButton->setDisabled(false);
         showInterpolatedCheck->setDisabled(false);
         showInterpolatedCheck->setChecked(true);
+        
         emit remeshButtonClicked();
     }
     void onTraceButtonClicked() {
@@ -131,6 +127,9 @@ private:
 
     QSpinBox* stepSpinBox;
     QPushButton* autoStepButton;
+
+    QPushButton* generateKnitoutButton;
+    
 
     QCheckBox* showInterpolatedCheck;
     QCheckBox* showGraphCheck;

@@ -1,5 +1,5 @@
 #include "Knittee.h"
-
+#include "HelperText.h"
 
 Knittee::Knittee(QWidget* parent)
     : QMainWindow(parent)
@@ -45,23 +45,6 @@ Knittee::Knittee(QWidget* parent)
 
     setMenuBar(topMenu);
 
-
-    QObject::connect(newProjectAction, &QAction::triggered, this, &Knittee::openNewProjectWindow);
-    QObject::connect(loadAction, &QAction::triggered, this, &Knittee::selectProject);
-    QObject::connect(exitAction, &QAction::triggered, this, &QApplication::quit);
-    QObject::connect(optionsMenu, &QMenu::triggered, this, &Knittee::openOptionsWindow);
-    QObject::connect(helpAction, &QAction::triggered, this, &Knittee::openHelpWindow);
-    QObject::connect(aboutAction, &QAction::triggered, this, &Knittee::openAboutWindow);
-    QObject::connect(toolsWidget, SIGNAL(constraintsButtonClicked()), this, SLOT(setConstraintsMode()));
-    QObject::connect(toolsWidget, SIGNAL(doneButtonClicked()), this, SLOT(handleToolbarDone()));
-    QObject::connect(toolsWidget, SIGNAL(remeshButtonClicked()), this, SLOT(startRemeshing()));
-    QObject::connect(toolsWidget, SIGNAL(widthChanged(float)), &knitGrapher, SLOT(setStitchWidth(float)));
-    QObject::connect(toolsWidget, SIGNAL(heightChanged(float)), &knitGrapher, SLOT(setStitchHeight(float)));
-    QObject::connect(toolsWidget, SIGNAL(unitChanged(float)), &knitGrapher, SLOT(setModelUnitLength(float)));
-    QObject::connect(toolsWidget, SIGNAL(stepButtonClicked()), &knitGrapher, SLOT(stepButtonClicked()));
-    QObject::connect(toolsWidget, SIGNAL(traceButtonClicked()), &knitGrapher, SLOT(traceButtonClicked()));
-    
-
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
     visualizerLayout = new QHBoxLayout(this);
@@ -72,6 +55,26 @@ Knittee::Knittee(QWidget* parent)
     vis->setMinimumSize(800, 600); // Set a minimum size for the widget
     visualizerLayout->addLayout(optionsLayout);
     visualizerLayout->addWidget(vis);
+
+    QObject::connect(newProjectAction, &QAction::triggered, this, &Knittee::openNewProjectWindow);
+    QObject::connect(loadAction, &QAction::triggered, this, &Knittee::selectProject);
+    QObject::connect(exitAction, &QAction::triggered, this, &QApplication::quit);
+    QObject::connect(optionsMenu, &QMenu::triggered, this, &Knittee::openOptionsWindow);
+    QObject::connect(helpAction, &QAction::triggered, this, &Knittee::openHelpWindow);
+    QObject::connect(aboutAction, &QAction::triggered, this, &Knittee::openAboutWindow);
+    QObject::connect(toolsWidget, SIGNAL(constraintsButtonClicked(bool)), vis, SLOT(setConstraintsMode(bool)));
+    //QObject::connect(toolsWidget, SIGNAL(doneButtonClicked()), this, SLOT(handleToolbarDone()));
+    QObject::connect(toolsWidget, SIGNAL(remeshButtonClicked()), this, SLOT(startRemeshing()));
+    QObject::connect(toolsWidget, SIGNAL(widthChanged(float)), &knitGrapher, SLOT(setStitchWidth(float)));
+    QObject::connect(toolsWidget, SIGNAL(heightChanged(float)), &knitGrapher, SLOT(setStitchHeight(float)));
+    QObject::connect(toolsWidget, SIGNAL(unitChanged(float)), &knitGrapher, SLOT(setModelUnitLength(float)));
+    QObject::connect(toolsWidget, SIGNAL(stepButtonClicked()), &knitGrapher, SLOT(stepButtonClicked()));
+    QObject::connect(toolsWidget, SIGNAL(traceButtonClicked()), &knitGrapher, SLOT(traceButtonClicked()));
+    
+    QObject::connect(vis, SIGNAL(requestConstraintsSave()), this, SLOT(saveConstraints()));
+    
+
+
 
     QObject::connect(&knitGrapher, SIGNAL(knitGraphInterpolated(ObjectMesh, std::vector<float>)), this, SLOT(meshInterpolated(ObjectMesh, std::vector<float>)));
     QObject::connect(&knitGrapher, SIGNAL(firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >*, std::vector< std::vector< Stitch > >*, RowColGraph*)), 
@@ -84,11 +87,15 @@ Knittee::Knittee(QWidget* parent)
    
     QObject::connect(&knitGrapher, SIGNAL(knitGraphTraced(std::vector< TracedStitch >*)), this, SLOT(knitGraphTraced(std::vector< TracedStitch >*)));
     QObject::connect(&knitGrapher, SIGNAL(knitGraphTraced(std::vector< TracedStitch >*)), toolsWidget, SLOT(knitGraphTraced()));
+    QObject::connect(&knitGrapher, SIGNAL(knitGraphTraced(std::vector< TracedStitch >*)), vis, SLOT(knitGraphTraced(std::vector< TracedStitch >*)));
     //QObject::connect(&knitGrapher, SIGNAL)
     QObject::connect(toolsWidget, SIGNAL(showInterpolatedChanged(int)), vis, SLOT(showInterpolatedChanged(int)));
     QObject::connect(toolsWidget, SIGNAL(showGraphChanged(int)), vis, SLOT(showGraphChanged(int)));
     QObject::connect(toolsWidget, SIGNAL(showTracedChanged(int)), vis, SLOT(showTracedChanged(int)));
 
+
+    QObject::connect(toolsWidget, SIGNAL(helpBoxCommunication(QString)),this, SLOT(helpBoxCommunication(QString)));
+    QObject::connect(&knitGrapher, SIGNAL(helpBoxCommunication(QString)), this, SLOT(helpBoxCommunication(QString)));
 
     messageTextEdit = new QTextEdit(this);
     messageTextEdit->setReadOnly(true);
@@ -98,9 +105,17 @@ Knittee::Knittee(QWidget* parent)
     mainLayout->addLayout(visualizerLayout);
     mainLayout->addWidget(messageTextEdit);
 
+    mainLayout->setStretchFactor(visualizerLayout, 3);
+    mainLayout->setStretchFactor(messageTextEdit, 1);
+
     QWidget* centralWidget = new QWidget(this);
     centralWidget->setLayout(mainLayout);
+
     setCentralWidget(centralWidget);
+}
+
+void Knittee::helpBoxCommunication(QString message) {
+	messageTextEdit->setText(message);
 }
 
 void Knittee::knitGraphTraced(std::vector< TracedStitch >* traced_stitches) {
@@ -316,7 +331,6 @@ void Knittee::loadConstraints() {
 
 void Knittee::start3DProject(ProjectInfo context)
 {
-    qDebug() << "starting 3D project: " << context.objectFilePath;
     object_loader.setFilePath(context.objectFilePath);
     ObjectMesh mesh = object_loader.loadFile();
 
@@ -326,10 +340,13 @@ void Knittee::start3DProject(ProjectInfo context)
     vis->loadMesh(mesh);
     knitGrapher.setOriginalMesh(mesh);
 
+    helpBoxCommunication(HelperText::project3DText);
+
     visualizerLayout->removeItem(visualizerLayout->itemAt(0));
     visualizerLayout->insertWidget(0, toolsWidget);
-    // Handle selected options
-    // context.type, context.file, etc. contain the selected values
+    visualizerLayout->setStretchFactor(vis, 3); 
+    visualizerLayout->setStretchFactor(toolsWidget, 1);
+
 }
 
 
@@ -412,7 +429,6 @@ void Knittee::openNewProjectWindow()
 
 void Knittee::setUpNew3DProject(ProjectInfo context)
 {
-    qDebug() << "Setting up 3D project with file: " << context.objectFilePath;
     //store the project information in the new folder
     QString projectFolderPath = QCoreApplication::applicationDirPath() + "/Projects/" + context.projectName;
     QDir().mkpath(projectFolderPath);
@@ -484,8 +500,7 @@ void Knittee::handleNewProject(ProjectInfo options)
 
 void Knittee::setConstraintsMode()
 {
-    vis->setConstraintsMode();
-    messageTextEdit->setText("Constraints mode enabled. Press 'C' while hovering over the mesh to add a constraint.\nOnce done, press 'ENTER' to finish");
+    //vis->setConstraintsMode();
 }
 
 
