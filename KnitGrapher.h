@@ -274,6 +274,7 @@ private:
 public:
 	KnitGrapher(QObject* parent = nullptr);
 	void constructNewMesh(std::vector<Constraint*> constraints);
+	void reset();
 public slots:
 	void setStitchWidth(float width);
 	void setStitchHeight(float height);

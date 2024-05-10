@@ -29,6 +29,8 @@ public:
     ~Visualizer();
     void loadMesh(ObjectMesh loaded_mesh);
     
+    void reset();
+
     std::vector<Constraint*> getConstraints();
     void setConstraints(std::vector<Constraint*>);
     void peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > >*, std::vector< std::vector< uint32_t > >*);
@@ -204,5 +206,8 @@ protected:
     //temp function, will be deleted later
     void paintCube(QVector3D, float sideLen);
     void deleteConstraint();
+
+
+    void loadInterpolated();
 };
 

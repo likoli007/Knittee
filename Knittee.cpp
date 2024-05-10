@@ -11,7 +11,7 @@ Knittee::Knittee(QWidget* parent)
     auto topMenu = this->menuBar();//new QMenuBar(this);
 
     auto projectMenu = new QMenu(topMenu); //project menu: user can open a new project (2D or 3D), load an existing one etc.
-    auto optionsMenu = new QMenu(topMenu); //options menu: will be able to select some basic options regarding the whole app
+    //auto optionsMenu = new QMenu(topMenu); //options menu: will be able to select some basic options regarding the whole app
     auto helpAction = new QAction("&Help");    //help menu: get the current working context (2D or 3D modelling), and display related help
     auto aboutAction = new QAction("&About");   //about menu: display some basic information about the project
 
@@ -34,12 +34,13 @@ Knittee::Knittee(QWidget* parent)
     projectMenu->setTitle("Project");
 
 
-    optionsMenu->setTitle("Options");
+    //optionsMenu->setTitle("Options");
 
-    toolsWidget = new MeshToolBar(this);
+    meshToolsWidget = new MeshToolBar(this);
+    sheetToolsWidget = new SheetToolBar(this);
 
     topMenu->addMenu(projectMenu);
-    topMenu->addMenu(optionsMenu);
+    //topMenu->addMenu(optionsMenu);
     topMenu->addAction(helpAction);
     topMenu->addAction(aboutAction);
 
@@ -59,17 +60,17 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(newProjectAction, &QAction::triggered, this, &Knittee::openNewProjectWindow);
     QObject::connect(loadAction, &QAction::triggered, this, &Knittee::selectProject);
     QObject::connect(exitAction, &QAction::triggered, this, &QApplication::quit);
-    QObject::connect(optionsMenu, &QMenu::triggered, this, &Knittee::openOptionsWindow);
+    //QObject::connect(optionsMenu, &QMenu::triggered, this, &Knittee::openOptionsWindow);
     QObject::connect(helpAction, &QAction::triggered, this, &Knittee::openHelpWindow);
     QObject::connect(aboutAction, &QAction::triggered, this, &Knittee::openAboutWindow);
-    QObject::connect(toolsWidget, SIGNAL(constraintsButtonClicked(bool)), vis, SLOT(setConstraintsMode(bool)));
+    QObject::connect(meshToolsWidget, SIGNAL(constraintsButtonClicked(bool)), vis, SLOT(setConstraintsMode(bool)));
     //QObject::connect(toolsWidget, SIGNAL(doneButtonClicked()), this, SLOT(handleToolbarDone()));
-    QObject::connect(toolsWidget, SIGNAL(remeshButtonClicked()), this, SLOT(startRemeshing()));
-    QObject::connect(toolsWidget, SIGNAL(widthChanged(float)), &knitGrapher, SLOT(setStitchWidth(float)));
-    QObject::connect(toolsWidget, SIGNAL(heightChanged(float)), &knitGrapher, SLOT(setStitchHeight(float)));
-    QObject::connect(toolsWidget, SIGNAL(unitChanged(float)), &knitGrapher, SLOT(setModelUnitLength(float)));
-    QObject::connect(toolsWidget, SIGNAL(stepButtonClicked()), &knitGrapher, SLOT(stepButtonClicked()));
-    QObject::connect(toolsWidget, SIGNAL(traceButtonClicked()), &knitGrapher, SLOT(traceButtonClicked()));
+    QObject::connect(meshToolsWidget, SIGNAL(remeshButtonClicked()), this, SLOT(startRemeshing()));
+    QObject::connect(meshToolsWidget, SIGNAL(widthChanged(float)), &knitGrapher, SLOT(setStitchWidth(float)));
+    QObject::connect(meshToolsWidget, SIGNAL(heightChanged(float)), &knitGrapher, SLOT(setStitchHeight(float)));
+    QObject::connect(meshToolsWidget, SIGNAL(unitChanged(float)), &knitGrapher, SLOT(setModelUnitLength(float)));
+    QObject::connect(meshToolsWidget, SIGNAL(stepButtonClicked()), &knitGrapher, SLOT(stepButtonClicked()));
+    QObject::connect(meshToolsWidget, SIGNAL(traceButtonClicked()), &knitGrapher, SLOT(traceButtonClicked()));
     
     QObject::connect(vis, SIGNAL(requestConstraintsSave()), this, SLOT(saveConstraints()));
     
@@ -86,16 +87,20 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(&knitGrapher, SIGNAL(knitGraphCreated()), this, SLOT(knitGraphCreated()));
    
     QObject::connect(&knitGrapher, SIGNAL(knitGraphTraced(std::vector< TracedStitch >*)), this, SLOT(knitGraphTraced(std::vector< TracedStitch >*)));
-    QObject::connect(&knitGrapher, SIGNAL(knitGraphTraced(std::vector< TracedStitch >*)), toolsWidget, SLOT(knitGraphTraced()));
+    QObject::connect(&knitGrapher, SIGNAL(knitGraphTraced(std::vector< TracedStitch >*)), meshToolsWidget, SLOT(knitGraphTraced()));
     QObject::connect(&knitGrapher, SIGNAL(knitGraphTraced(std::vector< TracedStitch >*)), vis, SLOT(knitGraphTraced(std::vector< TracedStitch >*)));
     //QObject::connect(&knitGrapher, SIGNAL)
-    QObject::connect(toolsWidget, SIGNAL(showInterpolatedChanged(int)), vis, SLOT(showInterpolatedChanged(int)));
-    QObject::connect(toolsWidget, SIGNAL(showGraphChanged(int)), vis, SLOT(showGraphChanged(int)));
-    QObject::connect(toolsWidget, SIGNAL(showTracedChanged(int)), vis, SLOT(showTracedChanged(int)));
+    QObject::connect(meshToolsWidget, SIGNAL(showInterpolatedChanged(int)), vis, SLOT(showInterpolatedChanged(int)));
+    QObject::connect(meshToolsWidget, SIGNAL(showGraphChanged(int)), vis, SLOT(showGraphChanged(int)));
+    QObject::connect(meshToolsWidget, SIGNAL(showTracedChanged(int)), vis, SLOT(showTracedChanged(int)));
 
 
-    QObject::connect(toolsWidget, SIGNAL(helpBoxCommunication(QString)),this, SLOT(helpBoxCommunication(QString)));
+    QObject::connect(meshToolsWidget, SIGNAL(helpBoxCommunication(QString)),this, SLOT(helpBoxCommunication(QString)));
     QObject::connect(&knitGrapher, SIGNAL(helpBoxCommunication(QString)), this, SLOT(helpBoxCommunication(QString)));
+
+    QObject::connect(meshToolsWidget, SIGNAL(resetButtonClicked()), this, SLOT(resetButtonClicked()));
+
+    QObject::connect(sheetToolsWidget, SIGNAL(sheetSizeChanged(int, int)), &laceKnitter, SLOT(createSheet(int, int)));
 
     messageTextEdit = new QTextEdit(this);
     messageTextEdit->setReadOnly(true);
@@ -112,6 +117,11 @@ Knittee::Knittee(QWidget* parent)
     centralWidget->setLayout(mainLayout);
 
     setCentralWidget(centralWidget);
+}
+
+void Knittee::resetButtonClicked() {
+	vis->reset();
+	knitGrapher.reset();
 }
 
 void Knittee::helpBoxCommunication(QString message) {
@@ -163,7 +173,7 @@ void Knittee::saveTraced(std::vector< TracedStitch >* traced_stitches) {
 
 void Knittee::knitGraphCreated()
 {
-    toolsWidget->knitGraphCreated();
+    meshToolsWidget->knitGraphCreated();
 }
 
 void Knittee::nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >* active_chains) {
@@ -332,6 +342,8 @@ void Knittee::loadConstraints() {
 void Knittee::start3DProject(ProjectInfo context)
 {
     object_loader.setFilePath(context.objectFilePath);
+    meshToolsWidget->resetButtonClicked();
+
     ObjectMesh mesh = object_loader.loadFile();
 
     loadConstraints();
@@ -343,9 +355,11 @@ void Knittee::start3DProject(ProjectInfo context)
     helpBoxCommunication(HelperText::project3DText);
 
     visualizerLayout->removeItem(visualizerLayout->itemAt(0));
-    visualizerLayout->insertWidget(0, toolsWidget);
+    visualizerLayout->insertWidget(0, meshToolsWidget);
     visualizerLayout->setStretchFactor(vis, 3); 
-    visualizerLayout->setStretchFactor(toolsWidget, 1);
+    visualizerLayout->setStretchFactor(meshToolsWidget, 1);
+
+   
 
 }
 
@@ -359,7 +373,9 @@ void Knittee::start2DProject(ProjectInfo context)
     laceKnitter.loadFromFile(projectPath);
 
     visualizerLayout->removeItem(visualizerLayout->itemAt(0));
-    visualizerLayout->insertWidget(0, toolsWidget);
+    visualizerLayout->insertWidget(0, sheetToolsWidget);
+    visualizerLayout->setStretchFactor(vis, 3);
+    visualizerLayout->setStretchFactor(sheetToolsWidget, 1);
 }
 
 void Knittee::openOptionsWindow()
@@ -367,7 +383,6 @@ void Knittee::openOptionsWindow()
     QMainWindow* optionsWindow = new QMainWindow(this);
     optionsWindow->setAttribute(Qt::WA_DeleteOnClose);
     optionsWindow->show();
-    qDebug() << "Shown Options Menu...";
 }
 
 void Knittee::openAboutWindow()
@@ -375,8 +390,7 @@ void Knittee::openAboutWindow()
     QDialog* aboutDialog = new QDialog(this); //needs to have 'this'?
     QString aboutText;
 
-    aboutText = QString("Knittee is a 2D sheet and 3D object to Knit instruction CAD software \n") +
-        QString("designed by Alojz Holubek as part of his bachelor's thesis at Zhejiang University\n");
+    aboutText = HelperText::aboutWindowText;
 
 
     aboutDialog->setWindowTitle("About This Software");
@@ -386,7 +400,6 @@ void Knittee::openAboutWindow()
     aboutDialog->setLayout(layout);
 
     aboutDialog->exec();
-    qDebug() << "Shown About Menu...";
 }
 
 void Knittee::openHelpWindow()
@@ -396,13 +409,11 @@ void Knittee::openHelpWindow()
 
     if (modellingType == 0)
     {
-        helpText = "Welcome to Knittee 2D/3D knitted objects modelling software!\n",
-            "Instructions for 3D modelling: to be written here!";
+        helpText = HelperText::helpWindowText3D;
     }
     else
     {
-        helpText = "Welcome to Knittee 2D/3D knitted objects modelling software!\n",
-            "Instructions for 2D modelling: to be written here!";
+        helpText = HelperText::helpWindowText2D;
     }
 
     //show the help dialog with the relevant help information
@@ -415,7 +426,6 @@ void Knittee::openHelpWindow()
     helpDialog->setLayout(layout);
 
     helpDialog->exec();
-    qDebug() << "Shown Help Menu...";
 }
 
 

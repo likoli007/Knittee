@@ -121,6 +121,7 @@
     <ClCompile Include="RowColGraph.cpp" />
     <ClCompile Include="ScheduleCost.cpp" />
     <ClCompile Include="Shape.cpp" />
+    <ClCompile Include="SheetToolBar.cpp" />
     <ClCompile Include="Stitch.cpp" />
     <ClCompile Include="TracedStitch.cpp" />
     <ClCompile Include="Typeset.cpp" />
@@ -149,6 +150,7 @@
     <ClInclude Include="PlanTransfersHelpers.h" />
     <ClInclude Include="ScheduleCost.h" />
     <ClInclude Include="Shape.h" />
+    <QtMoc Include="SheetToolBar.h" />
     <ClInclude Include="TracedStitch.h" />
     <ClInclude Include="Typeset.h" />
     <QtMoc Include="KnitGrapher.h" />

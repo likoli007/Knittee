@@ -32,7 +32,10 @@ void LaceKnitter::setDimensions(int w, int h)
 {
 	sheetWidth = w;
 	sheetHeight = h;
+
 }
+
+
 
 void LaceKnitter::loadFromFile(QString filename)
 {

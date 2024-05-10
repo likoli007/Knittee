@@ -20,6 +20,34 @@ KnitGrapher::KnitGrapher(QObject* parent) : QObject(parent)
 
 }
 
+
+void KnitGrapher::reset()
+{
+	//reset all the variables to their default values
+	stitchWidth = 3.66f;
+	stitchHeight = 1.73f;
+	//modelUnitLength = 10.0f;
+	stepCount = 0;
+	//constraints.clear();
+	//originalMesh = AutoKnitMesh();
+	newMesh.clear();
+	constrained_values.clear();
+	graph.clear();
+	slice.clear();
+	sliceOnModel.clear();
+	sliceActiveChains.clear();
+	sliceNextChains.clear();
+	nextUsedBoundary.clear();
+	sliceTimes.clear();
+	nextActiveChains.clear();
+	nextActiveStitches.clear();
+	nextStitches.clear();
+	links.clear();
+
+
+}
+
+
 /*
 *	Function: set the original mesh that will be used to create the knit graph
 *		this mesh will be remeshed and interpolated to create a new mesh that the AutoKnit algorithms will run on

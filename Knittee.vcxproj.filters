@@ -112,6 +112,9 @@
     <ClCompile Include="HelperText.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="SheetToolBar.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ObjHandler.h">
@@ -190,6 +193,9 @@
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="KnitoutSheduler.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="SheetToolBar.h">
       <Filter>Header Files</Filter>
     </QtMoc>
   </ItemGroup>

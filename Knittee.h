@@ -31,6 +31,7 @@
 #include "KnitOutStitch.h"
 #include "TracedStitch.h"
 #include "KnitoutSheduler.h"
+#include "SheetToolBar.h"
 
 /*
 * This is the main class that will be used to create the GUI for the program
@@ -129,6 +130,7 @@ private slots:
     void knitGraphTraced(std::vector< TracedStitch >*);
     void helpBoxCommunication(QString);
     void saveConstraints();
+    void resetButtonClicked();
 private:
     void saveTraced(std::vector< TracedStitch >*);
 
@@ -141,7 +143,8 @@ private:
     KnitGrapher knitGrapher;
     KnitoutScheduler knitoutScheduler;
     LaceKnitter laceKnitter;
-    MeshToolBar* toolsWidget;
+    MeshToolBar* meshToolsWidget;
+    SheetToolBar* sheetToolsWidget;
     QHBoxLayout* visualizerLayout;
     QString projectPath;
     //bottom textedit for messages to user

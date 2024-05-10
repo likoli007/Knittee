@@ -22,6 +22,7 @@ class MeshToolBar : public QWidget {
 public:
     MeshToolBar(QWidget* parent = nullptr);
     void knitGraphCreated();
+    void initializeUI();
 signals:
     void constraintsButtonClicked(bool);
     void doneButtonClicked();
@@ -35,10 +36,14 @@ signals:
     void showGraphChanged(int state);
     void showTracedChanged(int state);
     void helpBoxCommunication(QString message);
+    void resetButtonClicked();
 private slots:
     void knitGraphTraced() {
-        qDebug() << "mesh toolbar received knit graph traced signal";
-
+        generateKnitoutButton->setDisabled(false);
+        showTracedCheck->setDisabled(false);
+        showGraphCheck->setChecked(false);
+        showInterpolatedCheck->setChecked(false);
+        showTracedCheck->setChecked(true);
     }
 
     void onAutoStepButtonClicked() {
@@ -103,7 +108,6 @@ private slots:
     }
 
     void onShowInterpolatedButtonClicked(int state) {
-        qDebug() << "emitting";
         emit showInterpolatedChanged(state);
 	}
     void onShowGraphButtonClicked(int state) {
@@ -112,6 +116,17 @@ private slots:
     void onShowTracedButtonClicked(int state) {
         emit showTracedChanged(state);
     }
+
+    void onResetButtonClicked() {
+		emit helpBoxCommunication(HelperText::resetText);
+        initializeUI();
+        constraintsModeButton->setText("Constraints Mode");
+        constraintChoice = 0;
+        showInterpolatedCheck->setChecked(false);
+        showTracedCheck->setChecked(false);
+        showGraphCheck->setChecked(false);
+		emit resetButtonClicked();
+	}
 
 private:
     // Will have a slew of functions that pass the user specified options to the visualizer/algorithm program
@@ -130,6 +145,7 @@ private:
 
     QPushButton* generateKnitoutButton;
     
+    QPushButton* resetButton;
 
     QCheckBox* showInterpolatedCheck;
     QCheckBox* showGraphCheck;
@@ -144,5 +160,7 @@ private:
 
 
     int constraintChoice = 0;
+
+
 
 };

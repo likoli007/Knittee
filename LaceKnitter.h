@@ -23,11 +23,14 @@ public:
 	void createSheet(int w, int h);
 	void setDimensions(int w, int h);
 
+
 	void saveToFile(QString);
 	void loadFromFile(QString);
 
+
 signals:
 	void sheetChanged(std::vector<std::vector<FlatPoint>>* sheet);
+
 
 };
 

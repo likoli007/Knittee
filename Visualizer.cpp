@@ -227,7 +227,7 @@ void Visualizer::firstActiveChainsCreated(std::vector< std::vector< EmbeddedVert
     std::vector< std::vector< Stitch > >* active_stitches,
     RowColGraph* graph) {
 
-    qDebug() << "FIRST ACTIVE CHAINS ARRIVED AT VISUALIZER";
+    //qDebug() << "FIRST ACTIVE CHAINS ARRIVED AT VISUALIZER";
 
 
 
@@ -239,7 +239,8 @@ void Visualizer::firstActiveChainsCreated(std::vector< std::vector< EmbeddedVert
 
 
     showFirstChains = true;
-    showInterpolated = true;
+    showConstraints = false;
+    showInterpolated = false;
     showLinks = false;
     showSlice = false;
     showSliceChains = false;
@@ -415,7 +416,45 @@ void Visualizer::paintPath(QVector3D start, QVector3D end, float r, float g, flo
     glEnd();
 }
 
+void Visualizer::reset() {
+    interpolatedMesh.clear();
+    interpolatedValues.clear();
+    activeChains.clear();
+    activeStitches.clear();
+    rowColGraph.clear();
+    showFirstChains = false;
+    showInterpolated = false;
+    showLinks = false;
+    showSlice = false;
+    showSliceChains = false;
+    sliceMesh.clear();
+    sliceActiveChains.clear();
+    sliceNextChains.clear();
+    nextStitches.clear();
+    links.clear();
+    nextActiveChains.clear();
+    showNextChains = false;
+    showGraph = false;
+    showTraced = false;
+    tracedMesh.clear();
+    addingConstraints = false;
 
+    
+
+    showModel = true;
+    showConstraints= true;
+
+    translateX = 0.0f;
+    translateY = 0.0f;
+    translateZ = -5.0f;
+    m_rotationAngleX = 0.0f;
+    m_rotationAngleY = 0.0f;
+    zoomLevel = 1.0f;
+    rotationAngle = 0.0f;
+
+    loadMesh(mesh);
+
+}
 
 /*
 *   Function: paints all the constraints of different constraint sets iteratively
@@ -525,7 +564,52 @@ void Visualizer::paintOriginalMesh()
     glBindVertexArray(0);
 }
 
+void Visualizer::loadInterpolated() {
+    float min = -1.0f;
+    float max = 1.0f;
+
+    for (auto v : interpolatedValues) {
+        min = std::min(min, v);
+        max = std::max(max, v);
+    }
+
+
+    std::vector< float > texcoords;
+    for (auto v : interpolatedValues) {
+        texcoords.emplace_back(
+            (((v - min) / (max - min)) * (TimeTexSize - 1) + 0.5f) / float(TimeTexSize));
+        texcoords.emplace_back(0.5f);
+    }
+
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+    // Set up the vertex buffer data
+    glBufferData(GL_ARRAY_BUFFER, interpolatedMesh.vertices.size() * sizeof(QVector3D), interpolatedMesh.vertices.data(), GL_STATIC_DRAW);
+
+    // Create and bind the index buffer
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, interpolatedMesh.indices.size() * sizeof(GLuint), interpolatedMesh.indices.data(), GL_STATIC_DRAW);
+    GLenum error;
+    while ((error = glGetError()) != GL_NO_ERROR) {
+        qDebug() << "OpenGL error: " << error;
+    }
+    // Specify the format of the vertex data (position only)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), nullptr);
+
+
+    glBindBuffer(GL_ARRAY_BUFFER, coordsBuffer);
+    glBufferData(GL_ARRAY_BUFFER, texcoords.size() * sizeof(float), texcoords.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glFinish();
+}
+
 void Visualizer::paintInterpolatedMesh() {
+
+    loadInterpolated();
+
     glClearColor(0.0f, 0.0f, 0.5451f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
@@ -618,7 +702,7 @@ void Visualizer:: paintCube(QVector3D center, float sideLength) {
 }
 
 void Visualizer::paintTraced() {
-    std::vector<glm::vec3> colors = { glm::vec3(1.0f,0.0f,0.0f), glm::vec3(0.0f, 1.0f, 0.0f),
+    std::vector<glm::vec3> ycolors = { glm::vec3(1.0f,0.0f,0.0f), glm::vec3(0.0f, 1.0f, 0.0f),
         glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(1.0f, 0.0f, 1.0f), glm::vec3(0.0f, 1.0f, 1.0f),
     glm::vec3(1.0f, 1.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f)};
     
@@ -626,14 +710,14 @@ void Visualizer::paintTraced() {
 
     for (int i = 1; i < tracedMesh.size(); i++) {
         if (tracedMesh[i].yarn != tracedMesh[i - 1].yarn) {
-            yarnColor = (yarnColor + 1) % colors.size();
+            yarnColor = (yarnColor + 1) % ycolors.size();
             continue;
         }
         QVector3D start = QVector3D(tracedMesh[i - 1].at.x, tracedMesh[i - 1].at.y, tracedMesh[i - 1].at.z);
         QVector3D end = QVector3D(tracedMesh[i].at.x, tracedMesh[i].at.y, tracedMesh[i].at.z);
         paintPath(
             start, end,
-            colors[yarnColor].x, colors[yarnColor].y, colors[yarnColor].z);
+            ycolors[yarnColor].x, ycolors[yarnColor].y, ycolors[yarnColor].z);
     }
     for (int i = 0; i < tracedMesh.size(); i++) {
         glm::vec3 const& at = tracedMesh[i].at;
@@ -1168,6 +1252,9 @@ void Visualizer::paintGL()
             //glEnable(GL_DEPTH_TEST);
             //paintInterpolatedMesh();
             //qDebug() << "drawing first active chains";
+            if (showSlice) {
+                paintSliceMesh();
+            }
             paintFirstActiveChains();
         }
         if (showSlice) {
@@ -1544,9 +1631,11 @@ void Visualizer::showInterpolatedChanged(int state) {
 void Visualizer::showGraphChanged(int state) {
     if (state == Qt::Checked) {
 		showGraph = true;
+        showFirstChains = true;
 	}
     else if (state == Qt::Unchecked) {
 		showGraph = false;
+        showFirstChains = false;
 	}
 }
 

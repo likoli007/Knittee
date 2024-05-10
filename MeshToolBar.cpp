@@ -1,5 +1,17 @@
 #include "MeshToolBar.h"
 
+void MeshToolBar::initializeUI() {
+    // Set the buttons to be checkable
+    showInterpolatedCheck->setDisabled(true);
+    showGraphCheck->setDisabled(true);
+    showTracedCheck->setDisabled(true);
+    generateKnitoutButton->setDisabled(true);
+    traceButton->setDisabled(true);
+    stepButton->setDisabled(true);
+    autoStepButton->setDisabled(true);
+
+}
+
 MeshToolBar::MeshToolBar(QWidget* parent) {
 
     QFrame* meshSeparator = new QFrame();
@@ -61,13 +73,12 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     constraintsModeButton = new QPushButton("Constraints Mode", this);
     remeshButton = new QPushButton("Interpolate Mesh", this);
     stepButton = new QPushButton("Step", this);
-    stepButton->setDisabled(true);
 
 
 
 
     autoStepButton = new QPushButton("Auto Step", this);
-    autoStepButton->setDisabled(true);
+    
 
     stepSpinBox = new QSpinBox();
     stepSpinBox->setMinimum(1);
@@ -79,22 +90,21 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     stepLayout->addWidget(autoStepButton);
 
     traceButton = new QPushButton("Trace Graph", this);
-    traceButton->setDisabled(true);
+    
 
 
     showInterpolatedCheck = new QCheckBox("Mesh");
     showGraphCheck = new QCheckBox("Graph");
     showTracedCheck = new QCheckBox("Traced");
 
-    // Set the buttons to be checkable
-    showInterpolatedCheck->setDisabled(true);
-    showGraphCheck->setDisabled(true);
-    showTracedCheck->setDisabled(true);
+    
 
     // Create a layout for the radio buttons
     QHBoxLayout* showLayout = new QHBoxLayout;
     
 
+
+    resetButton = new QPushButton("Reset", this);
 
     QObject::connect(autoStepButton, &QPushButton::clicked, this, &MeshToolBar::onAutoStepButtonClicked);
     QObject::connect(constraintsModeButton, &QPushButton::clicked, this, &MeshToolBar::onConstraintsButtonClicked);
@@ -110,7 +120,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     QObject::connect(showInterpolatedCheck, &QCheckBox::stateChanged, this, &MeshToolBar::onShowInterpolatedButtonClicked);
     QObject::connect(showGraphCheck, &QCheckBox::stateChanged, this, &MeshToolBar::onShowGraphButtonClicked);
     QObject::connect(showTracedCheck, &QCheckBox::stateChanged, this, &MeshToolBar::onShowTracedButtonClicked);
-
+    QObject::connect(resetButton, &QPushButton::clicked, this, &MeshToolBar::onResetButtonClicked);
 
   
 
@@ -141,7 +151,9 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
 
 
     generateKnitoutButton = new QPushButton("Generate Knitout");
-    generateKnitoutButton->setDisabled(true);
+   
+
+
 
     QWidget* spacer = new QWidget();
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -170,16 +182,21 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     mainLayout->addWidget(exportSeparator);
     mainLayout->addWidget(ExportLabel);
     mainLayout->addWidget(generateKnitoutButton);
-
+    mainLayout->addWidget(resetButton);
 
     mainLayout->addWidget(spacer);
     //mainLayout->addWidget(label3);
     mainLayout->addLayout(showLayout);
     setLayout(mainLayout);
     setMinimumSize(300, 100);
+
+    initializeUI();
 }
 
 void MeshToolBar::knitGraphCreated() {
     traceButton->setDisabled(false);
+    showGraphCheck->setDisabled(false);
+    showGraphCheck->setChecked(true);
+    showInterpolatedCheck->setChecked(false);
 }
 
