@@ -42,7 +42,7 @@ public:
 
 signals:
     void requestConstraintsSave();
-
+    void moveLoop(QPair<int, int>, QPair<int, int>);
 public slots:
     void setConstraintsMode(bool);
     void meshInterpolated(ObjectMesh mesh, std::vector<float> values);
@@ -55,6 +55,11 @@ public slots:
     void showTracedChanged(int state);
     void knitGraphTraced(std::vector< TracedStitch >*);
 protected:
+    //Color information for various steps
+    //glm::vec4 clearColor = { 0.84f, 0.84f, 0.84f, 1.0f };
+    glm::vec4 clearColor = { 0.34f, 0.34f, 0.34f, 1.0f };
+
+
     std::vector<std::vector<FlatPoint>> sheet;
     
     
@@ -164,6 +169,8 @@ protected:
     void initializeGL();
     void resizeGL(int w, int h);
 
+
+    
 
 
     void paintYarn(int x, int y, int ex, int ey);

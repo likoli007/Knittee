@@ -7,6 +7,7 @@
 #include <QSlider>
 #include <qradiobutton.h>
 #include <qcombobox.h>
+#include <qspinbox.h>
 
 class SheetToolBar : public QWidget
 {
@@ -42,10 +43,10 @@ private slots:
 
 	void rightButtonClicked() {
 		if (adding == 1) {
-			emit heightChanged(1, 0);
+			emit widthChanged(1, 0);
 		}
 		else {
-			emit heightChanged(-1, 0);
+			emit widthChanged(-1, 0);
 		}
 	}
 
@@ -64,7 +65,13 @@ private slots:
 		resizeRightButton->setText("<");
 	}
 
+	void rackingSpinBoxChanged() {
+		int value = rackingSpinBox->value();
+		emit rackingChanged(value);
+	}
+
 signals:
+	void rackingChanged(int value);
 	void heightChanged(int height, int side);
 	void widthChanged(int width, int side);
 
@@ -88,6 +95,8 @@ private:
 	QPushButton* generateKnitoutButton;
 
 	QPushButton* exportButton;
+
+	QSpinBox* rackingSpinBox;
 
 	int adding = 1;
 };

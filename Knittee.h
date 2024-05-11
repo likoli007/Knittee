@@ -50,6 +50,7 @@ struct ProjectInfo {
     QString projectName; //name of the project
     int width; //width of the sheet
     int height; //height of the sheet
+    int racking; //racking value of the sheet
 };
 
 
@@ -135,8 +136,8 @@ private:
     void saveTraced(std::vector< TracedStitch >*);
 
 
-    int modellingType = 0; //is the user operating on a 3D model (0) or a 2D sheet? (1), perhaps could be an enum?
-
+    int modellingType = -1; //is the user operating on a 3D model (0) or a 2D sheet? (1), perhaps could be an enum?
+    void closeEvent(QCloseEvent* event) override;
     Ui::KnitteeClass ui;
     ObjHandler object_loader;
     Visualizer* vis;
@@ -150,6 +151,8 @@ private:
     //bottom textedit for messages to user
     QTextEdit* messageTextEdit;
 
+    ProjectInfo context;
+
     bool canSlice = false;
 
     void loadProject(QString);
@@ -157,19 +160,23 @@ private:
     void openHelpWindow();
     void openAboutWindow();
     void openNewProjectWindow();
-    void handleNewProject(ProjectInfo options);
+    void handleNewProject(ProjectInfo info);
     void selectProject();
 
+    void saveProject();
+
     //3D project functions
-    void setUpNew3DProject(ProjectInfo options);
-    void start3DProject(ProjectInfo context);
-    
+    void setUpNew3DProject();
+    void start3DProject();
+    void save3DProject();
     void loadConstraints();
 
     //2D project functions
-    void setUpNew2DProject(ProjectInfo options);
-    void start2DProject(ProjectInfo context);
-    
+    void setUpNew2DProject();
+    void start2DProject();
+    void save2DProject();
+    void save2DContext();
+
 protected:
     void KeyPressEvent(QKeyEvent* event);
 };

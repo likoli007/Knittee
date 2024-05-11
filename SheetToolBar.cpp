@@ -2,6 +2,9 @@
 
 
 SheetToolBar::SheetToolBar(QWidget* parent) {
+    QFrame* rackingSeparator = new QFrame();
+    rackingSeparator->setFrameShape(QFrame::HLine);
+    rackingSeparator->setFrameShadow(QFrame::Raised);
 
     QFrame* resizeSeparator = new QFrame();
     resizeSeparator->setFrameShape(QFrame::HLine);
@@ -61,6 +64,18 @@ SheetToolBar::SheetToolBar(QWidget* parent) {
     QWidget* spacer = new QWidget();
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
+
+    QLabel* rackingLabel = new QLabel("Maximum Racking:");
+    QHBoxLayout* rackingLayout = new QHBoxLayout();
+    rackingLayout->addWidget(rackingLabel);
+    rackingSpinBox = new QSpinBox();
+    rackingSpinBox->setSingleStep(1);
+    rackingSpinBox->setMinimum(1);
+    rackingSpinBox->setValue(3);
+    rackingLayout->addWidget(rackingSpinBox);
+
+    mainLayout->addLayout(rackingLayout);
+    mainLayout->addWidget(rackingSeparator);
     mainLayout->addWidget(resizeLabel);
     mainLayout->addLayout(resizeRadioLayout);
     mainLayout->addLayout(resizeLayout);
@@ -83,4 +98,6 @@ SheetToolBar::SheetToolBar(QWidget* parent) {
     //connect radio buttons to slot
     QObject::connect(increaseRadio, &QRadioButton::clicked, this, &SheetToolBar::increaseRadioClicked);
     QObject::connect(decreaseRadio, &QRadioButton::clicked, this, &SheetToolBar::decreaseRadioClicked);
+
+    QObject::connect(rackingSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, &SheetToolBar::rackingSpinBoxChanged);
 }

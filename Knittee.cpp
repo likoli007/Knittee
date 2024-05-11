@@ -60,6 +60,7 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(newProjectAction, &QAction::triggered, this, &Knittee::openNewProjectWindow);
     QObject::connect(loadAction, &QAction::triggered, this, &Knittee::selectProject);
     QObject::connect(exitAction, &QAction::triggered, this, &QApplication::quit);
+    QObject::connect(saveAction, &QAction::triggered, this, &Knittee::saveProject);
     //QObject::connect(optionsMenu, &QMenu::triggered, this, &Knittee::openOptionsWindow);
     QObject::connect(helpAction, &QAction::triggered, this, &Knittee::openHelpWindow);
     QObject::connect(aboutAction, &QAction::triggered, this, &Knittee::openAboutWindow);
@@ -83,7 +84,6 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(&knitGrapher, SIGNAL(peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > >*, std::vector< std::vector< uint32_t > >*)), this, SLOT(peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > > *, std::vector< std::vector< uint32_t > >*)));
     QObject::connect(&knitGrapher, SIGNAL(linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*)), this, SLOT(linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*)));
     QObject::connect(&knitGrapher, SIGNAL(nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*)), this, SLOT(nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*)));
-    QObject::connect(&laceKnitter, SIGNAL(sheetChanged(std::vector<std::vector<FlatPoint>>*)), vis, SLOT(sheetChanged(std::vector<std::vector<FlatPoint>>*)));
     QObject::connect(&knitGrapher, SIGNAL(knitGraphCreated()), this, SLOT(knitGraphCreated()));
    
     QObject::connect(&knitGrapher, SIGNAL(knitGraphTraced(std::vector< TracedStitch >*)), this, SLOT(knitGraphTraced(std::vector< TracedStitch >*)));
@@ -100,7 +100,18 @@ Knittee::Knittee(QWidget* parent)
 
     QObject::connect(meshToolsWidget, SIGNAL(resetButtonClicked()), this, SLOT(resetButtonClicked()));
 
-    QObject::connect(sheetToolsWidget, SIGNAL(sheetSizeChanged(int, int)), &laceKnitter, SLOT(createSheet(int, int)));
+    //QObject::connect(sheetToolsWidget, SIGNAL(sheetSizeChanged(int, int)), &laceKnitter, SLOT(createSheet(int, int)));
+
+    QObject::connect(sheetToolsWidget, SIGNAL(rackingChanged(int)), &laceKnitter, SLOT(rackingChanged(int)));
+    QObject::connect(sheetToolsWidget, SIGNAL(widthChanged(int, int)), &laceKnitter, SLOT(widthChanged(int, int)));
+QObject::connect(sheetToolsWidget, SIGNAL(heightChanged(int, int)), &laceKnitter, SLOT(heightChanged(int, int)));
+
+    QObject::connect(vis, SIGNAL(moveLoop(QPair<int, int>, QPair<int, int>)), &laceKnitter, SLOT(moveLoop(QPair<int, int>, QPair<int, int>)));
+    QObject::connect(&laceKnitter, SIGNAL(sheetChanged(std::vector<std::vector<FlatPoint>>*)), vis, SLOT(sheetChanged(std::vector<std::vector<FlatPoint>>*)));
+    QObject::connect(&laceKnitter, SIGNAL(sheetDimensionsChanged(int, int, int)), this, SLOT(sheetDimensionsChanged(int, int, int)));
+    
+
+    
 
     messageTextEdit = new QTextEdit(this);
     messageTextEdit->setReadOnly(true);
@@ -110,13 +121,60 @@ Knittee::Knittee(QWidget* parent)
     mainLayout->addLayout(visualizerLayout);
     mainLayout->addWidget(messageTextEdit);
 
-    mainLayout->setStretchFactor(visualizerLayout, 3);
+    mainLayout->setStretchFactor(visualizerLayout, 4);
     mainLayout->setStretchFactor(messageTextEdit, 1);
 
     QWidget* centralWidget = new QWidget(this);
     centralWidget->setLayout(mainLayout);
 
     setCentralWidget(centralWidget);
+}
+
+void Knittee::closeEvent(QCloseEvent* event) {
+    
+    saveProject();
+}
+
+void Knittee::save3DProject() {
+    qDebug() << "saving later yo";
+}
+
+void Knittee::saveProject(){
+    qDebug() << "savingyo";
+	if (modellingType == 0) {
+		save3DProject();
+	}
+	else if (modellingType == 1){
+		save2DProject();
+	}
+}
+
+void Knittee::save2DProject() {
+    QString projectFolderPath = QCoreApplication::applicationDirPath() + "/Projects/" + context.projectName;
+
+    laceKnitter.saveToFile(projectFolderPath);
+    
+    context.height = laceKnitter.getHeight();
+    context.width = laceKnitter.getWidth();
+    context.racking = laceKnitter.getRacking();
+
+    QFile file(projectFolderPath + "/" + context.projectName + ".knittee");
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qDebug() << "Error opening project file!";
+        return;
+    }
+    file.write(context.projectName.toUtf8());
+    file.write("\n");
+    file.write(QString::number(context.type).toUtf8());
+    file.write("\n");
+    file.write(QString::number(context.width).toUtf8());
+    file.write("\n");
+    file.write(QString::number(context.height).toUtf8());
+    file.write("\n");
+    file.write(QString::number(context.racking).toUtf8());
+    file.close();
+
+	
 }
 
 void Knittee::resetButtonClicked() {
@@ -131,11 +189,11 @@ void Knittee::helpBoxCommunication(QString message) {
 void Knittee::knitGraphTraced(std::vector< TracedStitch >* traced_stitches) {
 	//vis->knitGraphTraced(traced_stitches);
 
-    qDebug() << "saving knitgraph to file";
+    //qDebug() << "saving knitgraph to file";
 
     saveTraced(traced_stitches);
 
-    qDebug() << "sending traced to visualizer";
+    //qDebug() << "sending traced to visualizer";
 }
 
 void Knittee::saveTraced(std::vector< TracedStitch >* traced_stitches) {
@@ -275,28 +333,28 @@ void Knittee::loadProject(QString filePath) {
     if (projectType == 0)
     {
         meshFilePath = projFolder + "/mesh.obj"; // Construct the file path for mesh.obj
-        ProjectInfo projectInfo;
-        projectInfo.projectName = projectName;
-        projectInfo.type = projectType;
-        projectInfo.objectFilePath = meshFilePath;
+        context.projectName = projectName;
+        context.type = projectType;
+        context.objectFilePath = meshFilePath;
         file.close();
-        start3DProject(projectInfo);
+        start3DProject();
     }
     else
     {
         int width = in.readLine().toInt();
         int height = in.readLine().toInt();
+        int rack = in.readLine().toInt();
 
-        ProjectInfo projectInfo;
-        projectInfo.projectName = projectName;
-        projectInfo.type = projectType;
-        projectInfo.width = width;
-        projectInfo.height = height;
+        context.projectName = projectName;
+        context.type = projectType;
+        context.width = width;
+        context.height = height;
+        context.racking = rack;
 
         file.close();
-        laceKnitter.setDimensions(width, height);
+        laceKnitter.setDimensions(width, height, rack);
         laceKnitter.loadFromFile(projFolder);
-        start2DProject(projectInfo);
+        start2DProject();
     }
 
 
@@ -339,7 +397,7 @@ void Knittee::loadConstraints() {
     vis->setConstraints(constraints);
 }
 
-void Knittee::start3DProject(ProjectInfo context)
+void Knittee::start3DProject()
 {
     object_loader.setFilePath(context.objectFilePath);
     meshToolsWidget->resetButtonClicked();
@@ -348,6 +406,7 @@ void Knittee::start3DProject(ProjectInfo context)
 
     loadConstraints();
 
+    modellingType = 0;
     vis->projectType = 0;
     vis->loadMesh(mesh);
     knitGrapher.setOriginalMesh(mesh);
@@ -364,12 +423,13 @@ void Knittee::start3DProject(ProjectInfo context)
 }
 
 
-void Knittee::start2DProject(ProjectInfo context)
+void Knittee::start2DProject()
 {
     qDebug() << "starting 2D project: " << context.width << "x" << context.height;
     vis->projectType = 1;
+    modellingType = 1;
 
-    laceKnitter.setDimensions(context.width, context.height);
+    laceKnitter.setDimensions(context.width, context.height, context.racking);
     laceKnitter.loadFromFile(projectPath);
 
     visualizerLayout->removeItem(visualizerLayout->itemAt(0));
@@ -437,7 +497,7 @@ void Knittee::openNewProjectWindow()
 }
 
 
-void Knittee::setUpNew3DProject(ProjectInfo context)
+void Knittee::setUpNew3DProject()
 {
     //store the project information in the new folder
     QString projectFolderPath = QCoreApplication::applicationDirPath() + "/Projects/" + context.projectName;
@@ -462,46 +522,49 @@ void Knittee::setUpNew3DProject(ProjectInfo context)
     context.objectFilePath = projectFolderPath + "/mesh.obj";
     projectPath = projectFolderPath;
 
-    start3DProject(context);
+    start3DProject();
 }
 
 
 
-void Knittee::setUpNew2DProject(ProjectInfo info) {
-    QString projectFolderPath = QCoreApplication::applicationDirPath() + "/Projects/" + info.projectName;
+void Knittee::setUpNew2DProject() {
+    QString projectFolderPath = QCoreApplication::applicationDirPath() + "/Projects/" + context.projectName;
     QDir().mkpath(projectFolderPath);
-    QFile file(projectFolderPath + "/" + info.projectName + ".knittee");
+    QFile file(projectFolderPath + "/" + context.projectName + ".knittee");
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qDebug() << "Error opening project file!";
         return;
     }
-    file.write(info.projectName.toUtf8());
+    file.write(context.projectName.toUtf8());
     file.write("\n");
-    file.write(QString::number(info.type).toUtf8());
+    file.write(QString::number(context.type).toUtf8());
     file.write("\n");
-    file.write(QString::number(info.width).toUtf8());
+    file.write(QString::number(context.width).toUtf8());
     file.write("\n");
-	file.write(QString::number(info.height).toUtf8());
+	file.write(QString::number(context.height).toUtf8());
+    file.write("\n");
+    file.write(QString::number(3).toUtf8());
     file.close();
 
-    laceKnitter.createSheet(info.width, info.height);
+    laceKnitter.createSheet(context.width, context.height, 3);
     laceKnitter.saveToFile(projectFolderPath);
 
 
     projectPath = projectFolderPath;
-    start2DProject(info);
+    start2DProject();
 }
 
-void Knittee::handleNewProject(ProjectInfo options)
+void Knittee::handleNewProject(ProjectInfo info)
 {
-    if (options.type == 0) {
+    context = info;
+    if (context.type == 0) {
         qDebug() << "Setting up 3D editing project...";
-        setUpNew3DProject(options);
+        setUpNew3DProject();
         //openFile(options.filePath);
     }
     else {
         qDebug() << "Setting up 2D editing project...";
-        setUpNew2DProject(options);
+        setUpNew2DProject();
     }
 
     // Handle selected options

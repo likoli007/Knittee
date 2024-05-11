@@ -519,7 +519,7 @@ void Visualizer::setConstraintsMode(bool type) {
 void Visualizer::paintOriginalMesh()
 {
     // General OpenGL set up
-    glClearColor(0.0f, 0.0f, 0.5451f, 1.0f);
+    glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
@@ -610,7 +610,7 @@ void Visualizer::paintInterpolatedMesh() {
 
     loadInterpolated();
 
-    glClearColor(0.0f, 0.0f, 0.5451f, 1.0f);
+    glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
@@ -926,7 +926,7 @@ void Visualizer::peelSliceDone(ObjectMesh* slice, std::vector< std::vector< uint
 
 //paint both the slice mesh and the chains
 void Visualizer::paintSliceMesh() {
-    glClearColor(0.0f, 0.0f, 0.5451f, 1.0f);
+    glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
@@ -1228,7 +1228,8 @@ void Visualizer::paintGL()
     if (projectType == 0) {
         // Set up
         buildmvpMatrix();
-        glClearColor(0.0f, 0.0f, 0.5451f, 1.0f);
+        glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
+        //glClearColor(0.0f, 0.0f, 0.5451f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
 
@@ -1447,7 +1448,7 @@ void Visualizer::keyPressEvent(QKeyEvent* event)
 
 QPair<int, int> Visualizer::getLoopPos(int mX, int mY) {
     QPair<int, int> res(-1, -1);
-
+    
     int sheetWidth = sheet[0].size() + 1;
     int sheetHeight = sheet.size() + 1;
 
@@ -1467,7 +1468,7 @@ QPair<int, int> Visualizer::getLoopPos(int mX, int mY) {
             int rectHeight = cellHeight;
 
             if (mX > rectX && mX < rectX + rectWidth && mY > rectY && mY < rectY + rectHeight) {
-                qDebug() << "Mouse is in cell: " << i << ", " << j;
+                //qDebug() << "Mouse is in cell: " << i << ", " << j;
                 res.first = i;
                 res.second = j;
                 //chosenVertex = i * sheet[i].size() + j;
@@ -1535,7 +1536,9 @@ void Visualizer::mouseMoveEvent(QMouseEvent* event)
         to = getLoopPos(mouseX, mouseY);
 
         if (from.first != -1 && to.first != -1) {
-            sheet[from.first][from.second].offset = to.second - from.second;
+            
+            emit moveLoop(from, to);
+            
         }
 
     }
