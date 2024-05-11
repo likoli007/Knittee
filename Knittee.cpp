@@ -104,14 +104,15 @@ Knittee::Knittee(QWidget* parent)
 
     QObject::connect(sheetToolsWidget, SIGNAL(rackingChanged(int)), &laceKnitter, SLOT(rackingChanged(int)));
     QObject::connect(sheetToolsWidget, SIGNAL(widthChanged(int, int)), &laceKnitter, SLOT(widthChanged(int, int)));
-QObject::connect(sheetToolsWidget, SIGNAL(heightChanged(int, int)), &laceKnitter, SLOT(heightChanged(int, int)));
+    QObject::connect(sheetToolsWidget, SIGNAL(heightChanged(int, int)), &laceKnitter, SLOT(heightChanged(int, int)));
 
     QObject::connect(vis, SIGNAL(moveLoop(QPair<int, int>, QPair<int, int>)), &laceKnitter, SLOT(moveLoop(QPair<int, int>, QPair<int, int>)));
     QObject::connect(&laceKnitter, SIGNAL(sheetChanged(std::vector<std::vector<FlatPoint>>*)), vis, SLOT(sheetChanged(std::vector<std::vector<FlatPoint>>*)));
     QObject::connect(&laceKnitter, SIGNAL(sheetDimensionsChanged(int, int, int)), this, SLOT(sheetDimensionsChanged(int, int, int)));
     
-
+    QObject::connect(&knitoutScheduler, SIGNAL(instructionsCreated(std::vector<std::string>)), this, SLOT(instructionsCreated(std::vector<std::string>)));
     
+    QObject::connect(meshToolsWidget, SIGNAL(generateKnitoutButtonClicked()), this, SLOT(generateKnitoutButtonClicked()));
 
     messageTextEdit = new QTextEdit(this);
     messageTextEdit->setReadOnly(true);
@@ -128,6 +129,32 @@ QObject::connect(sheetToolsWidget, SIGNAL(heightChanged(int, int)), &laceKnitter
     centralWidget->setLayout(mainLayout);
 
     setCentralWidget(centralWidget);
+}
+
+void Knittee::generateKnitoutButtonClicked() {
+	qDebug() << "generate knitout button clicked!";
+	knitoutScheduler.schedule(projectPath + "/traced");
+}
+
+void Knittee::instructionsCreated(std::vector<std::string> instructions) {
+	qDebug() << "instructions created!";
+	
+    //save to project folder under 'knitoutgenerator'
+    QString filePath = projectPath + "/knitoutgenerator";
+    QFile file(filePath);
+
+    if (!file.open(QIODevice::WriteOnly))
+	{
+		qDebug() << "could not open file";
+		return;
+	}
+
+	QTextStream out(&file);
+    for (const std::string& instruction : instructions)
+	{
+		out << QString::fromStdString(instruction) << '\n';
+	}
+	file.close();
 }
 
 void Knittee::closeEvent(QCloseEvent* event) {

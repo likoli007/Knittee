@@ -132,6 +132,8 @@ private slots:
     void helpBoxCommunication(QString);
     void saveConstraints();
     void resetButtonClicked();
+    void instructionsCreated(std::vector<std::string> instructions);
+    void generateKnitoutButtonClicked();
 private:
     void saveTraced(std::vector< TracedStitch >*);
 

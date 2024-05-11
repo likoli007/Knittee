@@ -77,8 +77,15 @@ class KnitoutScheduler : public QObject
 
 	uint32_t maxRacking = 3;					//TODO: make a parameter settable by the user
 
+	std::vector< KnitOutStitch > stitches;
+	std::vector< std::pair<BedNeedle, BedNeedle>> stitch_locations, input_locations;
 
 public:
 	KnitoutScheduler(QObject* parent = nullptr);
+
+	void schedule(QString path);
+signals:
+	void instructionsCreated(std::vector<std::string>);
+
 };
 

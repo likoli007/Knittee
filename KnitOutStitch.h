@@ -97,7 +97,7 @@ inline QString to_string(KnitOutStitch const& s) {
 	return ret;
 };
 
-//bool load_stitches(std::string const& filename, std::vector< KnitOutStitch >* into);
+bool load_stitches(QString const& filename, std::vector< KnitOutStitch >* into);
 //void save_stitches(std::string const& filename, std::vector< KnitOutStitch > const& from);
 
 

@@ -121,7 +121,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     QObject::connect(showGraphCheck, &QCheckBox::stateChanged, this, &MeshToolBar::onShowGraphButtonClicked);
     QObject::connect(showTracedCheck, &QCheckBox::stateChanged, this, &MeshToolBar::onShowTracedButtonClicked);
     QObject::connect(resetButton, &QPushButton::clicked, this, &MeshToolBar::onResetButtonClicked);
-
+    
   
 
    QLabel* label3 = new QLabel("Show:", this);
@@ -152,7 +152,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
 
     generateKnitoutButton = new QPushButton("Generate Knitout");
    
-
+    QObject::connect(generateKnitoutButton, &QPushButton::clicked, this, &MeshToolBar::onGenerateKnitoutButtonClicked);
 
 
     QWidget* spacer = new QWidget();

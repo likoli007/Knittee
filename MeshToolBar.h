@@ -37,6 +37,7 @@ signals:
     void showTracedChanged(int state);
     void helpBoxCommunication(QString message);
     void resetButtonClicked();
+    void generateKnitoutButtonClicked();
 private slots:
     void knitGraphTraced() {
         generateKnitoutButton->setDisabled(false);
@@ -127,7 +128,10 @@ private slots:
         showGraphCheck->setChecked(false);
 		emit resetButtonClicked();
 	}
-
+    void onGenerateKnitoutButtonClicked() {
+		//emit helpBoxCommunication(HelperText::knitoutText);
+		emit generateKnitoutButtonClicked();
+	}
 private:
     // Will have a slew of functions that pass the user specified options to the visualizer/algorithm program
     QPushButton* constraintsModeButton;
