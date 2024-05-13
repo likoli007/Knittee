@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <functional>
 #include <string>
+#include <qdebug.h>
 
 bool embed_DAG(
 	std::vector< DAGNode > const& nodes,
@@ -16,7 +17,7 @@ bool embed_DAG(
 	std::vector< int32_t >* node_positions, //positions give total left-to-right order of edges/nodes
 	std::vector< int32_t >* edge_positions
 ) {
-
+	qDebug() << "starting dag embedding";
 	for (auto const& node : nodes) {
 		if (node.options.empty()) {
 			std::cerr << "WARNING: embed_DAG will fail because a node has no options." << std::endl;
@@ -25,6 +26,7 @@ bool embed_DAG(
 	}
 
 	{ //PARANOIA:
+		qDebug() << "paranoing";
 		for (auto const& node : nodes) {
 			assert(!node.options.empty());
 			std::set< DAGEdgeIndex > ins(node.options[0].in_order.begin(), node.options[0].in_order.end());
@@ -83,6 +85,7 @@ bool embed_DAG(
 	std::vector< uint32_t > select_order;
 
 	//TODO: ~smart ordering~
+	qDebug() << "ordering";
 	for (uint32_t i = 0; i < nodes.size(); ++i) {
 		select_order.emplace_back(i);
 	}
@@ -149,7 +152,7 @@ bool embed_DAG(
 	}
 
 	std::function< bool(std::vector< bool >&, uint32_t, uint32_t) > add_left_of;
-
+	qDebug() << "checkpoint 1";
 	auto run_excludes = [&add_left_of, &edges, &edge_excludes](std::vector< bool >& left_of, uint32_t a) -> bool {
 		for (std::vector< uint32_t > const& excl : edge_excludes[a]) {
 			bool is_left = false;
@@ -250,7 +253,7 @@ bool embed_DAG(
 
 		}
 	};
-
+	qDebug() << "checkpoint 2";
 	auto set_output = [&](State const& state) {
 		assert(state.step == select_order.size());
 		assert(state.selected.size() == nodes.size());
@@ -307,6 +310,7 @@ bool embed_DAG(
 
 	uint32_t step = 0;
 
+	qDebug() << "Checkpoint 3";
 	while (!to_expand.empty()) {
 		std::pop_heap(to_expand.begin(), to_expand.end(), CompareCost);
 		DAGCost cost = to_expand.back().first;
@@ -320,10 +324,9 @@ bool embed_DAG(
 			//assert(res.second);
 			if ((++step) % 10000 == 0) {
 				//DEBUG:
-				std::cout << /*expanded.size() << "/" <<*/ visited.size() << "/" << to_expand.size() << "   ";
-				std::cout << "[" << state.step << "]";
-				for (auto s : state.selected) std::cout << ' ' << (s == -1U ? std::string(".") : std::to_string(s));
-				std::cout << std::endl;
+				qDebug() << /*expanded.size() << "/" <<*/ visited.size() << "/" << to_expand.size() << "   ";
+				qDebug() << "[" << state.step << "]";
+				for (auto s : state.selected) qDebug() << ' ' << (s == -1U ? std::string(".") : std::to_string(s));
 			}
 
 			if (state.step < select_order.size()) {

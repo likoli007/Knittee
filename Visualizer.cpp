@@ -361,6 +361,9 @@ void Visualizer::paintPickFrame() {
         int blue = id & 0xFF;
 
         QColor color(red, green, blue);
+
+        //qDebug() << mesh.indices[i] << mesh.indices[i + 1] << mesh.indices[i + 2];
+
         QVector3D vertex1 = mesh.vertices[mesh.indices[i]];
         QVector3D vertex2 = mesh.vertices[mesh.indices[i + 1]];
         QVector3D vertex3 = mesh.vertices[mesh.indices[i + 2]];

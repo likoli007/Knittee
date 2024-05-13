@@ -7,6 +7,7 @@
 #include <vector>
 #include <QDebug>
 #include <set>
+#include <qregularexpression.h>
 
 KnitoutScheduler::KnitoutScheduler(QObject* parent) : QObject(parent)
 {
@@ -17,6 +18,14 @@ KnitoutScheduler::KnitoutScheduler(QObject* parent) : QObject(parent)
 
 void KnitoutScheduler::schedule(QString path)
 {
+	QString head1 = QString(";!knitout-2");
+	QString head2 = QString(";;Carriers: 1 2 3 4 5 6 7 8 9 10");
+
+
+	out(head1);
+	out(head2);
+
+
 
 	std::vector< KnitOutStitch > stitches;
 	std::vector< std::pair<BedNeedle, BedNeedle>> stitch_locations, input_locations;
@@ -1073,11 +1082,11 @@ void KnitoutScheduler::schedule(QString path)
 				assert(node.options.size() == step.options.size());
 			}
 		} //for(steps)
-		std::cout << " done." << std::endl;
+		qDebug() << " done.";
 
 		assert(node_steps.size() == nodes.size());
 
-		std::cout << "Have " << edges.size() << " edges and " << nodes.size() << " nodes." << std::endl;
+		qDebug() << "Have " << edges.size() << " edges and " << nodes.size() << " nodes.";
 
 		std::vector< uint32_t > node_options;
 		std::vector< int32_t > node_positions, edge_positions;
@@ -1091,6 +1100,8 @@ void KnitoutScheduler::schedule(QString path)
 		assert(node_positions.size() == nodes.size());
 		assert(edge_positions.size() == edges.size());
 
+
+		qDebug() << "going thru steps";
 		//Go through steps and assign selected option:
 		assert(node_options.size() == nodes.size());
 		for (uint32_t n = 0; n < nodes.size(); ++n) {
@@ -1128,6 +1139,7 @@ void KnitoutScheduler::schedule(QString path)
 
 		}
 
+		qDebug() << "assigning storage positions";
 		//assign storage positions:
 		for (auto const& step : steps) {
 			uint32_t si = &step - &steps[0];
@@ -1166,6 +1178,8 @@ void KnitoutScheduler::schedule(QString path)
 				storage_steps[o] = &step - &steps[0];
 			}
 		}
+
+		qDebug() << "iterating thru steps";
 		for (auto const& step : steps) {
 			uint32_t si = &step - &steps[0];
 			if (step_options[si] != -1U) {
@@ -1233,6 +1247,7 @@ void KnitoutScheduler::schedule(QString path)
 
 
 		//record shapes:
+		qDebug() << "record shapes";
 		uint32_t pre_xfers = 0;
 		for (uint32_t si = 0; si < steps.size(); ++si) {
 			qDebug() << "Step " << si << " option " << step_options[si] << " says "; //DEBUG
@@ -1275,7 +1290,7 @@ void KnitoutScheduler::schedule(QString path)
 		}
 
 		//TODO: PARANOIA: check that step option orders match recorded storage positions.
-
+		
 		auto summarize = [](Shape const& shape, uint32_t size, uint32_t mark) -> std::string {
 			//shape as braille dots
 			// e.g.  ⠲⠶⠷⠶
@@ -1311,6 +1326,7 @@ void KnitoutScheduler::schedule(QString path)
 			return ret;
 		};
 
+		qDebug() << "Storage positions";
 		//DEBUG: dump selections:
 		for (auto const& step : steps) {
 			uint32_t si = &step - &steps[0];
@@ -1490,20 +1506,22 @@ void KnitoutScheduler::schedule(QString path)
 		instructions.emplace_back(instr);
 		//std::cout << instr << std::endl; //DEBUG
 	};
-	add_instr("const autoknit = require('autoknit');");
-	add_instr("let h = new autoknit.Helpers;");
+
+	//Not necessary since i rewrote the javascript
+	//add_instr("const autoknit = require('autoknit');");
+	//add_instr("let h = new autoknit.Helpers;");
 
 	//helper:
 	auto typeset_bed_needle = [](char bed, int32_t needle) -> std::string {
 		std::string ret;
-		ret += '\'';
+		//ret += '\'';
 		static_assert(BedNeedle::Front == 'f' && BedNeedle::Back == 'b', "BedNeedle and our ad-hoc bed characters agree.");
 		if (bed == 'f' || bed == 'b') ret += bed;
 		else if (bed == BedNeedle::FrontSliders) ret += "fs";
 		else if (bed == BedNeedle::BackSliders) ret += "bs";
 		else assert(0 && "unhandled bed name");
 		ret += std::to_string(needle);
-		ret += '\'';
+		//ret += '\'';
 		return ret;
 	};
 
@@ -1627,7 +1645,7 @@ void KnitoutScheduler::schedule(QString path)
 
 
 	//helper: flop to one bed (returns bed flopped to, if no preference given)
-	auto stash = [&add_instr, &loop_to_bn, &typeset_bed_needle, &make_xfers](Storage const& storage, char const bed = '\0', int32_t offset = 0) -> char { //n.b. nonzero offset only makes sense when already stashed on *other* bed (maybe?)
+	auto stash = [&add_instr, &loop_to_bn, &typeset_bed_needle, &make_xfers, this](Storage const& storage, char const bed = '\0', int32_t offset = 0) -> char { //n.b. nonzero offset only makes sense when already stashed on *other* bed (maybe?)
 
 		if (offset != 0) assert(bed != '\0');
 
@@ -1663,6 +1681,10 @@ void KnitoutScheduler::schedule(QString path)
 		std::string to_str = "";
 		std::vector< BedNeedle > from_vec, to_vec;
 		Storage loops;
+
+		QStringList fromList;
+		QStringList toList;
+
 		for (auto const& loop : storage) {
 			auto f = loop_to_bn.find(loop);
 			assert(f != loop_to_bn.end());
@@ -1684,18 +1706,21 @@ void KnitoutScheduler::schedule(QString path)
 
 				if (from_str != "") from_str += ", ";
 				from_str += typeset_bed_needle(from.bed, from.needle);
+				fromList.append(QString::fromStdString(typeset_bed_needle(from.bed, from.needle)));
 				if (to_str != "") to_str += ", ";
 				to_str += typeset_bed_needle(to.bed, to.needle);
+				toList.append(QString::fromStdString(typeset_bed_needle(to.bed, to.needle)));
 			}
 		}
 		assert(from_vec.size() == to_vec.size());
 
 		if (!from_vec.empty()) {
 			std::string instr =
-				"h.stash([" + from_str + "],\n"
+				"stash([" + from_str + "],\n"
 				"        [" + to_str + "]);";
 
 			add_instr(instr);
+			this->kStash(fromList, toList);
 
 			make_xfers(from_vec, to_vec, loops);
 		}
@@ -1703,11 +1728,15 @@ void KnitoutScheduler::schedule(QString path)
 	};
 
 	//helper: flop from one bed
-	auto unstash = [&add_instr, &loop_to_bn, &typeset_bed_needle, &make_xfers](Storage const& storage) {
+	auto unstash = [this, &add_instr, &loop_to_bn, &typeset_bed_needle, &make_xfers](Storage const& storage) {
 		std::string from_str = "";
 		std::string to_str = "";
 		std::vector< BedNeedle > from, to;
 		Storage loops;
+
+		QStringList fromList;
+		QStringList toList;
+
 		for (auto const& loop : storage) {
 			auto f = loop_to_bn.find(loop);
 			assert(f != loop_to_bn.end());
@@ -1717,19 +1746,21 @@ void KnitoutScheduler::schedule(QString path)
 				loops.emplace_back(loop);
 				if (from_str != "") from_str += ", ";
 				from_str += typeset_bed_needle(from.back().bed, from.back().needle);
+				fromList.append(QString::fromStdString(typeset_bed_needle(from.back().bed, from.back().needle)));
 				if (to_str != "") to_str += ", ";
 				to_str += typeset_bed_needle(to.back().bed, to.back().needle);
+				toList.append(QString::fromStdString(typeset_bed_needle(to.back().bed, to.back().needle)));
 			}
 		}
 		assert(from.size() == to.size());
 
 		if (!from.empty()) {
 			std::string instr =
-				"h.unstash([" + from_str + "],\n"
+				"unstash([" + from_str + "],\n"
 				"          [" + to_str + "]);";
 
 			add_instr(instr);
-
+			this->kUnstash(fromList, toList);
 			make_xfers(from, to, loops);
 		}
 	};
@@ -1906,7 +1937,7 @@ void KnitoutScheduler::schedule(QString path)
 					}
 
 					add_instr(
-						"h.roll_cycle([" + from_str + "]\n"
+						"roll_cycle([" + from_str + "]\n"
 						"             [" + to_str + "]);"
 					);
 
@@ -2346,8 +2377,11 @@ void KnitoutScheduler::schedule(QString path)
 				}
 
 				//TODO: need to unstash left/right if there are ragged edge overlaps because cast-on would otherwise end up on the wrong side of adjacent tubes.
+				
+				QString dir = stitches[step.begin].direction == KnitOutStitch::Clockwise ? "clockwise" : "anticlockwise";
+				QStringList bns;
 
-				std::string instr = "h.start_tube(";
+				std::string instr = "start_tube(";
 				instr += (stitches[step.begin].direction == KnitOutStitch::Clockwise ? "'clockwise'" : "'anticlockwise'");
 				instr += ", [";
 				for (uint32_t s = step.begin; s != step.end; ++s) {
@@ -2375,6 +2409,8 @@ void KnitoutScheduler::schedule(QString path)
 					if (s != step.begin) instr += ", ";
 					instr += typeset_bed_needle(bed, needle);
 
+					bns.append(QString::fromStdString(typeset_bed_needle(bed, needle)));
+
 					make_start(bed, needle, Loop(s, 0));
 
 					stitch_locations[&st - &stitches[0]].first = BedNeedle(bed == 'f' ? BedNeedle::Front : BedNeedle::Back, needle);
@@ -2385,6 +2421,7 @@ void KnitoutScheduler::schedule(QString path)
 				instr += "]);";
 
 				add_instr(instr);
+				startTube(dir, bns);
 
 				//add new tube to layouts:
 				auto ret = storage_layouts.insert(std::make_pair(&storages[step.out[0]], std::make_pair(left, shape)));
@@ -2405,7 +2442,10 @@ void KnitoutScheduler::schedule(QString path)
 				assert(ret.second);
 			}
 
-			std::string instr = "h.end_tube(";
+			QString dir = (stitches[step.begin].direction == KnitOutStitch::Clockwise ? "clockwise" : "anticlockwise");
+			QStringList bns;
+
+			std::string instr = "end_tube(";
 			instr += (stitches[step.begin].direction == KnitOutStitch::Clockwise ? "'clockwise'" : "'anticlockwise'");
 			instr += ", [";
 			for (uint32_t s = step.begin; s != step.end; ++s) {
@@ -2433,6 +2473,7 @@ void KnitoutScheduler::schedule(QString path)
 
 				if (s != step.begin) instr += ", ";
 				instr += typeset_bed_needle(bed, needle);
+				bns.append(QString::fromStdString(typeset_bed_needle(bed, needle)));
 
 				assert(loop_to_bn.find(in0) != loop_to_bn.end());
 				input_locations[&st - &stitches[0]].first = loop_to_bn.find(in0)->second;
@@ -2442,6 +2483,7 @@ void KnitoutScheduler::schedule(QString path)
 			instr += "]);";
 
 			add_instr(instr);
+			endTube(dir, bns);
 
 			{ //no longer need to track inter layout; will replace with out[0]:
 				auto f = storage_layouts.find(&step.inter);
@@ -2471,6 +2513,9 @@ void KnitoutScheduler::schedule(QString path)
 			std::string from_str, to_str;
 			std::vector< BedNeedle > from, to;
 
+			QStringList fromList;
+			QStringList toList;
+
 			bool need_xfer = false;
 			for (uint32_t i = 0; i < step.inter.size(); ++i) {
 				char from_bed;
@@ -2487,9 +2532,11 @@ void KnitoutScheduler::schedule(QString path)
 
 				if (!from_str.empty()) from_str += ", ";
 				from_str += typeset_bed_needle(from_bed, from_needle);
+				fromList.append(QString::fromStdString(typeset_bed_needle(from_bed, from_needle)));
 
 				if (!to_str.empty()) to_str += ", ";
 				to_str += typeset_bed_needle(to_bed, to_needle);
+				toList.append(QString::fromStdString(typeset_bed_needle(to_bed, to_needle)));
 
 				from.emplace_back(from_bed == 'f' ? BedNeedle::Front : BedNeedle::Back, from_needle);
 
@@ -2609,19 +2656,25 @@ void KnitoutScheduler::schedule(QString path)
 					throw std::runtime_error("Failed to plan cycle transfer: " + error);
 				}
 				std::string transfers_str;
+				QList<QPair<QString, QString>> transfersList;
 				for (auto const& t : transfers) {
 					if (transfers_str != "") transfers_str += ", ";
 					transfers_str += "[" + typeset_bed_needle(t.from.bed, t.from.needle) + "," + typeset_bed_needle(t.to.bed, t.to.needle) + "]";
+					transfersList.append(QPair<QString, QString>(QString::fromStdString(typeset_bed_needle(t.from.bed, t.from.needle)), 
+						QString::fromStdString(typeset_bed_needle(t.to.bed, t.to.needle))));
 				}
 
 				std::string instr =
-					"h.xfer_cycle({minFree:" + std::to_string(constraints.min_free) + ", maxFree:" + std::to_string(constraints.max_free) + ", maxRacking:" + std::to_string(constraints.max_racking) + "},\n"
+					"xfer_cycle({minFree:" + std::to_string(constraints.min_free) + ", maxFree:" + std::to_string(constraints.max_free) + ", maxRacking:" + std::to_string(constraints.max_racking) + "},\n"
 					"             [" + from_str + "],\n"
 					"             [" + to_str + "],\n"
 					"             [" + transfers_str + "]);";
 
 				add_instr(instr);
 
+				QString dummy;
+				
+				xferCycle(dummy, dummy, dummy, transfersList);
 				make_xfers(from, to, step.inter);
 			}
 
@@ -2664,23 +2717,44 @@ void KnitoutScheduler::schedule(QString path)
 
 						{
 							std::string instr;
-							if (st.type == KnitOutStitch::Knit) instr += "h.knit(";
-							else if (st.type == KnitOutStitch::Tuck) instr += "h.tuck(";
-							else if (st.type == KnitOutStitch::Miss) instr += "h.miss(";
+							if (st.type == KnitOutStitch::Knit) instr += "knit(";
+							else if (st.type == KnitOutStitch::Tuck) instr += "tuck(";
+							else if (st.type == KnitOutStitch::Miss) instr += "miss(";
 							else assert(0 && "bad stitch type");
 
 							instr += '\'';
+							QChar stitchType;
 							if (st.direction == KnitOutStitch::Clockwise) {
 								instr += (bed == 'f' ? '-' : '+');
+								stitchType = (bed == 'f' ? '-' : '+');
 							}
 							else {
 								assert(st.direction == KnitOutStitch::Counterclockwise);
 								instr += (bed == 'f' ? '+' : '-');
+								stitchType = (bed == 'f' ? '+' : '-');
 							}
 							instr += '\'';
 							instr += ", " + typeset_bed_needle(bed, needle) + ");";
 
 							add_instr(instr);
+
+							
+							QString bedNeedle = QString::fromStdString(typeset_bed_needle(bed, needle));
+
+							qDebug() << instr;
+							assert(stitchType == '-' || stitchType == '+');
+							QString stitchTypeStr = stitchType;
+							
+							if (st.type == KnitOutStitch::Knit) {
+								knit(stitchTypeStr, bedNeedle);
+							}
+							else if (st.type == KnitOutStitch::Tuck) {
+								tuck(stitchTypeStr, bedNeedle);
+							}
+							else if (st.type == KnitOutStitch::Miss) {
+								miss(stitchTypeStr, bedNeedle);
+							}
+
 
 							assert(loop_to_bn.find(in0) != loop_to_bn.end());
 							// set this before make_stitch clears the old loop:
@@ -2731,35 +2805,49 @@ void KnitoutScheduler::schedule(QString path)
 						out_shape.size_index_to_bed_needle(storages[step.out[0]].size(), idx1, &bed1, &needle1);
 						needle1 += out_left;
 
+						QChar instrType1, instrType2;
+						QString instrTypeStr1, instrTypeStr2;
+						QString instrArg1, instrArg2;
 						{
-							std::string instr = "h.increase(";
+							std::string instr = "increase(";
 							instr += '\'';
 							if (st.direction == KnitOutStitch::Clockwise) {
 								instr += (bed0 == 'f' ? '-' : '+');
+								instrType1 = bed0 == 'f' ? '-' : '+';
 							}
 							else {
 								assert(st.direction == KnitOutStitch::Counterclockwise);
 								instr += (bed0 == 'f' ? '+' : '-');
+								instrType1 = bed0 == 'f' ? '+' : '-';
 							}
+							instrTypeStr1 = instrType1;
+
 							instr += '\'';
 							instr += ", ";
 							instr += typeset_bed_needle(bed0, needle0);
+							instrArg1 = QString::fromStdString(typeset_bed_needle(bed0,needle0));
 							instr += ", ";
 
 							instr += '\'';
 							if (st.direction == KnitOutStitch::Clockwise) {
 								instr += (bed1 == 'f' ? '-' : '+');
+								instrType2 = bed1 == 'f' ? '-' : '+';
 							}
 							else {
 								assert(st.direction == KnitOutStitch::Counterclockwise);
 								instr += (bed1 == 'f' ? '+' : '-');
+								instrType2 = bed1 == 'f' ? '+' : '-';
 							}
+							instrTypeStr2 = instrType2;
+							
 							instr += '\'';
 							instr += ", ";
 							instr += typeset_bed_needle(bed1, needle1);
+							instrArg2 = QString::fromStdString(typeset_bed_needle(bed1, needle1));
 							instr += ");";
 
 							add_instr(instr);
+							increase(instrTypeStr1, instrArg1, instrTypeStr2, instrArg2);
 
 							assert(loop_to_bn.find(in0) != loop_to_bn.end());
 							input_locations[&st - &stitches[0]].first = loop_to_bn.find(in0)->second;
@@ -2798,22 +2886,31 @@ void KnitoutScheduler::schedule(QString path)
 						out_shape.size_index_to_bed_needle(storages[step.out[0]].size(), f0->second, &bed0, &needle0);
 						needle0 += out_left;
 
+						QChar instrType1, instrType2;
+						QString instrTypeStr1, instrTypeStr2;
+						QString instrArg1, instrArg2;
+
 						{
-							std::string instr = "h.decrease(";
+							std::string instr = "decrease(";
 							instr += '\'';
 							if (st.direction == KnitOutStitch::Clockwise) {
 								instr += (bed0 == 'f' ? '-' : '+');
+								instrType1 = bed0 == 'f' ? '-' : '+';
 							}
 							else {
 								assert(st.direction == KnitOutStitch::Counterclockwise);
 								instr += (bed0 == 'f' ? '+' : '-');
+								instrType1 = bed0 == 'f' ? '+' : '-';
 							}
 							instr += '\'';
 							instr += ", ";
 							instr += typeset_bed_needle(bed0, needle0);
+							instrArg1 = QString::fromStdString(typeset_bed_needle(bed0, needle0));
 							instr += ");";
 
 							add_instr(instr);
+							instrTypeStr1 = instrType1;
+							decrease(instrTypeStr1, instrArg1);
 							// awkward to use loop_to_bn.find()..,since already xferred...
 
 							input_locations[&st - &stitches[0]].first = stitch_locations[st.in[0]].first;
@@ -2865,12 +2962,455 @@ void KnitoutScheduler::schedule(QString path)
 		//Check that locations in loop-tracking arrays are as expected:
 		check_storage_layouts(stepi);
 	}
-	add_instr("h.write();");
+	add_instr("write();");
 
 
 	qDebug() << "done!!!";
+	
+	scheduledInstructions.clear();
+	for (auto instr : instructions) {
+		scheduledInstructions.push_back(QString::fromStdString(instr));
+	}
+
+
 	emit instructionsCreated(instructions);
 
 	//original also saves schedules st file, not needed?
+	emit knitoutGenerated(knitout);
+	//generateKnitout();
+	//emit knitoutGenerated(knitout);
+
 	return;
+}
+
+
+void KnitoutScheduler::generateKnitout()
+{
+	QString head1 = QString(";!knitout-2");
+	QString head2 = QString(";;Carriers: 1 2 3 4 5 6 7 8 9 10");
+
+
+	out(head1);
+	out(head2);
+	for (auto instr : scheduledInstructions) {
+		qDebug() << "executing" << instr;
+	
+		//get the string before the '(' character
+		QStringList instrList = instr.split("(");
+		QString instrType = instrList[0];
+
+		//if knit
+		/*
+		if (instrType == "knit") {
+			QStringList instrArgs = instrList[1].split(" ");
+			QString d = instrArgs[0];
+			QString bn = instrArgs[1];
+			knit(d, bn);
+		}*/
+
+	
+	}
+
+
+
+}
+
+
+PortedBedNeedle KnitoutScheduler::parseBedNeedle(QString& bedNeedle)
+{
+
+	if (bedNeedle.isEmpty() || !bedNeedle.at(bedNeedle.size() - 1).isDigit())
+		qDebug() << "parseBedNeedle must be called with a string";
+
+	QRegularExpression pattern("^([fb]s?)([-+]?\\d+)$");
+	QRegularExpressionMatch match = pattern.match(bedNeedle);
+	if (!match.hasMatch())
+		qDebug() << "string '" << bedNeedle.toStdString() << "' does not look like a needle";
+
+	return { match.captured(1), match.captured(2).toInt() };
+
+}
+
+QString KnitoutScheduler::bnToHalf(QString& bn_str) {
+	PortedBedNeedle bn = parseBedNeedle(bn_str);
+	if (bn.bed == "f") {
+		return "f" + QString::number(2 * bn.needle);
+	}
+	else if (bn.bed == "fs") {
+		return "f" + QString::number(2 * bn.needle + 1);
+	}
+	else if (bn.bed == "b") {
+		return "b" + QString::number(2 * bn.needle + 1);
+	}
+	else if (bn.bed == "bs") {
+		return "b" + QString::number(2 * bn.needle);
+	}
+	else {
+		qDebug() << "don't know how to half-guage the needle '" + bn_str.toStdString() + "'";
+	}
+}
+
+void KnitoutScheduler::bringIn(QString& Carrier) {
+	qDebug() << "Bringing in Carrier " << Carrier << " before use.";
+	
+	QString output = "inhook " + Carrier;
+	out(output);
+
+	inYarns[Carrier] = true;
+	needsReleaseHook[Carrier] = true;
+	yarnUsedCount[Carrier] = 0;
+}
+
+void KnitoutScheduler::knit(QString& d, QString& bn) {
+	if (!inYarns[Carrier]) {
+		qDebug() << "Using carrier before inhook : " << Carrier;
+		this->bringIn(Carrier);
+	}
+	if (needsReleaseHook[Carrier] && yarnUsedCount[Carrier] > 5) {
+		QString output = "releasehook " + Carrier;
+		out(output);
+		needsReleaseHook[Carrier] = false;
+	}
+	yarnUsedCount[Carrier] += 1;
+
+	assert(!d.isEmpty());
+
+	QString output = "knit " + d + " " + bnToHalf(bn) + " " + Carrier;
+	out(output);
+}
+
+void KnitoutScheduler::drop(QString& bn) {
+	QString output = "drop " + bnToHalf(bn);
+	out(output);
+}
+
+void KnitoutScheduler::tuck(QString& d, QString& bn) {
+	if (!inYarns[Carrier]) {
+		qDebug() << "Using carrier before inhook : " << Carrier;
+		bringIn(Carrier);
+	}
+	if (this->needsReleaseHook[Carrier] && this->yarnUsedCount[Carrier] > 5) {
+		QString output = "releasehook " + Carrier;
+		out(output);
+		needsReleaseHook[Carrier] = false;
+	}
+	yarnUsedCount[Carrier] += 1;
+	
+	QString output = "tuck " + d + " " + bnToHalf(bn) + " " + Carrier;
+	out(output);
+}
+
+void KnitoutScheduler::miss(QString& d, QString& bn) {
+	if (!inYarns[Carrier]) {
+		qDebug() << "Using carrier before inhook : " << Carrier;
+		bringIn(Carrier);
+	}
+	if (this->needsReleaseHook[Carrier] && this->yarnUsedCount[Carrier] > 5) {
+		QString output = "releasehook " + Carrier;
+		out(output);
+		needsReleaseHook[Carrier] = false;
+	}
+
+	QString output = "miss " + d + " " + bnToHalf(bn) + " " + Carrier;
+	this->out(output);
+}
+
+void KnitoutScheduler::decrease(QString& d, QString& bn) {
+	qDebug() << "decresing";
+	knit(d, bn);
+}
+
+void KnitoutScheduler::increase(QString& d0, QString& bn0, QString& d1, QString& bn1) {
+	qDebug() << "increaseing";
+	knit(d0, bn0);
+
+	QString arg1 = d1 == "+" ? "-" : "+";
+	tuck(arg1, bn1);
+}
+
+void KnitoutScheduler::xfer(QString& from, QString& to) {
+	// If any releasehooks are pending, do them before xfers
+	for (const auto& pair : needsReleaseHook) {
+		
+		if (pair.second) {
+			QString output = "releasehook " + pair.first;
+			out(output);
+			needsReleaseHook[pair.first] = false;
+		}
+	}
+	QString output = "xfer " + bnToHalf(from) + " " + bnToHalf(to);
+	out(output);
+}
+
+void KnitoutScheduler::setRacking(QString& from_str, QString& to_str) {
+	int target;
+	if (from_str.isEmpty() && to_str.isEmpty()) {
+		target = 0;
+	}
+	else {
+
+		QString from_half = bnToHalf(from_str);
+		QString to_half = bnToHalf(to_str);
+
+		PortedBedNeedle from = parseBedNeedle(from_half);
+		PortedBedNeedle to = parseBedNeedle(to_half);
+		if (from.bed == "f" && to.bed == "b") {
+			target = from.needle - to.needle;
+		}
+		else {
+			assert(from.bed == "b" && to.bed == "f");
+			target = to.needle - from.needle;
+		}
+		assert(qAbs(target) <= 8);
+	}
+	if (racking != target) {
+		racking = target;
+		QString output = "rack " + QString::number(racking);
+		out(output);
+	}
+}
+
+void KnitoutScheduler::xferCycle(QString& opts, QString& from, QString& to, QList<QPair<QString, QString>>& xfers) {
+	for (const auto& xf : xfers) {
+		QString first = xf.first;
+		QString second = xf.second;
+		setRacking(first, second);
+		xfer(first, second);
+	}
+}
+
+void KnitoutScheduler::kStash(QStringList& from, QStringList& to) {
+	if (from.size() != to.size()) qDebug() << "from and to arrays should be the same length";
+	if (from.isEmpty()) return;
+
+	setRacking(from.first(), to.first());
+
+	for (int i = 0; i < from.size(); ++i) {
+		xfer(from[i], to[i]);
+	}
+
+	QString empty = "";
+	QString empty2 = "";
+	setRacking(empty, empty2);
+}
+
+void KnitoutScheduler::kUnstash(QStringList& from, QStringList& to) {
+	if (from.size() != to.size()) qDebug() << "from and to arrays should be the same length";
+	if (from.isEmpty()) return;
+
+	setRacking(from.first(), to.first());
+
+	for (int i = 0; i < from.size(); ++i) {
+		this->xfer(from[i], to[i]);
+	}
+
+	QString empty = "";
+	QString empty2 = "";
+	this->setRacking(empty, empty2);
+}
+
+void KnitoutScheduler::endTube(QString& dir, QStringList& bns) {
+	auto d = [this, &dir](QString& bn_str) {
+		PortedBedNeedle bn = parseBedNeedle(bn_str);
+		if (bn.bed.startsWith('f')) {
+			if (dir == "clockwise") {
+				return "-";
+			}
+			else {
+				Q_ASSERT(dir == "anticlockwise");
+				return "+";
+			}
+		}
+		else {
+			Q_ASSERT(bn.bed.startsWith('b'));
+			if (dir == "clockwise") {
+				return "+";
+			}
+			else {
+				Q_ASSERT(dir == "anticlockwise");
+				return "-";
+			}
+		}
+	};
+
+	QString output = "x-stitch-number " + QString::number(CastOnStitchNumber);
+	out(output);
+	qDebug() << "1";
+	for (int i = 0; i < bns.size(); ++i) {
+		QString l = d(bns[i]);
+		if (i % 2 == 0) knit(l, bns[i]);
+	}
+	for (int i = 0; i < bns.size(); ++i) {
+		QString l = d(bns[i]);
+		if (i % 2 == 1) knit(l, bns[i]);
+	}
+
+	qDebug() << "2";
+	output = "x-stitch-number " + QString::number(PlainStitchNumber);
+	out(output);
+	for (int row = 0; row < EndRows; ++row) {
+		for (QString& bn : bns) {
+			QString l = d(bn);
+			knit(l, bn);
+		}
+	}
+
+	if (this->inYarns[Carrier]) {
+		output = "outhook " + Carrier;
+		out(output);
+		inYarns[Carrier] = false;
+		yarnUsedCount[Carrier] = 0;
+		qDebug() << "Taking Carrier " << Carrier << " out.";
+	}
+	else {
+		qDebug() << "Taking out carrier that was never in : " << Carrier;
+	}
+
+	for (QString& bn : bns) {
+		drop(bn);
+	}
+}
+
+
+void KnitoutScheduler::startTube(QString& dir, QStringList& bns)
+{
+	QList<int> front;
+	QList<int> back;
+	for (QString& bn_str : bns) {
+		PortedBedNeedle bn = parseBedNeedle(bn_str);
+		if (bn.bed == "f") {
+			front.append(bn.needle);
+		}
+		else if (bn.bed == "b") {
+			back.append(bn.needle);
+		}
+		else {
+			qDebug() << "start_tube should only be called with 'f' or 'b' needles.";
+		}
+	}
+
+	std::sort(front.begin(), front.end());
+	std::sort(back.begin(), back.end());
+
+	if (front.isEmpty() || back.isEmpty()) {
+		qDebug() << "should start a tube with at least a stitch on each bed.";
+	}
+
+	// Do a tuck pattern to anchor yarn
+	int n = qMax(front.last(), back.last());
+	QList<QString> toDrop;
+	auto initTuck = [this, &toDrop](QString& d, QString& bn) {
+		tuck(d, bn);
+		toDrop.append(bn);
+	};
+
+	QString output = "x-stitch-number " + QString::number(YarnInStitchNumber);
+	out(output);
+
+
+	if (inYarns.find(Carrier) == inYarns.end()) {
+		QString output = "inhook " + Carrier;
+		out(output);
+		inYarns[Carrier] = true;
+		yarnUsedCount[Carrier] = 0;
+		qDebug() << "Bringing Carrier " << Carrier << " in.";
+	}
+	else {
+		qDebug() << "Bringing in carrier that was already in " << Carrier;
+	}
+
+	QString line1 = "f" + QString::number(n);
+	QString line2 = "f" + QString::number(n - 2);
+	QString line3 = "f" + QString::number(n - 4);
+	QString line4 = "f" + QString::number(n - 3);
+	QString line5 = "f" + QString::number(n - 1);
+	QString minus = "-";
+	QString plus = "+";
+
+	initTuck(minus, line1);
+	initTuck(minus, line2);
+	initTuck(minus, line3);
+	initTuck(plus, line4);
+	initTuck(plus, line5);
+
+
+	if (inYarns.find(Carrier) != inYarns.end()) {
+		QString line = "releasehook " + Carrier;
+		out(line);
+	}
+		
+
+	// Make list of needles and directions in tube order
+	QList<QPair<QString, QString>> sts;
+	if (dir == "clockwise") {
+		for (int i = front.size() - 1; i >= 0; --i) {
+			sts.append({ "-", "f" + QString::number(front[i]) });
+		}
+		for (int i = 0; i < back.size(); ++i) {
+			sts.append({ "+", "b" + QString::number(back[i]) });
+		}
+	}
+	else {
+		Q_ASSERT(dir == "anticlockwise");
+		for (int i = back.size() - 1; i >= 0; --i) {
+			sts.append({ "-", "b" + QString::number(back[i]) });
+		}
+		for (int i = 0; i < front.size(); ++i) {
+			sts.append({ "+", "f" + QString::number(front[i]) });
+		}
+	}
+
+	// Alternating tuck cast on
+	qDebug() << "Alternating";
+	output = "x-stitch-number " + QString::number(CastOnStitchNumber);
+	out(output);
+	for (int i = 0; i < sts.size(); ++i) {
+		if (i % 2 == 0) knit(sts[i].first, sts[i].second);
+	}
+	for (int i = 0; i < sts.size(); ++i) {
+		if (i % 2 == 1) knit(sts[i].first, sts[i].second);
+	}
+
+	// Drop everything in 'toDrop' that wasn't part of alternating tucks
+	for (QString& bn : toDrop) {
+		if (!bns.contains(bn)) {
+			this->drop(bn);
+		}
+	}
+
+	// Knit some plain rows
+	output = "x-stitch-number " + QString::number(PlainStitchNumber);
+	this->out(output);
+	qDebug() << "plain rows";
+	for (int row = 0; row < StartRows; ++row) {
+		for (auto& dbn : sts) {
+			knit(dbn.first, dbn.second);
+		}
+	}
+
+	int first = 0;
+	while (first < sts.size() && !bns.contains(sts[first].second)) ++first;
+	Q_ASSERT(first < sts.size());
+
+	// Knit a bit extra to get aligned to the input bns
+	qDebug() << "a bit extra";
+	for (int i = 0; i < first; ++i) {
+		QPair<QString, QString> st = sts.takeFirst();
+		this->knit(st.first, st.second);
+		sts.append(st);
+	}
+
+	// Alternating stitches to separate starting tube from knitting
+	output = "x-stitch-number " + QString::number(CastOnStitchNumber);
+	out(output);
+	qDebug() << "awwooge";
+	for (int i = 0; i < sts.size(); ++i) {
+		if (i % 2 == 0) this->knit(sts[i].first, sts[i].second);
+	}
+	for (int i = 0; i < sts.size(); ++i) {
+		if (i % 2 == 1) this->knit(sts[i].first, sts[i].second);
+	}
+
+	output = "x-stitch-number " + QString::number(PlainStitchNumber);
+	this->out(output);
 }

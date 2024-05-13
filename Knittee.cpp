@@ -111,7 +111,9 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(&laceKnitter, SIGNAL(sheetDimensionsChanged(int, int, int)), this, SLOT(sheetDimensionsChanged(int, int, int)));
     
     QObject::connect(&knitoutScheduler, SIGNAL(instructionsCreated(std::vector<std::string>)), this, SLOT(instructionsCreated(std::vector<std::string>)));
-    
+    QObject::connect(&knitoutScheduler, SIGNAL(knitoutGenerated(std::vector<QString>)), this, SLOT(knitoutGenerated(std::vector<QString>)));
+
+
     QObject::connect(meshToolsWidget, SIGNAL(generateKnitoutButtonClicked()), this, SLOT(generateKnitoutButtonClicked()));
 
     messageTextEdit = new QTextEdit(this);
@@ -129,6 +131,27 @@ Knittee::Knittee(QWidget* parent)
     centralWidget->setLayout(mainLayout);
 
     setCentralWidget(centralWidget);
+}
+
+void Knittee::knitoutGenerated(std::vector<QString> knitout) {
+    qDebug() << "instructions created!";
+
+    //save to project folder under 'knitoutgenerator'
+    QString filePath = projectPath + "/knitout";
+    QFile file(filePath);
+
+    if (!file.open(QIODevice::WriteOnly))
+    {
+        qDebug() << "could not open file";
+        return;
+    }
+
+    QTextStream out(&file);
+    for (const QString& instruction : knitout)
+    {
+        out << instruction << '\n';
+    }
+    file.close();
 }
 
 void Knittee::generateKnitoutButtonClicked() {
