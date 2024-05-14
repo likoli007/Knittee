@@ -218,27 +218,18 @@ void LaceKnitter::generateKnitout(int algo) {
 	QString knitout = ";;Carriage settings\n";
 	chosenAlgorithm = algo;
 	//iterate through sheet backwards
-	for (int i = sheet.size() - 1; i >= 0; i--) {
-		// Populate offsets
-		for (int j = 0; j < sheet[i].size(); j++) {
-			offsets.push_back(sheet[i][j].offset);
-		}
 
-
-		// Populate the needles map
-		for (int j = 0; j < offsets.size(); ++j) {
-			QString key = "f" + QString::number(j);
-			needles.insert(key, QVector<int>{ j });
-		}
-
-
-	}
 
 	QString dir = "-";
 	QString carrier = "5";
 	
 
 	for (int i = sheet.size() - 1; i >= 0; i--) {
+		offsets.clear();
+		for (int j = 0; j < sheet[i].size(); j++) {
+			offsets.push_back(sheet[i][j].offset);
+		}
+
 		if (dir == "-") {
 			for (int j = sheet[i].size(); j >= 1; j--) {
 				k.append("knit - f" + QString::number(j) + " " + carrier);
