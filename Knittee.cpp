@@ -116,6 +116,8 @@ Knittee::Knittee(QWidget* parent)
 
     QObject::connect(meshToolsWidget, SIGNAL(generateKnitoutButtonClicked()), this, SLOT(generateKnitoutButtonClicked()));
 
+    QObject::connect(sheetToolsWidget, SIGNAL(generateKnitoutSheet(int)), this, SLOT(generateKnitoutSheet(int)));
+
     messageTextEdit = new QTextEdit(this);
     messageTextEdit->setReadOnly(true);
     messageTextEdit->setMinimumSize(800, 100);
@@ -131,6 +133,10 @@ Knittee::Knittee(QWidget* parent)
     centralWidget->setLayout(mainLayout);
 
     setCentralWidget(centralWidget);
+}
+
+void Knittee::generateKnitoutSheet(int algorithm) {
+    laceKnitter.generateKnitout(algorithm);
 }
 
 void Knittee::knitoutGenerated(std::vector<QString> knitout) {

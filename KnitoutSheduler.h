@@ -136,5 +136,9 @@ private:
 		knitout.push_back(str);
 	}
 
+/////////////////////Helper functions and variables for 2D////////////////////////////////
+	void xfer2D(QString& fromBed, int fromIndex, QString& toBed, int toIndex);
+
+
 };
 

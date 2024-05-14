@@ -100,4 +100,7 @@ SheetToolBar::SheetToolBar(QWidget* parent) {
     QObject::connect(decreaseRadio, &QRadioButton::clicked, this, &SheetToolBar::decreaseRadioClicked);
 
     QObject::connect(rackingSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, &SheetToolBar::rackingSpinBoxChanged);
+
+    QObject::connect(generateKnitoutButton, &QPushButton::clicked, this, &SheetToolBar::generateKnitoutClicked);
+
 }

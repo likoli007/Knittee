@@ -3414,3 +3414,12 @@ void KnitoutScheduler::startTube(QString& dir, QStringList& bns)
 	output = "x-stitch-number " + QString::number(PlainStitchNumber);
 	this->out(output);
 }
+
+
+
+
+void KnitoutScheduler::xfer2D(QString& fromBed, int fromIndex, QString& toBed, int toIndex){
+	QString from = fromBed + QString::number(fromIndex);
+	QString to = toBed + QString::number(toIndex);
+	xfer(from, to);
+}

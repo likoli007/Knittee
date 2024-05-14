@@ -70,7 +70,13 @@ private slots:
 		emit rackingChanged(value);
 	}
 
+	void generateKnitoutClicked() {
+		int algorithm = AlgorithmComboBox->currentIndex();
+		emit generateKnitoutSheet(algorithm);
+	}
+
 signals:
+	void generateKnitoutSheet(int algorithm);
 	void rackingChanged(int value);
 	void heightChanged(int height, int side);
 	void widthChanged(int width, int side);

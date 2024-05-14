@@ -135,6 +135,7 @@ private slots:
     void instructionsCreated(std::vector<std::string> instructions);
     void generateKnitoutButtonClicked();
     void knitoutGenerated(std::vector<QString>);
+    void generateKnitoutSheet(int algorithm);
 private:
     void saveTraced(std::vector< TracedStitch >*);
 
