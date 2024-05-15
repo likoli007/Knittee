@@ -27,8 +27,11 @@ public:
 	void copyObjFileToProject(QString projectName);
 	ObjectMesh generateMesh();
 private:
+	float desiredSize = 10.0f;  //desired size of the mesh so that zooming and panning is constant
+
 	void flushArrays();
 	void addTriangle(QString line);
 	void addQuad(QString line);
+	void normalizeMesh(ObjectMesh& mesh);
 };
 

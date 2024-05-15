@@ -14,6 +14,7 @@
 #include <QApplication>
 #include <QPair>
 #include <QScreen>
+#include <QGraphicsDropShadowEffect>
 /*
 *   Function: constructor, adds mouse tracking for the visualization subwindow
 */
@@ -178,13 +179,30 @@ void Visualizer::buildmvpMatrix() {
     float aspectRatio = static_cast<float>(width()) / static_cast<float>(height());
     projectionMatrix.perspective(45, aspectRatio, 0.1f, 100.0f);
 
-    viewMatrix.translate(0, 0, translateZ);
+    viewMatrix.translate(-centroid.x(), -centroid.y(), -centroid.z());
+    
+    viewMatrix.translate(0.0, 0.0, -zoomLevel*zoomFactor);
+    viewMatrix.translate(translateX, translateY, 0.0f);
+
     viewMatrix.rotate(m_rotationAngleX, 1.0f, 0.0f, 0.0f);
     viewMatrix.rotate(m_rotationAngleY, 0.0f, 1.0f, 0.0f);
+    //viewMatrix.scale(1.0f / zoomLevel);
+    //viewMatrix.translate(centroid.x(), centroid.y(), centroid.z());
+    
+    
 
-    modelMatrix.translate(translateX, translateY, 0.0f);
-    modelMatrix.scale(1.0f / zoomLevel);
+    //modelMatrix.translate(-centroid.x(), -centroid.y(), -centroid.z());
+    //modelMatrix.translate(centroid.x(), centroid.y(), centroid.z()); // Translate to centroid
+    //modelMatrix.scale(1.0f / zoomLevel);
+    // Scale relative to centroid
+    //modelMatrix.translate(-centroid.x(), -centroid.y(), -centroid.z()); // Translate back
 
+    
+    
+    //modelMatrix.translate(0.0, 0.0, translateZ);
+
+    
+    //modelMatrix.translate(centroid.x(), centroid.y(), centroid.z());
 
     // Combine the matrices to form mvp matrix
     mvpMatrix = projectionMatrix * viewMatrix * modelMatrix;
@@ -388,12 +406,76 @@ void Visualizer::paintPickFrame() {
 }
 
 
+void Visualizer::paintLineTube(QVector3D start, QVector3D end, float r, float g, float b) {
+    //glLineWidth(5.0f);
+
+    buildmvpMatrix();
+    start = mvpMatrix.map(start);
+    end = mvpMatrix.map(end);
+
+    int numSegments = 16;
+    int radius = 1.0f;
+
+    // Calculate the direction and length of the tube
+    QVector3D direction = end - start;
+    float length = direction.length();
+    direction.normalize();
+
+    // Generate vertices for the tube
+    std::vector<QVector3D> vertices;
+    //<QVector3D> normals;
+    //QVector<QVector2D> texCoords; // If needed for texturing
+    
+    for (int i = 0; i <= numSegments; ++i) {
+        float theta = i * (2 * M_PI / numSegments);
+        float x = radius * cos(theta);
+        float y = radius * sin(theta);
+
+        QVector3D circlePoint = QVector3D(x, y, 0.0f);
+        QVector3D vertex = start + (direction * ((float)i / numSegments) * length) + circlePoint;
+        vertices.push_back(vertex);
+
+        // Calculate normals (pointing along the radial direction)
+        //QVector3D normal = QVector3D::crossProduct(circlePoint, direction).normalized();
+        //normals.push_back(normal);
+
+        // If you need texture coordinates, calculate them here
+    }
+    
+    // Generate indices for the tube
+    std::vector<unsigned int> indices;
+    for (int i = 0; i < numSegments-1; ++i) {
+        int next = (i + 1) % numSegments;
+        indices.push_back(i);
+        indices.push_back(next);
+        indices.push_back(i + numSegments);
+
+        indices.push_back(next);
+        indices.push_back(next + numSegments );
+        indices.push_back(i + numSegments );
+    }
+    
+    // Render the tube
+    glColor3f(r, g, b);
+    glBegin(GL_TRIANGLES);
+    for (int i = 0; i < indices.size(); ++i) {
+
+        int idx = indices[i];
+        qDebug() << i << idx << vertices.size();
+        //glNormal3f(normals[idx].x(), normals[idx].y(), normals[idx].z());
+        glVertex3f(vertices[idx].x(), vertices[idx].y(), vertices[idx].z());
+    }
+    glEnd();
+
+}
+
 /*
 *   Function: paint the constraint set by the user, currently a thick line running from the selected constrained vertices
 */
-void Visualizer::paintPath(QVector3D start, QVector3D end, float r, float g, float b) {
+void Visualizer::paintPath(QVector3D start, QVector3D end, float r, float g, float b, float radius = 5.0f) {
     // Set up
-    glLineWidth(5.0f);
+    glEnable(GL_LINE_SMOOTH);
+    glLineWidth(radius);
 
     buildmvpMatrix();
 
@@ -416,6 +498,7 @@ void Visualizer::paintPath(QVector3D start, QVector3D end, float r, float g, flo
     glVertex3f(start.x(), start.y(), start.z());
     glVertex3f(end.x(), end.y(), end.z());
 
+    glDisable(GL_LINE_SMOOTH);
     glEnd();
 }
 
@@ -441,7 +524,7 @@ void Visualizer::reset() {
     showTraced = false;
     tracedMesh.clear();
     addingConstraints = false;
-
+    showLastChain = false;
     
 
     showModel = true;
@@ -482,6 +565,7 @@ void Visualizer::paintConstraints() {
                 QVector3D vertex1 = mesh.vertices[c->vertices[i]];
                 QVector3D vertex2 = mesh.vertices[c->vertices[i + 1]];
 
+                //paintLineTube(vertex1, vertex2, r, g, b);
                 paintPath(vertex1, vertex2, r, g, b);
             }
         }
@@ -704,11 +788,10 @@ void Visualizer:: paintCube(QVector3D center, float sideLength) {
     glEnd();
 }
 
+
+
 void Visualizer::paintTraced() {
-    std::vector<glm::vec3> ycolors = { glm::vec3(1.0f,0.0f,0.0f), glm::vec3(0.0f, 1.0f, 0.0f),
-        glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(1.0f, 0.0f, 1.0f), glm::vec3(0.0f, 1.0f, 1.0f),
-    glm::vec3(1.0f, 1.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f)};
-    
+ 
     int yarnColor = 0;
 
     for (int i = 1; i < tracedMesh.size(); i++) {
@@ -731,10 +814,15 @@ void Visualizer::paintTraced() {
             QVector3D start = QVector3D(0.5f * (at.x + in0.x), 0.5f * (at.y + in0.y), 0.5f * (at.z + in0.z));
             QVector3D end = QVector3D(0.5f * (at.x + in1.x), 0.5f * (at.y + in1.y), 0.5f * (at.z + in1.z));
 
+            QVector3D atStart = QVector3D(at.x, at.y, at.z);
+
             paintPath(
-				start, end,
+				atStart, end,
 				0.33f, 0.33f, 0.33f);
-            paintPath(start, end, 0.8, 0.8, 0.8);
+            
+            
+
+            paintPath(atStart, start, 0.8, 0.8, 0.8);
         }
         if (tracedMesh[i].outs[0] != -1U && tracedMesh[i].outs[1] != -1U) {
             glm::vec3 const& out0 = tracedMesh[tracedMesh[i].outs[0]].at;
@@ -743,10 +831,13 @@ void Visualizer::paintTraced() {
             QVector3D start = QVector3D(0.5f * (at.x + out0.x), 0.5f * (at.y + out0.y), 0.5f * (at.z + out0.z));
             QVector3D end = QVector3D(0.5f * (at.x + out1.x), 0.5f * (at.y + out1.y), 0.5f * (at.z + out1.z));
 
+            QVector3D atStart = QVector3D(at.x, at.y, at.z);
+
+            
             paintPath(
-                start, end,
+                atStart, end,
                 0.26f, 0.26f, 0.26f);
-            paintPath(start, end, 0.73, 0.73, 0.73);
+            paintPath(atStart, start, 0.8, 0.8, 0.8);
         }
         if (tracedMesh[i].ins[0] != -1U && tracedMesh[i].ins[1] == -1U) {
             glm::vec3 const& in0 = tracedMesh[tracedMesh[i].ins[0]].at;
@@ -772,6 +863,10 @@ void Visualizer::paintTraced() {
     }
 }
 
+void Visualizer::knitGraphCreated() {
+    showLastChain = true;
+}
+
 void Visualizer::knitGraphTraced(std::vector< TracedStitch >* t) {
     tracedMesh = *t;
     showTraced = true;
@@ -786,7 +881,7 @@ void Visualizer::paintFirstActiveChains() {
         locations.emplace_back(v.at.interpolate(interpolatedMesh.vertices));
     }
 
-    
+    float r, g, b;
     //TODO: get parameters from knitgrapher
     float radius = 1.5f * 0.075f * 3.66f * 10.0f;
     for (uint32_t vi = 0; vi < rowColGraph.vertices.size(); ++vi) {
@@ -799,51 +894,62 @@ void Visualizer::paintFirstActiveChains() {
             radius
         );*/
 
-        //paintCube(locations[vi], radius);
-
+        
         if (v.row_in != -1U) {
             //qDebug() << "i have row_in";
-            paintPath(
-                locations[vi],
-                locations[v.row_in],
-                1.0f, 0.0f, 1.0f
-            );
+            if (showLastChain || (showNextChains && v.col_out[0] != -1U))
+                paintPath(
+                    locations[vi],
+                    locations[v.row_in],
+                    graphRowColor.x, graphRowColor.y, graphRowColor.z
+                );
         }
         if (v.row_out != -1U) {
             //qDebug() << "i have row_out";
-            paintPath(
-                locations[vi],
-                locations[v.row_out],
-                1.0f, 0.0f, 1.0f
-            );
+            if(!showNextChains || (showNextChains && v.col_out[0] != -1U))
+                paintPath(
+                    locations[vi],
+                    locations[v.row_out],
+                    graphRowColor.x, graphRowColor.y, graphRowColor.z
+                );
         }
         if (v.col_in[0] != -1U) {
+
+            //qDebug() << v.col_in[1] << (v.col_in[1] == -1U);
+            r = v.col_in[1] == -1U ?  graphLinkColor.x : graphCollapseColor.x;
+            g = v.col_in[1] == -1U ? graphLinkColor.y : graphCollapseColor.y;
+            b = v.col_in[1] == -1U ?  graphLinkColor.z : graphCollapseColor.z;
+
             paintPath(
                 locations[vi],
                 locations[v.col_in[0]],
-                1.0f, 0.0f, 1.0f
+                r, g, b
             );
         }
         if (v.col_in[1] != -1U) {
             paintPath(
                 locations[vi],
                 locations[v.col_in[1]],
-                1.0f, 0.0f, 1.0f
+                graphCollapseColor.x, graphCollapseColor.y, graphCollapseColor.z
             );
         }
-
+        
         if (v.col_out[0] != -1U) {
+            r = v.col_out[1] == -1U ? graphLinkColor.x : graphExpandColor.x;
+            g = v.col_out[1] == -1U ? graphLinkColor.y : graphExpandColor.y;
+            b = v.col_out[1] == -1U ? graphLinkColor.z : graphExpandColor.z;
+
             paintPath(
                 locations[vi],
                 locations[v.col_out[0]],
-                1.0f, 0.0f, 1.0f
+                r, g, b
             );
         }
         if (v.col_out[1] != -1U) {
             paintPath(
                 locations[vi],
                 locations[v.col_out[1]],
-                1.0f, 0.0f, 1.0f
+                graphExpandColor.x, graphExpandColor.y, graphExpandColor.z
             );
         }
     }
@@ -978,7 +1084,7 @@ void Visualizer::paintSliceMesh() {
             for (int i = 0; i < activeChain.size() - 1; i++) {
                 QVector3D vertex1 = sliceMesh.vertices[activeChain[i]];
                 QVector3D vertex2 = sliceMesh.vertices[activeChain[i + 1]];
-                paintPath(vertex1, vertex2, 1.0f, 0.0f, 0.0f);
+                paintPath(vertex1, vertex2, lowerBoundColor.x, lowerBoundColor.y, lowerBoundColor.z);
             }
         }
 
@@ -986,7 +1092,7 @@ void Visualizer::paintSliceMesh() {
             for (int i = 0; i < nextChain.size() - 1; i++) {
                 QVector3D vertex1 = sliceMesh.vertices[nextChain[i]];
                 QVector3D vertex2 = sliceMesh.vertices[nextChain[i + 1]];
-                paintPath(vertex1, vertex2, 0.0f, 0.0f, 1.0f);
+                paintPath(vertex1, vertex2, upperBoundColor.x, upperBoundColor.y, upperBoundColor.z);
             }
         }
     }
@@ -1066,7 +1172,7 @@ void Visualizer::paintLinks() {
         QVector3D const& vertex1 = from[link.from_chain][link.from_stitch];
         QVector3D const& vertex2 = to[link.to_chain][link.to_stitch];
 
-		paintPath(vertex1, vertex2, 0.0f, 1.0f, 0.0f);
+		paintPath(vertex1, vertex2, graphLinkColor.x, graphLinkColor.y, graphLinkColor.z);
 	}
 
 
@@ -1105,21 +1211,75 @@ void Visualizer::paintNextChains() {
         for (int i = 0; i < nextChain.size() - 1; i++) {
             QVector3D vertex1 = nextChain[i];
             QVector3D vertex2 = nextChain[i + 1];
-            paintPath(vertex1, vertex2, 1.0f, 0.0f, 0.0f);
+            paintPath(vertex1, vertex2, lowerBoundColor.x, lowerBoundColor.y, lowerBoundColor.z);
         }
     }
 
 }
 
+void Visualizer::paintCurve(QPainter& painter, const std::vector<QPoint>& controlPoints) {
 
+    QPainterPath path;
+
+
+    for (int i = 0; i < controlPoints.size(); i += 4) {
+        QPoint p0 = controlPoints[i];
+        QPoint p1 = controlPoints[i+1];
+        QPoint c0 = controlPoints[i+2];
+        QPoint c1 = controlPoints[i+3];
+
+        path.moveTo(p0);
+        path.cubicTo(c0.x(), c0.y(), c1.x(), c1.y(), p1.x(), p1.y());
+
+    }
+
+    // Top curve
+    
+    QPen blackPen(Qt::black, 6);
+    blackPen.setCapStyle(Qt::RoundCap);
+
+    painter.setPen(blackPen);
+    painter.drawPath(path);
+
+    QPen pen;
+    pen.setWidth(3);
+    pen.setColor(QColor(255, 25, 25));
+    pen.setCapStyle(Qt::RoundCap);
+    painter.setPen(pen);
+    painter.drawPath(path);
+
+    //cubicPath.moveTo(ax, ay);  // Continue from the end of the quadratic B¨¦zier curve
+    //cubicPath.cubicTo(bx, by, cx, cy, dx, dy);
+
+}
+
+void Visualizer::paintLoopConnection(QPainter& painter, QPoint p0, QPoint p1) {
+    QPainterPath path;
+
+    // Top curve
+    path.moveTo(p0);
+    path.lineTo(p1);
+
+    QPen pen;
+    pen.setWidth(5);
+    pen.setColor(QColor(168, 52, 50));
+    painter.setPen(pen);
+    painter.drawPath(path);
+
+    QPen blackPen(Qt::black, 7);
+    painter.setPen(blackPen);
+    painter.drawPath(path);
+    
+}
 
 void Visualizer::paintSheet() {
 
-    glClearColor(0.7451f, 0.7451f, 0.7451f, 1.0f);
+    glClearColor(0.85f, 0.85f, 0.85f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     // Set up orthogonal projection
 
-
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
     // +1 here so that loops are not on the edges
     int sheetWidth = sheet[0].size()+1;
     int sheetHeight = sheet.size()+1;
@@ -1139,71 +1299,196 @@ void Visualizer::paintSheet() {
     glMatrixMode(GL_MODELVIEW);
 
 
-
-    
+    QPoint p0;
+    QPoint p1;
+    QPoint c0;
+    QPoint c1;
+    std::vector<QPoint> controlPoints;
     //qDebug() << xOffset << yOffset;
-
+    
     for (int i = 0; i < sheet.size(); i++) {
+        if (i == sheet.size()-1) {
+            p0 = QPoint(0, (i+1) * cellHeight + yOffset);
+            p1 = QPoint(xOffset, (i+1) * cellHeight + yOffset);
+            c0 = QPoint(0, (i + 1) * cellHeight + yOffset);
+            c1 = QPoint(xOffset, (i + 1) * cellHeight + yOffset);
+            controlPoints.push_back(p0);
+			controlPoints.push_back(p1);
+			controlPoints.push_back(c0);
+			controlPoints.push_back(c1);
+			//controlPoints = { p0, p1, c0, c1 };
+			//paintCurve(painter, controlPoints);
+        }
+
         for (int j = 0; j < sheet[i].size(); j++) {
             // Calculate the position of the rectangle
             int rectX = j * cellWidth + xOffset; // Left of the cell
-            int rectY = i * cellHeight + yOffset; // Top of the cell
+            int rectY = (sheet.size() - 1 - i) * cellHeight + yOffset; // Top of the cell
 
+            
+            
             // Draw the rectangle around the cell
+            /*
             glColor3f(0.0f, 0.0f, 0.0f); // Black color
             glBegin(GL_LINE_LOOP);
             glVertex2i(rectX, rectY); // Top-left corner of the cell
             glVertex2i(rectX + cellWidth, rectY); // Top-right corner of the cell
             glVertex2i(rectX + cellWidth, rectY + cellHeight); // Bottom-right corner of the cell
             glVertex2i(rectX, rectY + cellHeight); // Bottom-left corner of the cell
-            glEnd();
-
-            // Calculate the position of the line
-            int lineX = j * cellWidth + xOffset; // Center of the cell horizontally
-            int lineY = i * cellHeight + yOffset + cellHeight / 6; // About 1/6th of the way up from the bottom of the cell
-            int endX = lineX + cellWidth / 4; // End of the line
-            int endY = lineY;
-        
-
-            paintYarn(lineX, lineY, endX, endY);
-           
-            lineX = endX;
-            lineY = endY;
-
-            endX = lineX + sheet[i][j].offset*cellWidth - cellWidth/8;
-            endY = i * cellHeight + yOffset + cellHeight + 2*(cellHeight / 6); // About 1/6th of the way down from the top of the cell
-
-            paintYarn(lineX, lineY, endX, endY);
-
-            lineX = endX;
-            lineY = endY;
-            endX = lineX + cellWidth / 2 + cellWidth/8;
-            endY = lineY;
-
-            paintYarn(lineX, lineY, endX, endY);
+            glEnd();*/
 
 
-            lineX = endX;
-            lineY = endY;
-            endX = lineX - sheet[i][j].offset * cellWidth - cellWidth / 8;
-            endY =  i * cellHeight + yOffset + cellHeight / 6;
+            //paint in yarn
+            p0 = QPoint(rectX, rectY + cellHeight);
+            p1 = QPoint(rectX + cellWidth / 2.4, rectY + (cellHeight / 1.25));
+            c0 = QPoint(rectX + cellWidth / 4, rectY + (cellHeight));
+            c1 = QPoint(rectX + cellWidth / 2, rectY + (cellHeight));
+            controlPoints.push_back(p0);
+            controlPoints.push_back(p1);
+            controlPoints.push_back(c0);
+            controlPoints.push_back(c1);
+            //controlPoints = { p0, p1, c0, c1 };
+            //paintCurve(painter, controlPoints);
 
-            paintYarn(lineX, lineY, endX, endY);
+            //paint loop connection
+            //controlPoints.clear();
 
-            lineX = endX;
-            lineY = endY;
-            endX = lineX+cellWidth/2;
-            endY = lineY;
-            paintYarn(lineX, lineY, endX, endY);
+            int x = cellWidth * sheet[i][j].offset;
+            p0 = p1;
+            p1 = QPoint(rectX + cellWidth / 4 + x, rectY - cellHeight / 3);
+            c0 = QPoint(rectX + (cellWidth / 2.6), rectY + (cellHeight / 1.15));
+            c1 = QPoint(rectX + cellWidth / 5 + x, rectY - cellHeight / 4);
+            controlPoints.push_back(p0);
+            controlPoints.push_back(p1);
+            controlPoints.push_back(c0);
+            controlPoints.push_back(c1);
+            //controlPoints = { p0, p1, c0, c1 };
+            //paintCurve(painter, controlPoints);
 
-            glLineWidth(1.0f); // Reset line width to default
+
+            //paint top curve
+            //controlPoints.clear();
+             
+            p0 = QPoint(rectX + cellWidth / 4 + x, rectY - cellHeight / 3);
+            p1 = QPoint(rectX + cellWidth - (cellWidth / 4) + x, rectY - cellHeight / 3);
+            c0 = QPoint(rectX + cellWidth / 2.7 + x, rectY - (cellHeight / 2));
+            c1 = QPoint(rectX + cellWidth - (cellWidth / 2.7) + x, rectY - (cellHeight / 2));
+            controlPoints.push_back(p0);
+            controlPoints.push_back(p1);
+            controlPoints.push_back(c0);
+            controlPoints.push_back(c1);
+            
+            
+            //controlPoints = { p0, p1, c0, c1 };
+
+            //paintCurve(painter, controlPoints);
+            
+
+            //paint loop back
+            //controlPoints.clear();
+			p0 = QPoint(rectX + cellWidth - (cellWidth / 4) + x, rectY - cellHeight / 3);
+            p1 = QPoint(rectX + cellWidth - (cellWidth / 2.4), rectY + (cellHeight / 1.25));
+            c0 = QPoint(rectX + cellWidth - (cellWidth / 5) + x, rectY - cellHeight / 4);
+            c1 = QPoint(rectX + cellWidth - (cellWidth / 2.6), rectY + (cellHeight / 1.15));
+            controlPoints.push_back(p0);
+            controlPoints.push_back(p1);
+            controlPoints.push_back(c0);
+            controlPoints.push_back(c1);
+            //controlPoints = { p0, p1, c0, c1 };
+            //paintCurve(painter, controlPoints);
+
+            //paint out yarn
+            //controlPoints.clear();
+            p0 = QPoint(rectX + cellWidth, rectY + cellHeight);
+            p1 = QPoint(rectX + cellWidth - (cellWidth / 2.4), rectY + (cellHeight / 1.25));
+            c0 = QPoint(rectX + cellWidth - (cellWidth / 4), rectY + (cellHeight));
+            c1 = QPoint(rectX + cellWidth - (cellWidth / 2), rectY + (cellHeight));
+            controlPoints.push_back(p0);
+            controlPoints.push_back(p1);
+            controlPoints.push_back(c0);
+            controlPoints.push_back(c1);
+            //controlPoints = { p0, p1, c0, c1 };
+            //paintCurve(painter, controlPoints);
+
+            //glLineWidth(1.0f); // Reset line width to default
+        }
+        if (i != 0) {
+            if ((i % 2 == 1 && sheet.size() % 2 == 0) || (i % 2 == 0 && sheet.size() % 2 == 1)) {
+                //controlPoints.clear();
+                p0 = QPoint(sheet[i].size() * cellWidth + xOffset, i * cellHeight + yOffset);
+                p1 = QPoint(sheet[i].size() * cellWidth + xOffset, (i + 1) * cellHeight + yOffset);
+                c0 = QPoint(sheet[i].size() * cellWidth + xOffset + (cellWidth / 5), i * cellHeight + yOffset + (cellHeight - cellHeight / 1.7));
+                c1 = QPoint(sheet[i].size() * cellWidth + xOffset + (cellWidth / 5), i * cellHeight + yOffset + cellHeight / 1.7);
+                controlPoints.push_back(p0);
+                controlPoints.push_back(p1);
+                controlPoints.push_back(c0);
+                controlPoints.push_back(c1);
+                //controlPoints = { p0, p1, c0, c1 };
+                //paintCurve(painter, controlPoints);
+            }
+            else {
+                //controlPoints.clear();
+                p0 = QPoint(xOffset, i * cellHeight + yOffset);
+                p1 = QPoint(xOffset, (i + 1) * cellHeight + yOffset);
+                c0 = QPoint(xOffset - (cellWidth / 5), i * cellHeight + yOffset + (cellHeight - cellHeight / 1.7));
+                c1 = QPoint(xOffset - (cellWidth / 5), i * cellHeight + yOffset + cellHeight / 1.7);
+                controlPoints.push_back(p0);
+                controlPoints.push_back(p1);
+                controlPoints.push_back(c0);
+                controlPoints.push_back(c1);
+                //controlPoints = { p0, p1, c0, c1 };
+                //paintCurve(painter, controlPoints);
+            }
+        }
+        else {
+            if (sheet.size() % 2 == 1) {
+                p0 = QPoint(sheet[i].size()*cellWidth + xOffset , (i + 1) * cellHeight + yOffset);
+                p1 = QPoint(sheet[i].size() * cellWidth + xOffset + xOffset, (i + 1) * cellHeight + yOffset);
+                c0 = QPoint(sheet[i].size() * cellWidth + xOffset, (i + 1) * cellHeight + yOffset);
+                c1 = QPoint(sheet[i].size() * cellWidth + xOffset, (i + 1) * cellHeight + yOffset);
+                controlPoints.push_back(p0);
+                controlPoints.push_back(p1);
+                controlPoints.push_back(c0);
+                controlPoints.push_back(c1);
+            }
+            else {
+                p0 = QPoint(0, (i + 1) * cellHeight + yOffset);
+                p1 = QPoint(xOffset, (i + 1) * cellHeight + yOffset);
+                c0 = QPoint(0, (i + 1) * cellHeight + yOffset);
+                c1 = QPoint(xOffset, (i + 1) * cellHeight + yOffset);
+                controlPoints.push_back(p0);
+                controlPoints.push_back(p1);
+                controlPoints.push_back(c0);
+                controlPoints.push_back(c1);
+            }
         }
     }
+
+    paintCurve(painter, controlPoints);
 
 }
 
 void Visualizer::paintYarn(int ax, int ay, int bx, int by) {
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
 
+    ay = this->height() - ay;
+    by = this->height() - by;
+
+    // Draw the thicker black line for the outline effect
+    QPen pen(Qt::black, 10);
+    painter.setPen(pen);
+    painter.drawLine(ax, ay, bx, by);
+
+
+
+    // Draw the thinner red line on top
+    pen.setColor(Qt::red);
+    pen.setWidth(5);
+    painter.setPen(pen);
+    painter.drawLine(ax, ay, bx, by);
+
+    /*
     glColor3f(1.0f, 0.0f, 0.0f); // Red color
     glLineWidth(5.0f); // Set line width to make it thicker
     glBegin(GL_LINES);
@@ -1217,7 +1502,29 @@ void Visualizer::paintYarn(int ax, int ay, int bx, int by) {
     glBegin(GL_LINES);
     glVertex2i(ax, ay); // Start from the left side of the rectangle
     glVertex2i(bx, by); // End at the right side of the rectangle
-    glEnd();
+    glEnd();*/
+}
+
+
+void Visualizer::computeBoundaries() {
+    float sumX, sumY, sumZ;
+    float maxDistSquared;
+
+    sumX = sumY = sumZ = 0.0f;
+    maxDistSquared = 0.0f;
+
+    for (int i = 0; i < mesh.vertices.size(); i++) {
+		sumX += mesh.vertices[i].x();
+		sumY += mesh.vertices[i].y();
+		sumZ += mesh.vertices[i].z();
+	}
+
+    int num_vertices = mesh.vertices.size();
+    float centroidX = sumX / num_vertices;
+    float centroidY = sumY / num_vertices;
+    float centroidZ = sumZ / num_vertices;
+
+    centroid = QVector3D(centroidX, centroidY, centroidZ);
 }
 
 /*
@@ -1286,7 +1593,6 @@ void Visualizer::paintGL()
 void Visualizer::loadMesh(ObjectMesh object) {
     mesh = object;
 
-    qDebug() << "start load " << mesh.vertices.size() << mesh.indices.size();
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
@@ -1296,10 +1602,7 @@ void Visualizer::loadMesh(ObjectMesh object) {
     // Create and bind the index buffer
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(GLuint), mesh.indices.data(), GL_STATIC_DRAW);
-    GLenum error;
-    while ((error = glGetError()) != GL_NO_ERROR) {
-        qDebug() << "OpenGL error: " << error;
-    }
+   
     // Specify the format of the vertex data (position only)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), nullptr);
     glEnableVertexAttribArray(0);
@@ -1307,8 +1610,14 @@ void Visualizer::loadMesh(ObjectMesh object) {
     // Unbind the VAO
     glBindVertexArray(0);
 
+
+    computeBoundaries();
+    qDebug() << "centroid" << centroid;
+
+    
+    
     showModel = true;
-    qDebug() << "end load";
+    
 }
 
 /*
@@ -1471,7 +1780,7 @@ QPair<int, int> Visualizer::getLoopPos(int mX, int mY) {
             int rectHeight = cellHeight;
 
             if (mX > rectX && mX < rectX + rectWidth && mY > rectY && mY < rectY + rectHeight) {
-                //qDebug() << "Mouse is in cell: " << i << ", " << j;
+                qDebug() << "Mouse is in cell: " << i << ", " << j;
                 res.first = i;
                 res.second = j;
                 //chosenVertex = i * sheet[i].size() + j;

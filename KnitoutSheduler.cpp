@@ -33,7 +33,7 @@ void KnitoutScheduler::schedule(QString path)
 		qDebug() << "ERROR: failed to load stitches";
 		return;
 	}
-	qDebug() << "Read " << stitches.size() << " stitches";
+	emit helpBoxCommunication(  "Read " +QString::number(stitches.size()) + " stitches");
 	stitch_locations.assign(stitches.size(), std::make_pair(BedNeedle(BedNeedle::FrontSliders, -1), BedNeedle(BedNeedle::FrontSliders, -1)));
 	input_locations.assign(stitches.size(), std::make_pair(BedNeedle(BedNeedle::FrontSliders, -1), BedNeedle(BedNeedle::FrontSliders, -1)));
 
@@ -368,12 +368,12 @@ void KnitoutScheduler::schedule(QString path)
 					ret += "]";
 					return ret;
 				};
-				qDebug() << "step[" << (&step - &steps[0]) << "]:";
-				qDebug() << "  in:";
+				//qDebug() << "step[" << (&step - &steps[0]) << "]:";
+				//qDebug() << "  in:";
 				for (auto i : step.in) qDebug() << ' ' << storage_to_string(i);
-				qDebug() << " int:";
+				//qDebug() << " int:";
 				for (auto const& l : step.inter) qDebug() << ' ' << l.to_string();
-				qDebug() << " out:";
+				//qDebug() << " out:";
 				for (auto o : step.out) qDebug() << ' ' << storage_to_string(o);
 			}
 
@@ -430,7 +430,7 @@ void KnitoutScheduler::schedule(QString path)
 						}
 					}
 					else {
-						qDebug() << "What is '" << stitch.type << "'?"; //DEBUG
+						//qDebug() << "What is '" << stitch.type << "'?"; //DEBUG
 						assert(0 && "Unsupported stitch type.");
 					}
 				}
@@ -486,12 +486,12 @@ void KnitoutScheduler::schedule(QString path)
 
 
 	//Figure out possible shapes for storages near *interesting* steps:
-	qDebug() << "Figuring out shapes for interesting steps:"; //DEBUG
+	//qDebug() << "Figuring out shapes for interesting steps:"; //DEBUG
 	for (auto& step : steps) {
 		//interesting steps have more than one out/in:
 		if (step.in.size() <= 1 && step.out.size() <= 1) continue;
 
-		qDebug() << "steps[" << (&step - &steps[0]) << "]:"; //DEBUG
+		//qDebug() << "steps[" << (&step - &steps[0]) << "]:"; //DEBUG
 
 		{ //DEBUG
 			for (StorageIdx s : step.in) {
@@ -800,17 +800,17 @@ void KnitoutScheduler::schedule(QString path)
 
 		enumerate_orders();
 
-		qDebug() << "In total, step had " << step.options.size() << " scheduling options.";
+		//qDebug() << "In total, step had " << step.options.size() << " scheduling options.";
 
 	} //interesting steps
 
-	qDebug() << "(done)" ;
+	//qDebug() << "(done)" ;
 
 
 	//Figure out possible shapes for storages near *boring* steps:
 	qDebug() << "Figuring out shapes for boring steps:"; //DEBUG
 	for (auto& step : steps) {
-		qDebug() << "step = " << &step - &steps[0];
+		//qDebug() << "step = " << &step - &steps[0];
 		if (!(step.in.size() <= 1 && step.out.size() <= 1)) continue; //skip exciting steps
 		uint32_t inter_roll = 0; //such that: storages[step.in[0]][i] == step.inter[i + inter_roll]
 		//used to fix up inter_shape relative to in_shape so the stitches are in the same places.
@@ -902,7 +902,7 @@ void KnitoutScheduler::schedule(QString path)
 			}
 
 		}
-		qDebug() << "steps[" << (&step - &steps[0]) << "] had " << step.options.size() << " scheduling options.";
+		//qDebug() << "steps[" << (&step - &steps[0]) << "] had " << step.options.size() << " scheduling options.";
 	}
 
 	std::vector< int32_t > storage_positions(storages.size(), std::numeric_limits< int32_t >::max());
@@ -926,9 +926,10 @@ void KnitoutScheduler::schedule(QString path)
 		step_in_edges.reserve(steps.size());
 		step_out_edges.reserve(steps.size());
 
-		qDebug() << "Building DAG "; 
+		//qDebug() << "Building DAG "; 
+		emit helpBoxCommunication("Building DAG, this may take a long while...");
 		for (auto const& step : steps) {
-			qDebug() << "."; 
+			//qDebug() << "."; 
 			step_in_edges.emplace_back();
 			step_out_edges.emplace_back();
 			if (step.in.size() == 1 && step.out.size() == 1) {
@@ -1082,17 +1083,19 @@ void KnitoutScheduler::schedule(QString path)
 				assert(node.options.size() == step.options.size());
 			}
 		} //for(steps)
-		qDebug() << " done.";
+
+		
+		//qDebug() << " done.";
 
 		assert(node_steps.size() == nodes.size());
 
-		qDebug() << "Have " << edges.size() << " edges and " << nodes.size() << " nodes.";
-
+		
+		emit helpBoxCommunication("DAG built! Have "+QString::number(edges.size())+" edges and "+QString::number(nodes.size()) + " nodes.");
 		std::vector< uint32_t > node_options;
 		std::vector< int32_t > node_positions, edge_positions;
 
 		if (!embed_DAG(nodes, edges, &node_options, &node_positions, &edge_positions)) {
-			qDebug() << "ERROR: failed to find an upward-planar embedding.";
+			emit helpBoxCommunication( "ERROR: failed to find an upward-planar embedding.");
 			return;
 		}
 
@@ -1100,20 +1103,19 @@ void KnitoutScheduler::schedule(QString path)
 		assert(node_positions.size() == nodes.size());
 		assert(edge_positions.size() == edges.size());
 
-
-		qDebug() << "going thru steps";
+		emit helpBoxCommunication("Going through scheduling steps, this make take a while...");
 		//Go through steps and assign selected option:
 		assert(node_options.size() == nodes.size());
 		for (uint32_t n = 0; n < nodes.size(); ++n) {
 			assert(node_steps[n] < steps.size());
 			//WARNING COST THING HERE
-			qDebug() << "Step " << node_steps[n] << " gets option " << node_options[n] << " of " << nodes[n].options.size() << " for cost ";
+			//qDebug() << "Step " << node_steps[n] << " gets option " << node_options[n] << " of " << nodes[n].options.size() << " for cost ";
 			assert(node_options[n] < steps[node_steps[n]].options.size());
 			assert(nodes[n].options.size() == steps[node_steps[n]].options.size());
 			step_options[node_steps[n]] = node_options[n];
 		}
 		for (auto const& e : edges) {
-			qDebug() << "Edge " << (&e - &edges[0]) << " from " << e.from << " to " << e.to << " ends up with cost "; 
+			//qDebug() << "Edge " << (&e - &edges[0]) << " from " << e.from << " to " << e.to << " ends up with cost "; 
 			uint32_t from_shape = -1U;
 			auto const& from_option = nodes[e.from].options[node_options[e.from]];
 			for (uint32_t out = 0; out < from_option.out_order.size(); ++out) {
@@ -1139,7 +1141,7 @@ void KnitoutScheduler::schedule(QString path)
 
 		}
 
-		qDebug() << "assigning storage positions";
+		//qDebug() << "assigning storage positions";
 		//assign storage positions:
 		for (auto const& step : steps) {
 			uint32_t si = &step - &steps[0];
@@ -1179,7 +1181,7 @@ void KnitoutScheduler::schedule(QString path)
 			}
 		}
 
-		qDebug() << "iterating thru steps";
+		//qDebug() << "iterating thru steps";
 		for (auto const& step : steps) {
 			uint32_t si = &step - &steps[0];
 			if (step_options[si] != -1U) {
@@ -1247,22 +1249,22 @@ void KnitoutScheduler::schedule(QString path)
 
 
 		//record shapes:
-		qDebug() << "record shapes";
+		//qDebug() << "record shapes";
 		uint32_t pre_xfers = 0;
 		for (uint32_t si = 0; si < steps.size(); ++si) {
-			qDebug() << "Step " << si << " option " << step_options[si] << " says "; //DEBUG
+			//qDebug() << "Step " << si << " option " << step_options[si] << " says "; //DEBUG
 			assert(step_options[si] < steps[si].options.size());
 			auto const& option = steps[si].options[step_options[si]];
 			for (uint32_t in = 0; in < steps[si].in.size(); ++in) {
-				qDebug() << " i" << steps[si].in[in] << "=" << option.in_shapes[in]; //DEBUG
+				//qDebug() << " i" << steps[si].in[in] << "=" << option.in_shapes[in]; //DEBUG
 				assert(storage_shapes[steps[si].in[in]] != -1U);
 				if (storage_shapes[steps[si].in[in]] != option.in_shapes[in]) {
 					++pre_xfers;
-					qDebug() << "*"; //DEBUG
+					//qDebug() << "*"; //DEBUG
 				}
 			}
 			for (uint32_t out = 0; out < steps[si].out.size(); ++out) {
-				qDebug() << " o" << steps[si].out[out] << "=" << option.out_shapes[out]; //DEBUG
+				//qDebug() << " o" << steps[si].out[out] << "=" << option.out_shapes[out]; //DEBUG
 				assert(storage_shapes[steps[si].out[out]] == -1U);
 				storage_shapes[steps[si].out[out]] = option.out_shapes[out];
 			}
@@ -1326,7 +1328,7 @@ void KnitoutScheduler::schedule(QString path)
 			return ret;
 		};
 
-		qDebug() << "Storage positions";
+		//qDebug() << "Storage positions";
 		//DEBUG: dump selections:
 		for (auto const& step : steps) {
 			uint32_t si = &step - &steps[0];
@@ -1443,7 +1445,7 @@ void KnitoutScheduler::schedule(QString path)
 			for (uint32_t si = 0; si < steps.size(); ++si) {
 				std::string num = std::to_string(si);
 				while (num.size() < 4) num = ' ' + num;
-				qDebug() << "after " << num << ": ";
+				//qDebug() << "after " << num << ": ";
 
 				std::vector< bool > on_back(max_needle - min_needle + 1, false);
 				std::vector< bool > on_front(max_needle - min_needle + 1, false);
@@ -1510,7 +1512,7 @@ void KnitoutScheduler::schedule(QString path)
 	//Not necessary since i rewrote the javascript
 	//add_instr("const autoknit = require('autoknit');");
 	//add_instr("let h = new autoknit.Helpers;");
-
+	emit helpBoxCommunication("Instructions scheduled! now generating knitout instructions...");
 	//helper:
 	auto typeset_bed_needle = [](char bed, int32_t needle) -> std::string {
 		std::string ret;
@@ -2080,7 +2082,7 @@ void KnitoutScheduler::schedule(QString path)
 			}
 		};
 
-		qDebug() << "Step[" << stepi << "]:"; //DEBUG
+		//qDebug() << "Step[" << stepi << "]:"; //DEBUG
 		add_instr("//steps[" + std::to_string(stepi) + "]:");
 		auto const& step = steps[stepi];
 		assert(step_options[stepi] < step.options.size());
@@ -2965,8 +2967,9 @@ void KnitoutScheduler::schedule(QString path)
 	add_instr("write();");
 
 
-	qDebug() << "done!!!";
+	//qDebug() << "done!!!";
 	
+
 	scheduledInstructions.clear();
 	for (auto instr : instructions) {
 		scheduledInstructions.push_back(QString::fromStdString(instr));
@@ -2977,6 +2980,7 @@ void KnitoutScheduler::schedule(QString path)
 
 	//original also saves schedules st file, not needed?
 	emit knitoutGenerated(knitout);
+	emit helpBoxCommunication("DONE - resulting 'knitout.k' was saved inside the project folder!");
 	//generateKnitout();
 	//emit knitoutGenerated(knitout);
 
@@ -3416,10 +3420,3 @@ void KnitoutScheduler::startTube(QString& dir, QStringList& bns)
 }
 
 
-
-
-void KnitoutScheduler::xfer2D(QString& fromBed, int fromIndex, QString& toBed, int toIndex){
-	QString from = fromBed + QString::number(fromIndex);
-	QString to = toBed + QString::number(toIndex);
-	xfer(from, to);
-}

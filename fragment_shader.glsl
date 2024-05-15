@@ -6,12 +6,19 @@ in float shading;
 out vec4 resultColor;
 
 uniform float shadingValue;
+uniform int selectedFace;
 
 void main()
 {
     
 
-    resultColor = fragColor*(shadingValue+0.4);
+    if (selectedFace == 0){
+        resultColor = fragColor*(shadingValue+0.5);
+    }
+    else{
+        resultColor = fragColor;
+    }
+    
     
 
 }

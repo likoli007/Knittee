@@ -49,13 +49,18 @@ Knittee::Knittee(QWidget* parent)
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
     visualizerLayout = new QHBoxLayout(this);
-    QVBoxLayout* optionsLayout = new QVBoxLayout(this);
+    //QVBoxLayout* optionsLayout = new QVBoxLayout(this);
 
 
     vis = new Visualizer(this); // Set the parent to be the main window
     vis->setMinimumSize(800, 600); // Set a minimum size for the widget
-    visualizerLayout->addLayout(optionsLayout);
+    //visualizerLayout->addLayout(optionsLayout);
+    visualizerLayout->addWidget(meshToolsWidget);
+    visualizerLayout->addWidget(sheetToolsWidget);
+    meshToolsWidget->hide();
+    sheetToolsWidget->hide();
     visualizerLayout->addWidget(vis);
+
 
     QObject::connect(newProjectAction, &QAction::triggered, this, &Knittee::openNewProjectWindow);
     QObject::connect(loadAction, &QAction::triggered, this, &Knittee::selectProject);
@@ -97,6 +102,7 @@ Knittee::Knittee(QWidget* parent)
 
     QObject::connect(meshToolsWidget, SIGNAL(helpBoxCommunication(QString)),this, SLOT(helpBoxCommunication(QString)));
     QObject::connect(&knitGrapher, SIGNAL(helpBoxCommunication(QString)), this, SLOT(helpBoxCommunication(QString)));
+    QObject::connect(&knitoutScheduler, SIGNAL(helpBoxCommunication(QString)), this, SLOT(helpBoxAppend(QString)));
 
     QObject::connect(meshToolsWidget, SIGNAL(resetButtonClicked()), this, SLOT(resetButtonClicked()));
 
@@ -133,17 +139,19 @@ Knittee::Knittee(QWidget* parent)
     centralWidget->setLayout(mainLayout);
 
     setCentralWidget(centralWidget);
+   
 }
 
 void Knittee::generateKnitoutSheet(int algorithm) {
+    
     laceKnitter.generateKnitout(algorithm);
 }
 
 void Knittee::knitoutGenerated(std::vector<QString> knitout) {
-    qDebug() << "instructions created!";
+    //qDebug() << "instructions created!";
 
     //save to project folder under 'knitoutgenerator'
-    QString filePath = projectPath + "/knitout";
+    QString filePath = projectPath + "/knitout.k";
     QFile file(filePath);
 
     if (!file.open(QIODevice::WriteOnly))
@@ -161,15 +169,23 @@ void Knittee::knitoutGenerated(std::vector<QString> knitout) {
 }
 
 void Knittee::generateKnitoutButtonClicked() {
-	qDebug() << "generate knitout button clicked!";
-	knitoutScheduler.schedule(projectPath + "/traced");
+	//qDebug() << "generate knitout button clicked!";
+    helpBoxCommunication(HelperText::meshKnitoutStartText);
+
+    //connect(knitoutGeneratorThread, &QThread::started, this, onThreadStarted);
+	
+    knitoutScheduler.schedule(projectPath + "/traced");
+}
+
+void Knittee::helpBoxAppend(QString message) {
+    messageTextEdit->append(message);
 }
 
 void Knittee::instructionsCreated(std::vector<std::string> instructions) {
 	qDebug() << "instructions created!";
 	
     //save to project folder under 'knitoutgenerator'
-    QString filePath = projectPath + "/knitoutgenerator";
+    QString filePath = projectPath + "/kgenerator";
     QFile file(filePath);
 
     if (!file.open(QIODevice::WriteOnly))
@@ -288,6 +304,7 @@ void Knittee::saveTraced(std::vector< TracedStitch >* traced_stitches) {
 void Knittee::knitGraphCreated()
 {
     meshToolsWidget->knitGraphCreated();
+    vis->knitGraphCreated();
 }
 
 void Knittee::nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >* active_chains) {
@@ -469,9 +486,12 @@ void Knittee::start3DProject()
 
     helpBoxCommunication(HelperText::project3DText);
 
-    visualizerLayout->removeItem(visualizerLayout->itemAt(0));
-    visualizerLayout->insertWidget(0, meshToolsWidget);
+    sheetToolsWidget->hide();
+    //visualizerLayout->removeItem(visualizerLayout->itemAt(0));
+    meshToolsWidget->show();
+    //visualizerLayout->insertWidget(0, meshToolsWidget);
     visualizerLayout->setStretchFactor(vis, 3); 
+    visualizerLayout->setStretchFactor(sheetToolsWidget, 0);
     visualizerLayout->setStretchFactor(meshToolsWidget, 1);
 
    
@@ -488,10 +508,14 @@ void Knittee::start2DProject()
     laceKnitter.setDimensions(context.width, context.height, context.racking);
     laceKnitter.loadFromFile(projectPath);
 
-    visualizerLayout->removeItem(visualizerLayout->itemAt(0));
-    visualizerLayout->insertWidget(0, sheetToolsWidget);
+    sheetToolsWidget->show();
+    //visualizerLayout->removeItem(visualizerLayout->itemAt(0));
+    meshToolsWidget->hide();
+    //visualizerLayout->insertWidget(0, meshToolsWidget);
     visualizerLayout->setStretchFactor(vis, 3);
     visualizerLayout->setStretchFactor(sheetToolsWidget, 1);
+    visualizerLayout->setStretchFactor(meshToolsWidget, 0);
+
 }
 
 void Knittee::openOptionsWindow()

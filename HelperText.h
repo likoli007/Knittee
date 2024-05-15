@@ -39,6 +39,10 @@ namespace HelperText
 	const QString aboutWindowText = QString("Knittee is a 2D sheet and 3D object to Knit instruction CAD software\n") +
 		QString("Designed by Alojz Holubek as part of his bachelor's thesis at Zhejiang University\n");
 
+	const QString meshKnitoutStartText = QString("Generating Knitout instructions, this may take a while...");
+	const QString meshKnitoutEndText = QString("Knitout instructions generated successfully! file was saved to the project folder as 'knitout.k'\n");
+
+
 
 }
 

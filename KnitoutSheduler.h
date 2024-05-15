@@ -96,6 +96,7 @@ public:
 signals:
 	void instructionsCreated(std::vector<std::string>);
 	void knitoutGenerated(std::vector<QString>);
+	void helpBoxCommunication(QString message);
 private:
 	void writeKnitout(QString instruction);
 
@@ -135,9 +136,6 @@ private:
 	void out (QString& str) {
 		knitout.push_back(str);
 	}
-
-/////////////////////Helper functions and variables for 2D////////////////////////////////
-	void xfer2D(QString& fromBed, int fromIndex, QString& toBed, int toIndex);
 
 
 };

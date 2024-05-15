@@ -12,6 +12,47 @@
 
 #include <QCoreApplication>
 
+
+
+
+void ObjHandler::normalizeMesh(ObjectMesh& mesh) {
+	float minX = std::numeric_limits<float>::max();
+	float minY = std::numeric_limits<float>::max();
+	float minZ = std::numeric_limits<float>::max();
+	float maxX = std::numeric_limits<float>::lowest();
+	float maxY = std::numeric_limits<float>::lowest();
+	float maxZ = std::numeric_limits<float>::lowest();
+
+	for (const auto& vertex : mesh.vertices) {
+		if (vertex.x() < minX) minX = vertex.x();
+		if (vertex.y() < minY) minY = vertex.y();
+		if (vertex.z() < minZ) minZ = vertex.z();
+		if (vertex.x() > maxX) maxX = vertex.x();
+		if (vertex.y() > maxY) maxY = vertex.y();
+		if (vertex.z() > maxZ) maxZ = vertex.z();
+	}
+
+
+	float currentSizeX = maxX - minX;
+	float currentSizeY = maxY - minY;
+	float currentSizeZ = maxZ - minZ;
+
+	float scaleFactor = desiredSize / std::max({ currentSizeX, currentSizeY, currentSizeZ });
+
+	qDebug() << "current dimensions: " << currentSizeX << " " << currentSizeY << " " << currentSizeZ;
+	qDebug() << "scale factor: " << scaleFactor;
+
+	// Scale the mesh vertices
+	for (auto& vertex : mesh.vertices) {
+		vertex.setX(vertex.x() * scaleFactor);
+		vertex.setY(vertex.y() * scaleFactor);
+		vertex.setZ(vertex.z() * scaleFactor);
+	}
+
+}
+
+
+
 /* 
 *	Function: open an.obj file, read each line and process it using parseLine(),
 *		and generate an ObjectMesh object after parsing using generateMesh()
@@ -237,6 +278,8 @@ ObjectMesh ObjHandler::generateMesh()
 			//result.vertices.push_back(vertex);
 		}
 	}
+
+	normalizeMesh(result);
 
 	//qDebug() << result.vertices.size();
 	//qDebug() << result.indices.size();

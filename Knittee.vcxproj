@@ -127,7 +127,6 @@
     <ClCompile Include="Typeset.cpp" />
     <ClCompile Include="Visualizer.cpp" />
     <None Include="fragment_shader.glsl" />
-    <None Include="geometry_shader.glsl" />
     <None Include="time_fragment_shader.glsl" />
     <None Include="time_vertex_shader.glsl" />
     <None Include="vertex_shader.glsl" />

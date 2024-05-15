@@ -36,7 +36,7 @@ public:
     void peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > >*, std::vector< std::vector< uint32_t > >*);
     void linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*);
     void nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex>>*);
-
+    void knitGraphCreated();
     //could be getted and setted in the future
     int projectType = 0; //is the user operating on a 3D model (0) or a 2D sheet? (1)
 
@@ -57,7 +57,17 @@ public slots:
 protected:
     //Color information for various steps
     //glm::vec4 clearColor = { 0.84f, 0.84f, 0.84f, 1.0f };
-    glm::vec4 clearColor = { 0.34f, 0.34f, 0.34f, 1.0f };
+    glm::vec4 clearColor = { 0.65f, 0.65f, 0.65f, 1.0f };
+    glm::vec3 graphRowColor = { 0.3, 0.3, 0.3 };//{ 0.44, 0.16, 0.39 };
+    glm::vec3 graphLinkColor = { 0.196, 0.710, 0.176 };
+    glm::vec3 graphCollapseColor = { 1.0 , 0.34, 0.2 };
+    glm::vec3 graphExpandColor = { 0.953, 0.953, 0.110 };
+    glm::vec3 lowerBoundColor = { 0.090, 0.216, 0.753 };
+    glm::vec3 upperBoundColor = { 0.780, 0.0, 0.224 };
+
+    std::vector<glm::vec3> ycolors = { glm::vec3(0.831, 0.110, 0.447), glm::vec3(0.098, 0.580, 0.129),
+        glm::vec3(0.137, 0.275, 0.737), glm::vec3(0.745, 0.420, 0.749), glm::vec3(0.808, 0.851, 0.082),
+        glm::vec3(0.082, 0.851, 0.835), glm::vec3(0.898, 0.886, 0.863) };
 
 
     std::vector<std::vector<FlatPoint>> sheet;
@@ -147,7 +157,7 @@ protected:
     bool isDragging = false;
     bool addingConstraints = false;
    
-    
+    bool showLastChain = false;
     bool showModel = false;
     bool showFirstChains = false;
     bool showInterpolated = false;
@@ -161,23 +171,26 @@ protected:
 
     float translateX = 0.0f;
     float translateY = 0.0f;
-    float translateZ = -5.0f;
+    float translateZ = -11.0f;
     float m_rotationAngleX = 0.0f;
     float m_rotationAngleY = 0.0f;
     float zoomLevel = 1.0f;
+    float zoomFactor = 10.0f;
     float rotationAngle = 0.0f;
     void initializeGL();
     void resizeGL(int w, int h);
+    void computeBoundaries();
 
+    QVector3D centroid;
 
     
-
+    //void normalizeMesh();
 
     void paintYarn(int x, int y, int ex, int ey);
     void paintGL();
     void paintConstraints();
     void paintPickFrame();
-    void paintPath(QVector3D, QVector3D, float, float, float);
+    void paintPath(QVector3D, QVector3D, float, float, float, float);
     void paintPickedFace(int);
     void paintOriginalMesh();
     void paintInterpolatedMesh();
@@ -187,6 +200,10 @@ protected:
     void paintLinks();
     void paintNextChains();
     void paintTraced();
+    void paintCurve(QPainter& painter, const std::vector<QPoint>& controlPoints);
+    void paintLoopConnection(QPainter& painter,QPoint p1, QPoint p2);
+    void paintLineTube(QVector3D start, QVector3D end, float r, float g, float b);
+
 
     void buildmvpMatrix();
     void mousePressEvent(QMouseEvent* event);

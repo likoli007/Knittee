@@ -17,6 +17,7 @@
 #include <QPushButton>
 #include <QTextEdit>
 #include <QComboBox>
+#include <QThread>
 #include <qbuttongroup.h>
 
 #include "ui_Knittee.h"
@@ -53,7 +54,21 @@ struct ProjectInfo {
     int racking; //racking value of the sheet
 };
 
+/*
+class ExportMeshKnitoutDialog : public QDialog
+{
+    Q_OBJECT
 
+public:
+    ExportMeshKnitoutDialog(QWidget* parent = nullptr);
+
+private:
+    QLineEdit* outputLineEdit;
+    QLineEdit* outputFileNameLineEdit;
+    QTextEdit* outputTextEdit;
+    QPushButton* exportButton;
+
+};*/
 /*
 * This class is used to create the new project popup window when the user selects 'new' in the project menu
 */
@@ -130,12 +145,18 @@ private slots:
     void knitGraphCreated();
     void knitGraphTraced(std::vector< TracedStitch >*);
     void helpBoxCommunication(QString);
+    void helpBoxAppend(QString message);
     void saveConstraints();
     void resetButtonClicked();
     void instructionsCreated(std::vector<std::string> instructions);
     void generateKnitoutButtonClicked();
     void knitoutGenerated(std::vector<QString>);
     void generateKnitoutSheet(int algorithm);
+
+    void onThreadStarted() {
+        knitoutScheduler.schedule(projectPath + "/traced");
+    }
+
 private:
     void saveTraced(std::vector< TracedStitch >*);
 
@@ -156,6 +177,12 @@ private:
     QTextEdit* messageTextEdit;
 
     ProjectInfo context;
+
+    //testing threads for algorithmic portions
+    //Worker* worker;
+    //QThread* knitoutGeneratorThread;
+
+
 
     bool canSlice = false;
 
