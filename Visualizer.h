@@ -33,7 +33,7 @@ public:
 
     std::vector<Constraint*> getConstraints();
     void setConstraints(std::vector<Constraint*>);
-    void peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > >*, std::vector< std::vector< uint32_t > >*);
+    
     void linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*);
     void nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex>>*);
     void knitGraphCreated();
@@ -44,6 +44,7 @@ signals:
     void requestConstraintsSave();
     void moveLoop(QPair<int, int>, QPair<int, int>);
 public slots:
+    void peelSliceDone(ObjectMesh, std::vector< std::vector< uint32_t > >, std::vector< std::vector< uint32_t > >);
     void setConstraintsMode(bool);
     void meshInterpolated(ObjectMesh mesh, std::vector<float> values);
     void firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
@@ -171,7 +172,7 @@ protected:
 
     float translateX = 0.0f;
     float translateY = 0.0f;
-    float translateZ = -11.0f;
+    float translateZ = -20.0f;
     float m_rotationAngleX = 0.0f;
     float m_rotationAngleY = 0.0f;
     float zoomLevel = 1.0f;

@@ -998,12 +998,12 @@ void Visualizer::paintSphere(QVector3D center, float radius) {
     glEnd();
 }
 
-void Visualizer::peelSliceDone(ObjectMesh* slice, std::vector< std::vector< uint32_t > >* slice_active_chains_, std::vector< std::vector< uint32_t > >* slice_next_chains_) {
+void Visualizer::peelSliceDone(ObjectMesh slice, std::vector< std::vector< uint32_t > > slice_active_chains_, std::vector< std::vector< uint32_t > > slice_next_chains_) {
     showInterpolated = false;
-    qDebug() << "slice arrived at visualizer";
-    sliceMesh = *slice;
-    sliceActiveChains = *slice_active_chains_;
-    sliceNextChains = *slice_next_chains_;
+    qDebug() << "slice arrived at visualizer" << slice.vertices.size();
+    sliceMesh = slice;
+    sliceActiveChains = slice_active_chains_;
+    sliceNextChains = slice_next_chains_;
 
 
 

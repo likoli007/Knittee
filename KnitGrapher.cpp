@@ -5330,65 +5330,78 @@ void KnitGrapher::clearPeeling() {
 *	Return: void, starts the different autknit algorithms
 *	Called: is a SLOT function, called when the user clicks the 'step' button
 */
-void KnitGrapher::stepButtonClicked()
+void KnitGrapher::stepButtonClicked(int steps = 1)
 {
-	if (stepCount % 4 == 0) {
-		auto old_next_active_chains = nextActiveChains;
-		auto old_next_active_stitches = nextActiveStitches;
-		auto old_rowcol_graph = graph;
-		clearPeeling();
-		
-		graph = old_rowcol_graph;
-		if (stepCount == 0) {
-			qDebug() << "[Step 0] - peel begin, calling findFirstActiveChains()---------------------------------------------------";
+	while (steps > 0) {
 
-			//generate the 3 variables used in findFirstActiveChains()
-			findFirstActiveChains(&active_chains, &active_stitches, &graph);
+
+		QEventLoop loop;
+		QTimer::singleShot(250, &loop, &QEventLoop::quit); // Wait for 1000 milliseconds (1 second)
+		loop.exec();
+
+
+		if (stepCount % 4 == 0) {
+			auto old_next_active_chains = nextActiveChains;
+			auto old_next_active_stitches = nextActiveStitches;
+			auto old_rowcol_graph = graph;
+			clearPeeling();
+
+			graph = old_rowcol_graph;
+			if (stepCount == 0) {
+				qDebug() << "[Step 0] - peel begin, calling findFirstActiveChains()---------------------------------------------------";
+
+				//generate the 3 variables used in findFirstActiveChains()
+				findFirstActiveChains(&active_chains, &active_stitches, &graph);
+			}
+			else {
+				qDebug() << "[Step " << stepCount << "] - repeat, moving active and next chains...--------------------------------------";
+				active_chains = old_next_active_chains;
+				active_stitches = old_next_active_stitches;
+			}
+			if (!active_chains.empty()) {
+				emit helpBoxCommunication("New active chains were created.");
+				emit firstActiveChainsCreated(&active_chains, &active_stitches, &graph);
+			}
+			else {
+				stepCount--;
+				steps = 0;
+				emit helpBoxCommunication("Mesh has no active chains, you can now start tracing the graph.");
+				
+				emit firstActiveChainsCreated(&active_chains, &active_stitches, &graph);
+				emit knitGraphCreated();
+			}
 		}
-		else {
-			qDebug() << "[Step " << stepCount << "] - repeat, moving active and next chains...--------------------------------------";
-			active_chains = old_next_active_chains;
-			active_stitches = old_next_active_stitches;
+		else if (stepCount % 4 == 1) {
+			qDebug() << "[Step " << stepCount << " ] - slice, calling peelSlice()-------------------------------------------------------";
+
+			peelSlice(active_chains, &slice, &sliceOnModel, &sliceActiveChains, &sliceNextChains, &nextUsedBoundary);
+
+			qDebug() << "sliceonmodel size" << sliceOnModel.size();
+			sliceTimes.clear();
+			sliceTimes.reserve(sliceOnModel.size());
+			for (auto& ev : sliceOnModel) {
+				sliceTimes.emplace_back(ev.interpolate(constrained_values));
+			}
+
+			ObjectMesh emittedMesh = slice.toObjMesh();
+			emit peelSliceDone(emittedMesh, sliceActiveChains, sliceNextChains);
 		}
-		if (!active_chains.empty()) {
-			emit helpBoxCommunication("New active chains were created.");
-			emit firstActiveChainsCreated(&active_chains, &active_stitches, &graph);
+		else if (stepCount % 4 == 2) {
+			qDebug() << "[Step " << stepCount << " ] - link, calling linkChains()-------------------------------------------------------------------";
+
+			qDebug() << "slice size" << sliceNextChains.size();
+			linkChains(slice, sliceTimes, sliceActiveChains, active_stitches, sliceNextChains, nextUsedBoundary, &nextStitches, &links);
+			emit linkChainsDone(&nextStitches, &links);
 		}
-		else {
-			stepCount--;
-			emit helpBoxCommunication("Mesh has no active chains, you can now start tracing the graph.");
-			emit firstActiveChainsCreated(&active_chains, &active_stitches, &graph);
-			emit knitGraphCreated();
+		else if (stepCount % 4 == 3) {
+			qDebug() << "[Step " << stepCount << " ] - build, calling buildNextActiveChains()------------------------------------------------------------";
+			buildNextActiveChains(slice, sliceOnModel, sliceActiveChains, active_stitches, sliceNextChains, nextStitches, nextUsedBoundary, links, &nextActiveChains, &nextActiveStitches, &graph);
+			emit nextActiveChainsDone(&nextActiveChains);
 		}
+		stepCount++;
+		steps--;
 	}
-	else if (stepCount % 4 == 1) {
-		qDebug() << "[Step " << stepCount << " ] - slice, calling peelSlice()-------------------------------------------------------";
-		
-		peelSlice(active_chains, &slice, &sliceOnModel, &sliceActiveChains, &sliceNextChains, &nextUsedBoundary);
-		
-		qDebug() << "sliceonmodel size" << sliceOnModel.size();
-		sliceTimes.clear();
-		sliceTimes.reserve(sliceOnModel.size());
-		for (auto& ev : sliceOnModel) {
-			sliceTimes.emplace_back(ev.interpolate(constrained_values));
-		}
-		
-		ObjectMesh emittedMesh = slice.toObjMesh();
-		emit peelSliceDone(&emittedMesh, &sliceActiveChains, &sliceNextChains);
-	}
-	else if (stepCount % 4 == 2) {
-		qDebug() << "[Step "<< stepCount << " ] - link, calling linkChains()-------------------------------------------------------------------";
-		
-		qDebug() << "slice size" << sliceNextChains.size();
-		linkChains(slice, sliceTimes, sliceActiveChains, active_stitches, sliceNextChains, nextUsedBoundary, &nextStitches, &links);
-		emit linkChainsDone(&nextStitches, &links);
-	}
-	else if (stepCount % 4 == 3) {
-		qDebug() << "[Step " << stepCount << " ] - build, calling buildNextActiveChains()------------------------------------------------------------";
-		buildNextActiveChains(slice, sliceOnModel, sliceActiveChains, active_stitches, sliceNextChains, nextStitches, nextUsedBoundary, links, &nextActiveChains, &nextActiveStitches, &graph);
-		emit nextActiveChainsDone(&nextActiveChains);
-	}
-	stepCount++;
+	emit unlockMeshButtons();
 }
 
 void KnitGrapher::traceGraph(
@@ -5941,8 +5954,17 @@ void KnitGrapher::traceGraph(
 
 void KnitGrapher::traceButtonClicked()
 {
-	qDebug() << "trace arrived at knitgrapher";
+	//qDebug() << "trace arrived at knitgrapher";
 	traceGraph(graph, &tracedMesh, &newMesh);
+
+
+	//find out how many unique yarn ids are there
+	int totalYarns = 0;
+	for (auto const& ts : tracedMesh) {
+		totalYarns = std::max(totalYarns, int(ts.yarn));
+	}
+
+	emit helpBoxCommunication("Graph traced! A total of " + QString::number(totalYarns+1) + " yarn(s) will be used.");
 	emit knitGraphTraced(&tracedMesh);
 }
 /*

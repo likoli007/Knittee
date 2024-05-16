@@ -19,6 +19,7 @@
 #include <QComboBox>
 #include <QThread>
 #include <qbuttongroup.h>
+#include <QtConcurrent>
 
 #include "ui_Knittee.h"
 #include "ObjHandler.h"
@@ -139,7 +140,7 @@ private slots:
     void firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
         std::vector< std::vector< Stitch > >* active_stitches,
         RowColGraph* graph);
-    void peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > > *, std::vector< std::vector< uint32_t > >*);
+    void peelSliceDone(ObjectMesh, std::vector< std::vector< uint32_t > > , std::vector< std::vector< uint32_t > >);
     void linkChainsDone(std::vector< std::vector< Stitch > >* , std::vector< Link >* );
     void nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*);
     void knitGraphCreated();
@@ -152,12 +153,15 @@ private slots:
     void generateKnitoutButtonClicked();
     void knitoutGenerated(std::vector<QString>);
     void generateKnitoutSheet(int algorithm);
-
+    //void stepButtonClicked();
     void onThreadStarted() {
-        knitoutScheduler.schedule(projectPath + "/traced");
+        knitoutScheduler.schedule();
     }
 
 private:
+    
+    QThread* knitoutGeneratorThread;
+
     void saveTraced(std::vector< TracedStitch >*);
 
 
@@ -208,6 +212,7 @@ private:
     void save2DProject();
     void save2DContext();
 
+    QThread* knitGrapherThread;
 protected:
     void KeyPressEvent(QKeyEvent* event);
 };

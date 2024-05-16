@@ -280,19 +280,20 @@ public slots:
 	void setStitchHeight(float height);
 	void setModelUnitLength(float length);
 	void setOriginalMesh(ObjectMesh mesh);
-	void stepButtonClicked();
+	void stepButtonClicked(int steps);
 	void traceButtonClicked();
 signals:
 	void knitGraphInterpolated(ObjectMesh mesh, std::vector<float> values);
 	void firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
 		std::vector< std::vector< Stitch > >* active_stitches,
 		RowColGraph* graph);
-	void peelSliceDone(ObjectMesh* slice_, std::vector< std::vector< uint32_t > >* slice_active_chains_, std::vector< std::vector< uint32_t > >* slice_next_chains_);
+	void peelSliceDone(ObjectMesh slice_, std::vector< std::vector< uint32_t > > slice_active_chains_, std::vector< std::vector< uint32_t > > slice_next_chains_);
 	void linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*);
 	void nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*);
 	void knitGraphCreated();
 	void knitGraphTraced(std::vector< TracedStitch >* traced_);
 	void helpBoxCommunication(QString message);
 	void helpBoxAppend(QString message);
+	void unlockMeshButtons();
 };
 

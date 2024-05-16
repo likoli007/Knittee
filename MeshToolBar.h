@@ -30,7 +30,7 @@ signals:
     void heightChanged(float height);
     void unitChanged(float unit);
     void remeshButtonClicked();
-    void stepButtonClicked();
+    void stepButtonClicked(int step = 1);
     void traceButtonClicked();
     void showInterpolatedChanged(int state);
     void showGraphChanged(int state);
@@ -50,15 +50,13 @@ private slots:
     void onAutoStepButtonClicked() {
         stepButton->setDisabled(true);
         autoStepButton->setDisabled(true);
+        resetButton->setDisabled(true);
         qDebug() << "Auto Step button clicked";
-        for (int i = 0; i < stepSpinBox->value(); i++) {
-			emit stepButtonClicked();
-            QEventLoop loop;
-            QTimer::singleShot(200, &loop, &QEventLoop::quit); // Wait for 1000 milliseconds (1 second)
-            loop.exec();
-		}
-        stepButton->setDisabled(false);
-        autoStepButton->setDisabled(false);
+        
+		emit stepButtonClicked(stepSpinBox->value());
+            
+        //stepButton->setDisabled(false);
+        //autoStepButton->setDisabled(false);
     }
 
     void onStepButtonClicked() {
@@ -132,6 +130,13 @@ private slots:
 		//emit helpBoxCommunication(HelperText::knitoutText);
 		emit generateKnitoutButtonClicked();
 	}
+
+    void unlockMeshButtons() {
+		stepButton->setDisabled(false);
+		autoStepButton->setDisabled(false);
+		resetButton->setDisabled(false);
+	}
+
 private:
     // Will have a slew of functions that pass the user specified options to the visualizer/algorithm program
     QPushButton* constraintsModeButton;

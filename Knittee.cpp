@@ -15,8 +15,9 @@ Knittee::Knittee(QWidget* parent)
     auto helpAction = new QAction("&Help");    //help menu: get the current working context (2D or 3D modelling), and display related help
     auto aboutAction = new QAction("&About");   //about menu: display some basic information about the project
 
-
-    
+    knitGrapherThread = new QThread();
+    knitGrapher.moveToThread(knitGrapherThread);
+    knitGrapherThread->start();
 
     //populate the projectMenu
     QAction* loadAction = new QAction("&Load", projectMenu);
@@ -75,7 +76,7 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(meshToolsWidget, SIGNAL(widthChanged(float)), &knitGrapher, SLOT(setStitchWidth(float)));
     QObject::connect(meshToolsWidget, SIGNAL(heightChanged(float)), &knitGrapher, SLOT(setStitchHeight(float)));
     QObject::connect(meshToolsWidget, SIGNAL(unitChanged(float)), &knitGrapher, SLOT(setModelUnitLength(float)));
-    QObject::connect(meshToolsWidget, SIGNAL(stepButtonClicked()), &knitGrapher, SLOT(stepButtonClicked()));
+    QObject::connect(meshToolsWidget, SIGNAL(stepButtonClicked(int)), &knitGrapher, SLOT(stepButtonClicked(int)));
     QObject::connect(meshToolsWidget, SIGNAL(traceButtonClicked()), &knitGrapher, SLOT(traceButtonClicked()));
     
     QObject::connect(vis, SIGNAL(requestConstraintsSave()), this, SLOT(saveConstraints()));
@@ -86,7 +87,7 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(&knitGrapher, SIGNAL(knitGraphInterpolated(ObjectMesh, std::vector<float>)), this, SLOT(meshInterpolated(ObjectMesh, std::vector<float>)));
     QObject::connect(&knitGrapher, SIGNAL(firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >*, std::vector< std::vector< Stitch > >*, RowColGraph*)), 
         this, SLOT(firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >*, std::vector< std::vector< Stitch > >*, RowColGraph*)));
-    QObject::connect(&knitGrapher, SIGNAL(peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > >*, std::vector< std::vector< uint32_t > >*)), this, SLOT(peelSliceDone(ObjectMesh*, std::vector< std::vector< uint32_t > > *, std::vector< std::vector< uint32_t > >*)));
+    QObject::connect(&knitGrapher, SIGNAL(peelSliceDone(ObjectMesh, std::vector< std::vector< uint32_t > >, std::vector< std::vector< uint32_t > >)), vis, SLOT(peelSliceDone(ObjectMesh, std::vector< std::vector< uint32_t > > , std::vector< std::vector< uint32_t > >)));
     QObject::connect(&knitGrapher, SIGNAL(linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*)), this, SLOT(linkChainsDone(std::vector< std::vector< Stitch > >*, std::vector< Link >*)));
     QObject::connect(&knitGrapher, SIGNAL(nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*)), this, SLOT(nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >*)));
     QObject::connect(&knitGrapher, SIGNAL(knitGraphCreated()), this, SLOT(knitGraphCreated()));
@@ -99,6 +100,7 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(meshToolsWidget, SIGNAL(showGraphChanged(int)), vis, SLOT(showGraphChanged(int)));
     QObject::connect(meshToolsWidget, SIGNAL(showTracedChanged(int)), vis, SLOT(showTracedChanged(int)));
 
+    QObject::connect(&knitGrapher, SIGNAL(unlockMeshButtons()), meshToolsWidget, SLOT(unlockMeshButtons()));
 
     QObject::connect(meshToolsWidget, SIGNAL(helpBoxCommunication(QString)),this, SLOT(helpBoxCommunication(QString)));
     QObject::connect(&knitGrapher, SIGNAL(helpBoxCommunication(QString)), this, SLOT(helpBoxCommunication(QString)));
@@ -139,8 +141,18 @@ Knittee::Knittee(QWidget* parent)
     centralWidget->setLayout(mainLayout);
 
     setCentralWidget(centralWidget);
+
+
+    
+
+    //QObject::connect(knitGrapherThread, &QThread::started, &knitGrapher, &KnitGrapher::stepButtonClicked);
+
    
 }
+
+
+
+
 
 void Knittee::generateKnitoutSheet(int algorithm) {
     
@@ -169,12 +181,22 @@ void Knittee::knitoutGenerated(std::vector<QString> knitout) {
 }
 
 void Knittee::generateKnitoutButtonClicked() {
-	//qDebug() << "generate knitout button clicked!";
+    //qDebug() << "generate knitout button clicked!";
     helpBoxCommunication(HelperText::meshKnitoutStartText);
 
-    //connect(knitoutGeneratorThread, &QThread::started, this, onThreadStarted);
-	
-    knitoutScheduler.schedule(projectPath + "/traced");
+    knitoutGeneratorThread = new QThread();
+
+    knitoutScheduler.setFilePath(projectPath + "/traced");
+
+    knitoutScheduler.moveToThread(knitoutGeneratorThread);
+
+
+    connect(knitoutGeneratorThread, &QThread::started, &knitoutScheduler, &KnitoutScheduler::schedule);
+
+    knitoutGeneratorThread->start();
+
+    //QtConcurrent::run(&knitoutScheduler, &KnitoutScheduler::generateKnitout, projectPath + "/traced");
+    //knitoutScheduler.schedule(projectPath + "/traced");
 }
 
 void Knittee::helpBoxAppend(QString message) {
@@ -250,8 +272,11 @@ void Knittee::save2DProject() {
 }
 
 void Knittee::resetButtonClicked() {
+
+
 	vis->reset();
 	knitGrapher.reset();
+    
 }
 
 void Knittee::helpBoxCommunication(QString message) {
@@ -317,7 +342,7 @@ void Knittee::linkChainsDone(std::vector< std::vector< Stitch > >* next_stitches
 	vis->linkChainsDone(next_stitches, links);
 }
 
-void Knittee::peelSliceDone(ObjectMesh* slice_, std::vector< std::vector< uint32_t > >* slice_active_chains_, std::vector< std::vector< uint32_t > >* slice_next_chains_) {
+void Knittee::peelSliceDone(ObjectMesh slice_, std::vector< std::vector< uint32_t > > slice_active_chains_, std::vector< std::vector< uint32_t > > slice_next_chains_) {
 	vis->peelSliceDone(slice_, slice_active_chains_, slice_next_chains_);
 
 }
@@ -654,16 +679,6 @@ void Knittee::handleNewProject(ProjectInfo info)
 void Knittee::setConstraintsMode()
 {
     //vis->setConstraintsMode();
-}
-
-
-void Knittee::KeyPressEvent(QKeyEvent* event)
-{
-    qDebug() << "Key pressesssd: " << event->key();
-    if (event->key() == Qt::Key_N) {
-        qDebug() << "pressed N";
-        knitGrapher.stepButtonClicked();
-    }
 }
 
 Knittee::~Knittee()
