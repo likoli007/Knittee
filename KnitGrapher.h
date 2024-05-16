@@ -11,13 +11,10 @@
 #include <glm/gtx/hash.hpp>
 #include <glm/glm.hpp>
 #include <QVector3D>
+
 #include "TracedStitch.h"
-
-
-
 #include "ObjectMesh.h"
 #include "Visualizer.h"
-//#include "Stitch.h"
 #include "RowColGraph.h"
 #include "EmbeddedVertex.h"
 #include "EmbeddedPlanarMap.h"
@@ -25,7 +22,6 @@
 #include "Link.h"
 #include "EmbeddedVertex.h"
 #include "EmbeddedPlanarMap.h"
-
 #include "HelperText.h"
 
 

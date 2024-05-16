@@ -8,6 +8,10 @@
 #include <unordered_map>
 
 
+/*
+*	Implementation for the helper functions defined in the header file, used only by PlanTransfers.h
+*/
+
 void best_collapse(
 	Constraints const& constraints,
 	BedNeedle::Bed top_bed, std::vector< NeedleRollGoal > const& top,

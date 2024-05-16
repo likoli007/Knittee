@@ -6,6 +6,14 @@
 #include <GL/gl.h>
 #include "EmbeddedVertex.h"
 
+
+/*
+*	RowColGraph is essentially the KnitGraph structure, but with additional info
+*		row_in and row_out define the movement of yarn from left to right (or right to left) in a row of loops -> course-wise connections
+*			eg. row_in -> Vertex -> row_out  defines that after loop 'row_in' is made the current vertex is made, before loop 'row_out' is made
+*		col_in and col_out define the wale-wise connections of the yarn
+*	Is used in algorithms as well as during visualization
+*/
 struct RowColGraph {
 	struct Vertex {
 		EmbeddedVertex at;

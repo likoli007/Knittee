@@ -2,7 +2,6 @@
 
 void ObjectMesh::clear() {
 	//clear all vectors
-vertices.clear();
-indices.clear();
-
+	vertices.clear();
+	indices.clear();
 }

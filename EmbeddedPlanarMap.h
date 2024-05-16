@@ -7,14 +7,18 @@
 #include <algorithm>
 #include <QOpenGLExtraFunctions>
 #include <GL/gl.h>
-//#include <glm/gtx/norm.hpp>
-
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
-
-
 #include "glm/glm.hpp"
 
+
+
+/*
+*	Helper class copied over from autoknit, used to represent the shape the mesh
+*		as stated in autoknit: "a mesh is considered knittable if its reeb graph has an upwards planar embedding"
+*		this means that this map needs to not overlap with each other
+*	used widely in remesh() and trim() functions of KnitGrapher
+*/
 
 #define WEIGHT_SUM  (1024U)
 struct IntegerEmbeddedVertex {
@@ -239,13 +243,6 @@ struct EmbeddedPlanarMap {
 		for (auto i : verts) {
 			if (vertices[i] == v) return i;
 		}
-		/* //PARANOIA:
-		assert(v.simplex.x < v.simplex.y && v.simplex.y <= v.simplex.z);
-		assert(v.weights.x + v.weights.y + v.weights.z == WEIGHT_SUM);
-		for (const auto &v2 : vertices) {
-			assert(!(v2 == v));
-		}
-		//end PARANOIA*/
 
 		uint32_t idx = vertices.size();
 		vertices.emplace_back(v);
@@ -501,16 +498,6 @@ struct EmbeddedPlanarMap {
 			do_side(0, 1);
 			do_side(1, 2);
 			do_side(2, 0);
-
-			/*//DEBUG:
-			std::cout << "---------------\n";
-			for (uint32_t c = 0; c < coords.size(); ++c) {
-				std::cout << "coords[" << c << "] = (" << coords[c].x << ", " << coords[c].y << ")\n";
-			}
-			for (auto e : half_edges) {
-				std::cout << "  " << e.first << " -> " << e.second << "\n";
-			}
-			std::cout.flush();*/
 
 			while (!half_edges.empty()) {
 				std::vector< uint32_t > loop;

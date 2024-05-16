@@ -2,6 +2,14 @@
 #include <cstdint>
 #include <glm/glm.hpp>
 
+
+/*
+*	Helper class used to trace the path of a stitch through the KnitGraph (RowColGraph)
+*		tracing = linking stitches together in a way that is valid for the knitting machine
+*	used in algorithms but also in visualization, in essence a vector of these stitches already corresponds to a valid output of knitting loops
+*		the only remaining step is to convert this into a format that the knitting machine can understand -> schedule
+*/
+
 struct TracedStitch {
 	uint32_t yarn = -1U; //yarn ID (why is this on a yarn_in? I guess the schedule.cpp code will tell me someday.
 	//ins and outs are in construction order (OLD was: CW direction):

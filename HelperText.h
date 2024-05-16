@@ -3,9 +3,13 @@
 #include <qstring.h>
 
 
+/*
+*	A simple header file containing all the helper text strings used in the program
+*	These are used to display information to the user in the GUI£¬particularly in the 'status text box' at the bottom of the application
+*/
+
 namespace HelperText
 {
-
 	const QString constraintText = QString("Constraints mode enabled.\nPress 'C' while hovering over the mesh to add a constraint.\n") 
 		.append("Press 'Ctrl-Z' to undo the added constraint edges in the current constraint.\n")
 		.append("Press 'Delete' when on a face with a constrained edge to delete the entire constraint. \n")
@@ -44,6 +48,8 @@ namespace HelperText
 
 
 	const QString showYarnText = QString("Showing yarn paths\nNOTE: the loops at the end of the knitting process are approximated, actual positioning of them may differ");
+
+	const QString welcomeText = QString("Welcome to Knittee! Please open a project to get started.");
 }
 
 

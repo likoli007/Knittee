@@ -1,5 +1,5 @@
 #pragma once
-// This class will be called to be shown when the user selects a 3D mesh project
+
 #include <QWidget>
 #include <QPushButton>
 #include <QHBoxLayout>
@@ -16,6 +16,11 @@
 
 #include "HelperText.h"
 
+
+/*
+* This class will be called to be shown when the user selects a 3D mesh project, is used to show the options related to the mesh
+*   is very straightforward, no function comments are needed
+*/
 class MeshToolBar : public QWidget {
     Q_OBJECT
 
@@ -40,7 +45,8 @@ signals:
     void resetButtonClicked();
     void generateKnitoutButtonClicked();
 private slots:
-    void knitGraphTraced() {
+    void knitGraphTraced() 
+    {
         generateKnitoutButton->setDisabled(false);
         showYarnCheck->setDisabled(false);
         showTracedCheck->setDisabled(false);
@@ -48,38 +54,32 @@ private slots:
         showInterpolatedCheck->setChecked(false);
         showTracedCheck->setChecked(true);
     }
-
-    void onAutoStepButtonClicked() {
+    void onAutoStepButtonClicked() 
+    {
         stepButton->setDisabled(true);
         autoStepButton->setDisabled(true);
         resetButton->setDisabled(true);
-        qDebug() << "Auto Step button clicked";
         
-		emit stepButtonClicked(stepSpinBox->value());
-            
-        //stepButton->setDisabled(false);
-        //autoStepButton->setDisabled(false);
+		emit stepButtonClicked(stepSpinBox->value());     
     }
-
-    void onStepButtonClicked() {
-        qDebug() << "Step button clicked";
+    void onStepButtonClicked() 
+    {
         emit stepButtonClicked();
     }
-    
-    void onWidthValueChanged(float v) {
-        qDebug() << "width changed!";
+    void onWidthValueChanged(float v) 
+    {
         emit widthChanged(v);
     }
-    void onHeightValueChanged(float v) {
-        qDebug() << "height changed!";
+    void onHeightValueChanged(float v) 
+    {
         emit heightChanged(v);
     }
-    void onUnitValueChanged(float v) {
-        qDebug() << "unit changed!";
+    void onUnitValueChanged(float v) 
+    {
         emit unitChanged(v);
     }
-
-    void onConstraintsButtonClicked() {
+    void onConstraintsButtonClicked() 
+    {
         if (constraintChoice != 1) {
             constraintsModeButton->setText("Cancel Constraints Mode");
             constraintChoice = 1;
@@ -92,37 +92,38 @@ private slots:
             emit helpBoxCommunication(HelperText::constraintEndText);
             emit constraintsButtonClicked(false);
         }
-
-        
     }
-    void onRemeshButtonClicked() {
+    void onRemeshButtonClicked() 
+    {
         emit helpBoxCommunication(HelperText::interpolateText);
         stepButton->setDisabled(false);
         autoStepButton->setDisabled(false);
         showInterpolatedCheck->setDisabled(false);
         showInterpolatedCheck->setChecked(true);
-        
         emit remeshButtonClicked();
     }
     void onTraceButtonClicked() {
         emit traceButtonClicked();
     }
-
-    void onShowInterpolatedButtonClicked(int state) {
+    void onShowInterpolatedButtonClicked(int state) 
+    {
         emit showInterpolatedChanged(state);
 	}
-    void onShowGraphButtonClicked(int state) {
+    void onShowGraphButtonClicked(int state) 
+    {
         emit showGraphChanged(state);
 	}
-    void onShowTracedButtonClicked(int state) {
+    void onShowTracedButtonClicked(int state) 
+    {
         emit showTracedChanged(state);
     }
-    void onShowYarnButtonClicked(int state) {
+    void onShowYarnButtonClicked(int state) 
+    {
         emit showYarnChanged(state);
         emit helpBoxCommunication(HelperText::showYarnText);
     }
-
-    void onResetButtonClicked() {
+    void onResetButtonClicked() 
+    {
 		emit helpBoxCommunication(HelperText::resetText);
         initializeUI();
         constraintsModeButton->setText("Constraints Mode");
@@ -133,12 +134,12 @@ private slots:
         showYarnCheck->setChecked(false);
 		emit resetButtonClicked();
 	}
-    void onGenerateKnitoutButtonClicked() {
-		//emit helpBoxCommunication(HelperText::knitoutText);
+    void onGenerateKnitoutButtonClicked() 
+    {
 		emit generateKnitoutButtonClicked();
 	}
-
-    void unlockMeshButtons() {
+    void unlockMeshButtons() 
+    {
 		stepButton->setDisabled(false);
 		autoStepButton->setDisabled(false);
 		resetButton->setDisabled(false);

@@ -7,6 +7,7 @@
 
 /*
 *	Helper class copied over from autoknit, used to represent the shape of a cycle of stitches on the bed.
+*		below is the original autoknit documentation
 */
 
 

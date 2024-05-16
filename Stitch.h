@@ -1,4 +1,10 @@
 #pragma once
+
+
+/*
+*	Helper class representing a stitch on a KnitGraph (RowColGraph), used mainly to implement valid linking of stitches 
+*/
+
 struct Stitch {
 	float t; //position along chain [0,1)
 	unsigned int vertex; //used to track stitches when building RowColGraph

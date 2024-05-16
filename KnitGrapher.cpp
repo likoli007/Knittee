@@ -20,16 +20,13 @@ KnitGrapher::KnitGrapher(QObject* parent) : QObject(parent)
 
 }
 
-
+//reset all the variables to their default values
 void KnitGrapher::reset()
 {
-	//reset all the variables to their default values
+	
 	stitchWidth = 3.66f;
 	stitchHeight = 1.73f;
-	//modelUnitLength = 10.0f;
 	stepCount = 0;
-	//constraints.clear();
-	//originalMesh = AutoKnitMesh();
 	newMesh.clear();
 	constrained_values.clear();
 	graph.clear();
@@ -5398,6 +5395,9 @@ void KnitGrapher::stepButtonClicked(int steps = 1)
 	emit unlockMeshButtons();
 }
 
+/*
+*	Function: generate a traced graph that can be used to generate scheduling instructions
+*/
 void KnitGrapher::traceGraph(
 	RowColGraph const& graph, //in: row-column graph
 	std::vector< TracedStitch >* traced_, //out:traced list of stitches
@@ -5946,9 +5946,10 @@ void KnitGrapher::traceGraph(
 	}
 }
 
+
+//signal function
 void KnitGrapher::traceButtonClicked()
 {
-	//qDebug() << "trace arrived at knitgrapher";
 	traceGraph(graph, &tracedMesh, &newMesh);
 
 
@@ -5968,9 +5969,7 @@ void KnitGrapher::traceButtonClicked()
 */
 void KnitGrapher::constructNewMesh(std::vector<Constraint*> constraints)
 {
-	qDebug() << "Constructing new mesh, sizes:" << stitchWidth << stitchHeight << modelUnitLength;
 	//create a new mesh that conforms to the constraints and stitch size given by the user
-	qDebug() << "Constraints:" << constraints.size();
 	this->constraints = constraints;   
 	
 	remesh();

@@ -5,9 +5,11 @@
 #include <cstdint>
 #include <QString>
 #include <QFile>
+#include <QDataStream>
+#include <QDebug>
 /*
 *	Originally called 'Stitch' in autoknit, however since there are many 'Stitch' classes in the project,
-		(including one directly names 'Stitch'), renamed it to 'KnitOutStitch'
+		(including one directly named 'Stitch'), renamed it to 'KnitOutStitch'
 */
 
 struct KnitOutStitch

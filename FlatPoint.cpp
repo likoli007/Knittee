@@ -1,6 +1,6 @@
 #include "FlatPoint.h"
 
-
+//simple functions that manipulate the FlatPoint
 
 FlatPoint::FlatPoint()
 {

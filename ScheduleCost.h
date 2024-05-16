@@ -1,15 +1,15 @@
 #pragma once
+#include "Shape.h"
+#include <vector>
+#include <iostream>
+
+
 
 /*
 *	Helper class used to calculate the cost of a schedule according to the research paper on autoknit
 *		in essence, minimize the penalty function which is given by the sum of the costs of each stitch
+*			cost = how many 'jumps' are needed to get the stitch to its desired in location (calculated counter-clockwise?)
 */
-
-
-#include "Shape.h"
-
-#include <vector>
-#include <iostream>
 
 struct ScheduleCost {
 	uint32_t shape = 0; //for awkwardly-oriented cycles

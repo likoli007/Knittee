@@ -21,6 +21,18 @@
       <UniqueIdentifier>{639EADAA-A684-42e4-A9AD-28FC9BCB8F7C}</UniqueIdentifier>
       <Extensions>ts</Extensions>
     </Filter>
+    <Filter Include="AutoKnit Helpers">
+      <UniqueIdentifier>{3767f97a-ae3a-4a03-b815-0c74584dd716}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GUI Related">
+      <UniqueIdentifier>{28cad02e-a72e-4e8e-9edf-226f74124c19}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Algorithm Classes">
+      <UniqueIdentifier>{3cf14f25-d2b6-4a3e-b52f-dd7808105bfe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Obj Related">
+      <UniqueIdentifier>{eb3663ae-4e07-4525-a007-01e79a3f435d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <QtRcc Include="Knittee.qrc">
@@ -29,12 +41,6 @@
     <QtUic Include="Knittee.ui">
       <Filter>Form Files</Filter>
     </QtUic>
-    <QtMoc Include="Knittee.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <ClCompile Include="Knittee.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <None Include="Knittee.ico">
       <Filter>Resource Files</Filter>
     </None>
@@ -46,130 +52,100 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Visualizer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ObjHandler.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ObjectMesh.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="KnitGrapher.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="MeshToolBar.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="EmbeddedVertex.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="EmbeddedPlanarMap.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Stitch.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="RowColGraph.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Link.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="FlatPoint.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="LaceKnitter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="KnitOutStitch.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="TracedStitch.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="KnitoutSheduler.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Shape.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Typeset.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ScheduleCost.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="EmbedDAG.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="PlanTransfersHelpers.cpp">
+      <Filter>AutoKnit Helpers</Filter>
     </ClCompile>
     <ClCompile Include="PlanTransfers.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>AutoKnit Helpers</Filter>
     </ClCompile>
-    <ClCompile Include="PlanTransfersHelpers.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="ScheduleCost.cpp">
+      <Filter>AutoKnit Helpers</Filter>
     </ClCompile>
-    <ClCompile Include="HelperText.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="Knittee.cpp">
+      <Filter>GUI Related</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshToolBar.cpp">
+      <Filter>GUI Related</Filter>
     </ClCompile>
     <ClCompile Include="SheetToolBar.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>GUI Related</Filter>
+    </ClCompile>
+    <ClCompile Include="Visualizer.cpp">
+      <Filter>GUI Related</Filter>
+    </ClCompile>
+    <ClCompile Include="ObjHandler.cpp">
+      <Filter>Obj Related</Filter>
+    </ClCompile>
+    <ClCompile Include="ObjectMesh.cpp">
+      <Filter>Obj Related</Filter>
+    </ClCompile>
+    <ClCompile Include="FlatPoint.cpp">
+      <Filter>Algorithm Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="KnitGrapher.cpp">
+      <Filter>Algorithm Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="KnitoutSheduler.cpp">
+      <Filter>Algorithm Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="KnitOutStitch.cpp">
+      <Filter>Algorithm Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="LaceKnitter.cpp">
+      <Filter>Algorithm Classes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ObjHandler.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ObjectMesh.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Face.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="EmbeddedVertex.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="Link.h">
+      <Filter>AutoKnit Helpers</Filter>
     </ClInclude>
     <ClInclude Include="EmbeddedPlanarMap.h">
-      <Filter>Header Files</Filter>
+      <Filter>AutoKnit Helpers</Filter>
     </ClInclude>
-    <ClInclude Include="Stitch.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="RowColGraph.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Link.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="FlatPoint.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="KnitOutStitch.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="TracedStitch.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Shape.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Typeset.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ScheduleCost.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="EmbedDAG.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="EmbeddedVertex.h">
+      <Filter>AutoKnit Helpers</Filter>
     </ClInclude>
     <ClInclude Include="PlanTransfers.h">
-      <Filter>Header Files</Filter>
+      <Filter>AutoKnit Helpers</Filter>
     </ClInclude>
     <ClInclude Include="PlanTransfersHelpers.h">
-      <Filter>Header Files</Filter>
+      <Filter>AutoKnit Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="RowColGraph.h">
+      <Filter>AutoKnit Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="ScheduleCost.h">
+      <Filter>AutoKnit Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="Shape.h">
+      <Filter>AutoKnit Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="Stitch.h">
+      <Filter>AutoKnit Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="TracedStitch.h">
+      <Filter>AutoKnit Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="Typeset.h">
+      <Filter>AutoKnit Helpers</Filter>
     </ClInclude>
     <ClInclude Include="HelperText.h">
-      <Filter>Header Files</Filter>
+      <Filter>GUI Related</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjectMesh.h">
+      <Filter>Obj Related</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjHandler.h">
+      <Filter>Obj Related</Filter>
+    </ClInclude>
+    <ClInclude Include="Face.h">
+      <Filter>Obj Related</Filter>
+    </ClInclude>
+    <ClInclude Include="FlatPoint.h">
+      <Filter>Algorithm Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="KnitOutStitch.h">
+      <Filter>Algorithm Classes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -179,23 +155,26 @@
     <None Include="time_fragment_shader.glsl" />
   </ItemGroup>
   <ItemGroup>
+    <QtMoc Include="Knittee.h">
+      <Filter>GUI Related</Filter>
+    </QtMoc>
     <QtMoc Include="MeshToolBar.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <QtMoc Include="KnitGrapher.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <QtMoc Include="LaceKnitter.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <QtMoc Include="Visualizer.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <QtMoc Include="KnitoutSheduler.h">
-      <Filter>Header Files</Filter>
+      <Filter>GUI Related</Filter>
     </QtMoc>
     <QtMoc Include="SheetToolBar.h">
-      <Filter>Header Files</Filter>
+      <Filter>GUI Related</Filter>
+    </QtMoc>
+    <QtMoc Include="Visualizer.h">
+      <Filter>GUI Related</Filter>
+    </QtMoc>
+    <QtMoc Include="KnitGrapher.h">
+      <Filter>Algorithm Classes</Filter>
+    </QtMoc>
+    <QtMoc Include="KnitoutSheduler.h">
+      <Filter>Algorithm Classes</Filter>
+    </QtMoc>
+    <QtMoc Include="LaceKnitter.h">
+      <Filter>Algorithm Classes</Filter>
     </QtMoc>
   </ItemGroup>
 </Project>

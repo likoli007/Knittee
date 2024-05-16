@@ -34,7 +34,7 @@
 #include "TracedStitch.h"
 #include "KnitoutSheduler.h"
 #include "SheetToolBar.h"
-
+#include "HelperText.h"
 /*
 * This is the main class that will be used to create the GUI for the program
 * It also includes helper classes that will be shown at some stages of the program
@@ -46,7 +46,8 @@
 /*
 * This struct is used to define the project types, it is saved into .knittee files and can also be loaded into the program from them
 */
-struct ProjectInfo {
+struct ProjectInfo 
+{
     int type;    // same as modellingType, will pass the user selected option
     QString objectFilePath; //path of the 3D object/ 2D sheet that is used by the project
     QString projectName; //name of the project
@@ -55,21 +56,7 @@ struct ProjectInfo {
     int racking; //racking value of the sheet
 };
 
-/*
-class ExportMeshKnitoutDialog : public QDialog
-{
-    Q_OBJECT
 
-public:
-    ExportMeshKnitoutDialog(QWidget* parent = nullptr);
-
-private:
-    QLineEdit* outputLineEdit;
-    QLineEdit* outputFileNameLineEdit;
-    QTextEdit* outputTextEdit;
-    QPushButton* exportButton;
-
-};*/
 /*
 * This class is used to create the new project popup window when the user selects 'new' in the project menu
 */
@@ -115,8 +102,6 @@ private:
     QComboBox* preformSelectionComboBox;
     QLabel* preformSelectionLabel;
     QLabel* meshTypeLabel;
-    //QHBoxLayout* meshTypeLayout;
-    //QSeparator preformSelectionSeparator;
 };
 
 
@@ -133,8 +118,6 @@ public:
     ~Knittee();
 
 private slots:
-    void setConstraintsMode();
-    void handleToolbarDone();
     void startRemeshing();
     void meshInterpolated(ObjectMesh, std::vector<float>);
     void firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
@@ -153,20 +136,15 @@ private slots:
     void generateKnitoutButtonClicked();
     void knitoutGenerated(std::vector<QString>);
     void generateKnitoutSheet(int algorithm);
-    //void stepButtonClicked();
     void onThreadStarted() {
         knitoutScheduler.schedule();
     }
 
 private:
-    
+    //threads
     QThread* knitoutGeneratorThread;
-
-    void saveTraced(std::vector< TracedStitch >*);
-
-
+    QThread* knitGrapherThread;
     int modellingType = -1; //is the user operating on a 3D model (0) or a 2D sheet? (1), perhaps could be an enum?
-    void closeEvent(QCloseEvent* event) override;
     Ui::KnitteeClass ui;
     ObjHandler object_loader;
     Visualizer* vis;
@@ -177,42 +155,22 @@ private:
     SheetToolBar* sheetToolsWidget;
     QHBoxLayout* visualizerLayout;
     QString projectPath;
-    //bottom textedit for messages to user
     QTextEdit* messageTextEdit;
-
     ProjectInfo context;
 
-    //testing threads for algorithmic portions
-    //Worker* worker;
-    //QThread* knitoutGeneratorThread;
-
-
-
-    bool canSlice = false;
-
+    void closeEvent(QCloseEvent* event) override;
     void loadProject(QString);
-    void openOptionsWindow();
     void openHelpWindow();
     void openAboutWindow();
     void openNewProjectWindow();
     void handleNewProject(ProjectInfo info);
     void selectProject();
-
+    void saveTraced(std::vector< TracedStitch >*);
     void saveProject();
-
-    //3D project functions
     void setUpNew3DProject();
     void start3DProject();
-    void save3DProject();
     void loadConstraints();
-
-    //2D project functions
     void setUpNew2DProject();
     void start2DProject();
     void save2DProject();
-    void save2DContext();
-
-    QThread* knitGrapherThread;
-protected:
-    void KeyPressEvent(QKeyEvent* event);
 };

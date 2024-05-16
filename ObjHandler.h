@@ -8,6 +8,9 @@
 #include "Face.h"
 #include <QFile>
 
+/*
+* ObjHandler handles the loading and creation of a 3D mesh that will then be further used for visualizations and algorithms
+*/
 
 class ObjHandler
 {

@@ -1,7 +1,8 @@
 #include "SheetToolBar.h"
 
 
-SheetToolBar::SheetToolBar(QWidget* parent) {
+SheetToolBar::SheetToolBar(QWidget* parent) 
+{
     QFrame* rackingSeparator = new QFrame();
     rackingSeparator->setFrameShape(QFrame::HLine);
     rackingSeparator->setFrameShadow(QFrame::Raised);
@@ -49,7 +50,6 @@ SheetToolBar::SheetToolBar(QWidget* parent) {
     exportLabel->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     sheetLabel->setAlignment(Qt::AlignCenter);
 
-
     leftRightLayout->addWidget(resizeLeftButton);
     leftRightLayout->addWidget(sheetLabel);
     leftRightLayout->addWidget(resizeRightButton);
@@ -95,12 +95,8 @@ SheetToolBar::SheetToolBar(QWidget* parent) {
     QObject::connect(resizeDownButton, &QPushButton::clicked, this, &SheetToolBar::downButtonClicked);
     QObject::connect(resizeLeftButton, &QPushButton::clicked, this, &SheetToolBar::leftButtonClicked);
     QObject::connect(resizeRightButton, &QPushButton::clicked, this, &SheetToolBar::rightButtonClicked);
-    //connect radio buttons to slot
     QObject::connect(increaseRadio, &QRadioButton::clicked, this, &SheetToolBar::increaseRadioClicked);
     QObject::connect(decreaseRadio, &QRadioButton::clicked, this, &SheetToolBar::decreaseRadioClicked);
-
     QObject::connect(rackingSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, &SheetToolBar::rackingSpinBoxChanged);
-
     QObject::connect(generateKnitoutButton, &QPushButton::clicked, this, &SheetToolBar::generateKnitoutClicked);
-
 }

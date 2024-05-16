@@ -5,6 +5,17 @@
 #include <string>
 #include <cassert>
 
+/*
+*	This file contains helper structs and functions used to calculate an optimal transfer plan for a set of scheduled stitches.
+*		BedNeedle: represents a needle on a knitting machine. The needle is identified by its bed (front, front sliders, back sliders, back) and its number.
+*		Constraints: represents the constraints for the transfer plan. The constraints are the minimum and maximum number of free needles, and the maximum racking.
+* 		Transfer: represents a transfer operation. It contains the source and destination needles, and a string explaining the reason for the transfer.
+*		Slack: represents the slack between a stitch and its counterclockwise neighbor.
+*		plan_transfers(): calculates an optimal transfer plan  
+*	BedNeedle was renamed since the previous class name was already defined in the project.
+*/
+
+
 struct BedNeedle {
 	enum Bed : char {
 		Front = 'f',

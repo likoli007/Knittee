@@ -1,20 +1,5 @@
 #include "Visualizer.h"
 
-
-#include <QWidget>
-#include <QOpenGLWidget>
-//#include <QOpenGLFunctions>
-#include <QOpenGLExtraFunctions>
-#include <GL/gl.h>
-
-//#include <GL/glu.h>
-//#include "ObjLoader.h"
-#include <QDebug>
-#include <QToolTip>
-#include <QApplication>
-#include <QPair>
-#include <QScreen>
-#include <QGraphicsDropShadowEffect>
 /*
 *   Function: constructor, adds mouse tracking for the visualization subwindow
 */
@@ -36,18 +21,15 @@ Visualizer::~Visualizer()
 
 }
 
-
-void Visualizer::sheetChanged(std::vector<std::vector<FlatPoint>>* sheet) {
-	qDebug() << "sheet changed";
-	this->sheet = *sheet;
-	//update();
-}
-
-QColor timeColor(float time) {
+/*
+*   Function: get suitable color for a corresponding time value, creates the nice gradient for interpolated mesh
+*/
+QColor Visualizer::timeColor(float time) 
+{
     constexpr int size = 3;
     static const QColor grad[size] = {
         QColor(51, 51, 255),   // Blue
-        QColor(204, 204, 204), // Gray
+        QColor(204, 204, 204), // Grey
         QColor(204, 51, 51)    // Red
     };
 
@@ -63,18 +45,19 @@ QColor timeColor(float time) {
     int green = static_cast<int>(g * 255.0f);
     int blue = static_cast<int>(b * 255.0f);
 
-    // Interpolate between colors
     QColor color(red, green, blue);
 
     return color;
 }
-const uint TimeTexSize = 16;
 
-void Visualizer::generateTimeTexture() {
+/*
+*  Function: generate a time texture which will be used to pick the color of a vertex in the interpolated mesh
+*/
+void Visualizer::generateTimeTexture() 
+{
     timeTexImage = QImage(TimeTexSize, 1, QImage::Format_RGB888);
     for (int i = 0; i < TimeTexSize; ++i) {
         QColor color = timeColor(i / float(TimeTexSize - 1));
-        //QColor qColor = QColor::fromRgbF(color.r, color.g, color.b);
         timeTexImage.setPixel(i, 0, color.rgb());
     }
 
@@ -84,8 +67,8 @@ void Visualizer::generateTimeTexture() {
     timeTexture->setMinificationFilter(QOpenGLTexture::Nearest);
     timeTexture->setMagnificationFilter(QOpenGLTexture::Linear);
 
-    timeTexImage.save("stuffensie.jpg");
-
+    //debug - show the texture
+    //timeTexImage.save("stuffensie.jpg");
 }
 
 /*
@@ -94,15 +77,9 @@ void Visualizer::generateTimeTexture() {
 */
 void Visualizer::initializeGL()
 {
-
-
-
     initializeOpenGLFunctions();
 
     glEnable(GL_DEPTH_TEST);
-    // Set the clear color to blue
-    glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
-
 
     // Create and bind the VAO, VBO 
     glGenVertexArrays(1, &vao);
@@ -122,27 +99,22 @@ void Visualizer::initializeGL()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), nullptr);
     glEnableVertexAttribArray(0);
 
-
-
-    // Create and bind the  buffer
+    // Create and bind the buffer
     glGenBuffers(1, &coordsBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, coordsBuffer);
     glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_STATIC_DRAW);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(float)*2, nullptr);
     glEnableVertexAttribArray(1);
-
     glBindVertexArray(0);
 
     // Load the shader program
     shaderProgram.addShaderFromSourceFile(QOpenGLShader::Vertex, "vertex_shader.glsl");
     shaderProgram.addShaderFromSourceFile(QOpenGLShader::Fragment, "fragment_shader.glsl");
-    //shaderProgram.addShaderFromSourceFile(QOpenGLShader::Geometry, "geometry_shader.glsl"); //unneeded?
     shaderProgram.link();
 
     timeShaderProgram.addShaderFromSourceFile(QOpenGLShader::Vertex, "time_vertex_shader.glsl");
     timeShaderProgram.addShaderFromSourceFile(QOpenGLShader::Fragment, "time_fragment_shader.glsl");
     timeShaderProgram.link();
-
 
     // Set the default matrices
     viewMatrix.setToIdentity();
@@ -169,7 +141,8 @@ void Visualizer::resizeGL(int w, int h)
 /*
 * Function: build an mvp matrix from the different operations applied to the mesh, such as rotations..
 */
-void Visualizer::buildmvpMatrix() {
+void Visualizer::buildmvpMatrix() 
+{
     // Remove the original changes to the mvp matrix by setting each matrix to identity
     projectionMatrix.setToIdentity();
     viewMatrix.setToIdentity();
@@ -186,26 +159,18 @@ void Visualizer::buildmvpMatrix() {
 
     viewMatrix.rotate(m_rotationAngleX, 1.0f, 0.0f, 0.0f);
     viewMatrix.rotate(m_rotationAngleY, 0.0f, 1.0f, 0.0f);
-    //viewMatrix.scale(1.0f / zoomLevel);
-    //viewMatrix.translate(centroid.x(), centroid.y(), centroid.z());
-    
-    
-
-    //modelMatrix.translate(-centroid.x(), -centroid.y(), -centroid.z());
-    //modelMatrix.translate(centroid.x(), centroid.y(), centroid.z()); // Translate to centroid
-    //modelMatrix.scale(1.0f / zoomLevel);
-    // Scale relative to centroid
-    //modelMatrix.translate(-centroid.x(), -centroid.y(), -centroid.z()); // Translate back
-
-    
-    
-    //modelMatrix.translate(0.0, 0.0, translateZ);
-
-    
-    //modelMatrix.translate(centroid.x(), centroid.y(), centroid.z());
 
     // Combine the matrices to form mvp matrix
     mvpMatrix = projectionMatrix * viewMatrix * modelMatrix;
+}
+
+
+/*
+*  Function: change the visualized sheet as it was changed in the toolbar (usually the dimensions changed)
+*/
+void Visualizer::sheetChanged(std::vector<std::vector<FlatPoint>>* sheet)
+{
+    this->sheet = *sheet;
 }
 
 /*
@@ -243,18 +208,12 @@ void Visualizer::paintPickedFace(int faceID) {
 
 void Visualizer::firstActiveChainsCreated(std::vector< std::vector< EmbeddedVertex > >* active_chains,
     std::vector< std::vector< Stitch > >* active_stitches,
-    RowColGraph* graph) {
-
-    //qDebug() << "FIRST ACTIVE CHAINS ARRIVED AT VISUALIZER";
-
-
-
-
+    RowColGraph* graph) 
+{
     //assign the passed pointers to class vars
     this->activeChains = *active_chains;
     this->activeStitches = *active_stitches;
     this->rowColGraph = *graph;
-
 
     showFirstChains = true;
     showConstraints = false;
@@ -262,19 +221,16 @@ void Visualizer::firstActiveChainsCreated(std::vector< std::vector< EmbeddedVert
     showLinks = false;
     showSlice = false;
     showSliceChains = false;
-
 }
 
-void Visualizer::meshInterpolated(ObjectMesh mesh, std::vector<float> values) {
-    qDebug() << "visualizer loaded interpolated mesh!";
+/*
+*   Function: slot function that sets up the visualization of the remeshed and interpolated mesh
+*/
+void Visualizer::meshInterpolated(ObjectMesh mesh, std::vector<float> values) 
+{
     showModel = false;
-
-
-
-
     interpolatedMesh = mesh;
     interpolatedValues = values;
-    qDebug() << "interpolatedvalues size: " << interpolatedValues.size();
 
     generateTimeTexture();
 
@@ -286,7 +242,6 @@ void Visualizer::meshInterpolated(ObjectMesh mesh, std::vector<float> values) {
         max = std::max(max, v);
     }
 
-
     std::vector< float > texcoords;
     for (auto v : interpolatedValues) {
         texcoords.emplace_back(
@@ -294,28 +249,12 @@ void Visualizer::meshInterpolated(ObjectMesh mesh, std::vector<float> values) {
         texcoords.emplace_back(0.5f);
     }
 
-
-    qDebug() << texcoords.size() << interpolatedMesh.vertices.size() << interpolatedMesh.indices.size();
-
-    qDebug() << "original mesh tris: " << mesh.indices.size() / 3 << " interpolated mesh tris: " << interpolatedMesh.indices.size() / 3;
-
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-    // Set up the vertex buffer data
     glBufferData(GL_ARRAY_BUFFER, interpolatedMesh.vertices.size() * sizeof(QVector3D), interpolatedMesh.vertices.data(), GL_STATIC_DRAW);
-
-    // Create and bind the index buffer
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, interpolatedMesh.indices.size() * sizeof(GLuint), interpolatedMesh.indices.data(), GL_STATIC_DRAW);
-    GLenum error;
-    while ((error = glGetError()) != GL_NO_ERROR) {
-        qDebug() << "OpenGL error: " << error;
-    }
-    // Specify the format of the vertex data (position only)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), nullptr);
-
-
     glBindBuffer(GL_ARRAY_BUFFER, coordsBuffer);
     glBufferData(GL_ARRAY_BUFFER, texcoords.size() * sizeof(float), texcoords.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
@@ -331,7 +270,8 @@ void Visualizer::meshInterpolated(ObjectMesh mesh, std::vector<float> values) {
 *   Function: after the color picking mesh is drawn, this function gets the id of the face under the cursor,
 *       also gets the closest vertex, both the face and vertex info is stored in Visualizer member variables
 */
-void Visualizer::pickFromMesh() {
+void Visualizer::pickFromMesh() 
+{
     unsigned char pixel[3];
 
     // Get pixel color under cursor and derive the ID from it
@@ -357,15 +297,14 @@ void Visualizer::pickFromMesh() {
         chosenVertex = mesh.indices[id * 3 + max];
     }
     selectedFace = id;
-    //qDebug() << "Selected face: " << selectedFace;
-    //qDebug() << "Chosen vertex: " << chosenVertex;
 }
 
 
 /*
 *   Function: paint the mesh with each face having a different color, which sets the screen up for the color picking function
 */
-void Visualizer::paintPickFrame() {
+void Visualizer::paintPickFrame() 
+{
     // Set up
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -379,8 +318,6 @@ void Visualizer::paintPickFrame() {
         int blue = id & 0xFF;
 
         QColor color(red, green, blue);
-
-        //qDebug() << mesh.indices[i] << mesh.indices[i + 1] << mesh.indices[i + 2];
 
         QVector3D vertex1 = mesh.vertices[mesh.indices[i]];
         QVector3D vertex2 = mesh.vertices[mesh.indices[i + 1]];
@@ -405,75 +342,11 @@ void Visualizer::paintPickFrame() {
     glFinish();
 }
 
-
-void Visualizer::paintLineTube(QVector3D start, QVector3D end, float r, float g, float b) {
-    //glLineWidth(5.0f);
-
-    buildmvpMatrix();
-    start = mvpMatrix.map(start);
-    end = mvpMatrix.map(end);
-
-    int numSegments = 16;
-    int radius = 1.0f;
-
-    // Calculate the direction and length of the tube
-    QVector3D direction = end - start;
-    float length = direction.length();
-    direction.normalize();
-
-    // Generate vertices for the tube
-    std::vector<QVector3D> vertices;
-    //<QVector3D> normals;
-    //QVector<QVector2D> texCoords; // If needed for texturing
-    
-    for (int i = 0; i <= numSegments; ++i) {
-        float theta = i * (2 * M_PI / numSegments);
-        float x = radius * cos(theta);
-        float y = radius * sin(theta);
-
-        QVector3D circlePoint = QVector3D(x, y, 0.0f);
-        QVector3D vertex = start + (direction * ((float)i / numSegments) * length) + circlePoint;
-        vertices.push_back(vertex);
-
-        // Calculate normals (pointing along the radial direction)
-        //QVector3D normal = QVector3D::crossProduct(circlePoint, direction).normalized();
-        //normals.push_back(normal);
-
-        // If you need texture coordinates, calculate them here
-    }
-    
-    // Generate indices for the tube
-    std::vector<unsigned int> indices;
-    for (int i = 0; i < numSegments-1; ++i) {
-        int next = (i + 1) % numSegments;
-        indices.push_back(i);
-        indices.push_back(next);
-        indices.push_back(i + numSegments);
-
-        indices.push_back(next);
-        indices.push_back(next + numSegments );
-        indices.push_back(i + numSegments );
-    }
-    
-    // Render the tube
-    glColor3f(r, g, b);
-    glBegin(GL_TRIANGLES);
-    for (int i = 0; i < indices.size(); ++i) {
-
-        int idx = indices[i];
-        qDebug() << i << idx << vertices.size();
-        //glNormal3f(normals[idx].x(), normals[idx].y(), normals[idx].z());
-        glVertex3f(vertices[idx].x(), vertices[idx].y(), vertices[idx].z());
-    }
-    glEnd();
-
-}
-
 /*
-*   Function: paint the constraint set by the user, currently a thick line running from the selected constrained vertices
+*   Function: paint the a path between two points, done for constraints, links, chains etc..
 */
-void Visualizer::paintPath(QVector3D start, QVector3D end, float r, float g, float b, float radius = 5.0f) {
-    // Set up
+void Visualizer::paintPath(QVector3D start, QVector3D end, float r, float g, float b, float radius = 5.0f) 
+{
     glEnable(GL_LINE_SMOOTH);
     glLineWidth(radius);
 
@@ -502,7 +375,11 @@ void Visualizer::paintPath(QVector3D start, QVector3D end, float r, float g, flo
     glEnd();
 }
 
-void Visualizer::reset() {
+/*
+*   Function: reset all parameters of the visualizer, used when the user wants to start a new project or resets the current one
+*/
+void Visualizer::reset() 
+{
     interpolatedMesh.clear();
     interpolatedValues.clear();
     activeChains.clear();
@@ -525,8 +402,6 @@ void Visualizer::reset() {
     tracedMesh.clear();
     addingConstraints = false;
     showLastChain = false;
-    
-
     showModel = true;
     showConstraints= true;
 
@@ -536,16 +411,15 @@ void Visualizer::reset() {
     m_rotationAngleX = 0.0f;
     m_rotationAngleY = 0.0f;
     zoomLevel = 1.0f;
-    rotationAngle = 0.0f;
 
     loadMesh(mesh);
-
 }
 
 /*
 *   Function: paints all the constraints of different constraint sets iteratively
 */
-void Visualizer::paintConstraints() {
+void Visualizer::paintConstraints() 
+{
     for (Constraint* c : constraints) {
         if (c->vertices.size() > 1) {
             //select a color of the constraint based on the time value
@@ -559,13 +433,11 @@ void Visualizer::paintConstraints() {
             float g = static_cast<float>(green) / 255.0f;
             float b = static_cast<float>(blue) / 255.0f;
 
-            
             for (int i = 0; i < c->vertices.size() - 1; i++) {
                 //a constraint is a set of vertices, paint a line between each pair of vertices
                 QVector3D vertex1 = mesh.vertices[c->vertices[i]];
                 QVector3D vertex2 = mesh.vertices[c->vertices[i + 1]];
 
-                //paintLineTube(vertex1, vertex2, r, g, b);
                 paintPath(vertex1, vertex2, r, g, b);
             }
         }
@@ -576,7 +448,8 @@ void Visualizer::paintConstraints() {
 *   Function: allow the user to set constraints in the visualizer, in the future
 *       will disable a different mode selected by the user previously
 */
-void Visualizer::setConstraintsMode(bool type) {
+void Visualizer::setConstraintsMode(bool type) 
+{
     addingConstraints = type;
     showConstraints = type;
 
@@ -617,7 +490,6 @@ void Visualizer::paintOriginalMesh()
     QMatrix4x4 invViewMatrix = viewMatrix.inverted();
     QVector3D cameraPosition = invViewMatrix.column(3).toVector3D();
     QVector3D lightDirection = cameraPosition.normalized();
-    //shaderProgram.setUniformValue("lightDirection", lightDirection);
 
     // Start the paint process
     glBindVertexArray(vao);
@@ -642,6 +514,7 @@ void Visualizer::paintOriginalMesh()
 
         // Set the uniform values for the shader, selectedFace determines face color,
         // shadingValue determines the 'darkness' of the face about to be painted
+        // in the future pass it by buffer?
         shaderProgram.setUniformValue("selectedFace", isSelected);
         shaderProgram.setUniformValue("shadingValue", shading);
 
@@ -651,7 +524,11 @@ void Visualizer::paintOriginalMesh()
     glBindVertexArray(0);
 }
 
-void Visualizer::loadInterpolated() {
+/*
+*  Function: load the interpolated mesh into the OpenGL buffers
+*/
+void Visualizer::loadInterpolated() 
+{
     float min = -1.0f;
     float max = 1.0f;
 
@@ -670,21 +547,10 @@ void Visualizer::loadInterpolated() {
 
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-    // Set up the vertex buffer data
     glBufferData(GL_ARRAY_BUFFER, interpolatedMesh.vertices.size() * sizeof(QVector3D), interpolatedMesh.vertices.data(), GL_STATIC_DRAW);
-
-    // Create and bind the index buffer
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, interpolatedMesh.indices.size() * sizeof(GLuint), interpolatedMesh.indices.data(), GL_STATIC_DRAW);
-    GLenum error;
-    while ((error = glGetError()) != GL_NO_ERROR) {
-        qDebug() << "OpenGL error: " << error;
-    }
-    // Specify the format of the vertex data (position only)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), nullptr);
-
-
     glBindBuffer(GL_ARRAY_BUFFER, coordsBuffer);
     glBufferData(GL_ARRAY_BUFFER, texcoords.size() * sizeof(float), texcoords.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
@@ -693,137 +559,63 @@ void Visualizer::loadInterpolated() {
     glFinish();
 }
 
-void Visualizer::paintInterpolatedMesh() {
-
+/// the following are self-explanatory paint functions for the different visualizations
+void Visualizer::paintInterpolatedMesh() 
+{
     loadInterpolated();
 
     glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
-   
-    //print out 2 texcord values per line in qdebug
-    /*
-    for (int i = 0; i < texcoords.size(); i += 2) {
-		qDebug() << texcoords[i] << " " << texcoords[i + 1];
-	}*/
-    
     // For each face, draw the triangle with a different color
     glBindVertexArray(vao);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
     glFinish();
 
-    //qDebug() << "painting interpolated mesh with (verts, tris) = " << interpolatedMesh.vertices.size() << ", " << interpolatedMesh.indices.size()/3;
-
-   // qDebug() << "1";
     // Set the texture unit in the shader program
     timeShaderProgram.bind();
     timeTexture->bind(1);
     timeShaderProgram.setUniformValue("tex", 1);
-
     buildmvpMatrix();
     timeShaderProgram.setUniformValue("mvpMatrix", mvpMatrix);
-    //qDebug() << "2";
     glDrawElements(GL_TRIANGLES, interpolatedMesh.indices.size(), GL_UNSIGNED_INT, nullptr);
-
     glFinish();
-   // qDebug() << "3";
     timeShaderProgram.release();
     timeTexture->release();
     glBindVertexArray(0);
 
 }
-
-void Visualizer:: paintCube(QVector3D center, float sideLength) {
-    float halfSide = sideLength;
-    halfSide = 0.05f;
-    buildmvpMatrix();
-    center = mvpMatrix.map(center);
-    
-    qDebug() << sideLength;
-
-    float x = center.x();
-    float y = center.y();
-    float z = center.z();
-    
-    glBegin(GL_QUADS);
-
-    glColor3f(1.0f, 1.0f, 1.0f);
-    // Front face
-    glVertex3f(x - halfSide, y - halfSide, z + halfSide);
-    glVertex3f(x + halfSide, y - halfSide, z + halfSide);
-    glVertex3f(x + halfSide, y + halfSide, z + halfSide);
-    glVertex3f(x - halfSide, y + halfSide, z + halfSide);
-
-    // Back face
-    glVertex3f(x - halfSide, y - halfSide, z - halfSide);
-    glVertex3f(x - halfSide, y + halfSide, z - halfSide);
-    glVertex3f(x + halfSide, y + halfSide, z - halfSide);
-    glVertex3f(x + halfSide, y - halfSide, z - halfSide);
-
-    // Top face
-    glVertex3f(x - halfSide, y + halfSide, z - halfSide);
-    glVertex3f(x - halfSide, y + halfSide, z + halfSide);
-    glVertex3f(x + halfSide, y + halfSide, z + halfSide);
-    glVertex3f(x + halfSide, y + halfSide, z - halfSide);
-
-    // Bottom face
-    glVertex3f(x - halfSide, y - halfSide, z - halfSide);
-    glVertex3f(x + halfSide, y - halfSide, z - halfSide);
-    glVertex3f(x + halfSide, y - halfSide, z + halfSide);
-    glVertex3f(x - halfSide, y - halfSide, z + halfSide);
-
-    // Right face
-    glVertex3f(x + halfSide, y - halfSide, z - halfSide);
-    glVertex3f(x + halfSide, y + halfSide, z - halfSide);
-    glVertex3f(x + halfSide, y + halfSide, z + halfSide);
-    glVertex3f(x + halfSide, y - halfSide, z + halfSide);
-
-    // Left face
-    glVertex3f(x - halfSide, y - halfSide, z - halfSide);
-    glVertex3f(x - halfSide, y - halfSide, z + halfSide);
-    glVertex3f(x - halfSide, y + halfSide, z + halfSide);
-    glVertex3f(x - halfSide, y + halfSide, z - halfSide);
-
-    glEnd();
-}
-
-void Visualizer::paint3DCurve(QVector3D start, QVector3D end, QVector3D cp1, QVector3D cp2, int debug = 0) {
-    glColor3f(yarnMeshColor.x, yarnMeshColor.y, yarnMeshColor.z); // Red color
-    if (debug) glColor3f(0.0, 0.0, 1.0);
-
-
+void Visualizer::paint3DCurve(QVector3D start, QVector3D end, QVector3D cp1, QVector3D cp2) 
+{
+    glColor3f(yarnMeshColor.x, yarnMeshColor.y, yarnMeshColor.z); 
+  
     buildmvpMatrix();
     start = mvpMatrix.map(start);
 	end = mvpMatrix.map(end);
     cp1 = mvpMatrix.map(cp1);
     cp2 = mvpMatrix.map(cp2);
 
-    int numSegments = 32;
+    int numSegments = 16;
 
-    // Draw the cubic Bezier curve
+    //Draw a cubic Bezier curve
     glBegin(GL_LINE_STRIP);
     for (int i = 0; i <= numSegments; ++i) {
         float t = static_cast<float>(i) / numSegments;
-        float one_minus_t = 1.0f - t;
+        float oneMinusT = 1.0f - t;
 
-        // Bezier curve equation
-        QVector3D point = one_minus_t * one_minus_t * one_minus_t * start +
-            3 * one_minus_t * one_minus_t * t * cp1 +
-            3 * one_minus_t * t * t * cp2 +
+        //Bezier curve equation
+        QVector3D point = oneMinusT * oneMinusT * oneMinusT * start +
+            3 * oneMinusT * oneMinusT * t * cp1 +
+            3 * oneMinusT * t * t * cp2 +
             t * t * t * end;
 
         glVertex3f(point.x(), point.y(), point.z());
     }
     glEnd();
 }
-
-void Visualizer::paintTopLoop(int curr, int prev) {
-    qDebug() << "todo";
-}
-
-void Visualizer::paintYarnMesh() {
-
+void Visualizer::paintYarnMesh() 
+{
     QVector3D cp1;
     QVector3D cp2;
     QVector3D direction;
@@ -833,8 +625,6 @@ void Visualizer::paintYarnMesh() {
         if (tracedMesh[i].yarn != tracedMesh[i - 1].yarn) {
             continue;
         }
-
-
 
         QVector3D previousPoint = QVector3D(tracedMesh[i - 1].at.x, tracedMesh[i - 1].at.y, tracedMesh[i - 1].at.z);
         QVector3D currentPoint = QVector3D(tracedMesh[i].at.x, tracedMesh[i].at.y, tracedMesh[i].at.z);
@@ -852,7 +642,6 @@ void Visualizer::paintYarnMesh() {
             yarnMeshColor.x, yarnMeshColor.y, yarnMeshColor.z, radius);
 
         if (tracedMesh[i].outs[0] != -1U) {
-
 
             //painting yarn going 'up' to the stitch above
             QVector3D loopstart = currentPoint;
@@ -883,12 +672,8 @@ void Visualizer::paintYarnMesh() {
             }
 
             //painting the top 'loop cap' of a stitch
-            //previousPoint = upperTwoThirdsPoint;
-            //QVector3D helper = upperTwoThirdsPoint;
             QVector3D nextTwoThirdsPoint;   //last loop will have to do something special
-            //qDebug() << tracedMesh[i].outs[0] + 1 << tracedMesh.size();
             if (tracedMesh[i].outs[0] + 1 < tracedMesh.size()) {
-                //qDebug() << "woee";
                 if (tracedMesh[tracedMesh[i].outs[0] + 1].yarn == tracedMesh[tracedMesh[i].outs[0]].yarn) {
                     nextToUp = { tracedMesh[(tracedMesh[i].outs[0]) + 1].at.x, tracedMesh[(tracedMesh[i].outs[0]) + 1].at.y, tracedMesh[(tracedMesh[i].outs[0]) + 1].at.z };
                     direction = nextToUp - up;
@@ -903,7 +688,6 @@ void Visualizer::paintYarnMesh() {
                 direction = up - previousToUp;
                 nextTwoThirdsPoint = up + (1 / 3.0) * direction;
             }
-            //qDebug() << "start: " << previousPoint << " end: " << nextTwoThirdsPoint;
             direction = up - currentPoint;
             QVector3D upperFourThirdsPoint = currentPoint + (5.0 / 3.0) * direction;
 
@@ -923,14 +707,11 @@ void Visualizer::paintYarnMesh() {
             cp1 = currentPoint;
             cp2 = currentPoint;
 
-            paint3DCurve(start, nextOneThirdsPoint, cp1, cp2, 0);
+            paint3DCurve(start, nextOneThirdsPoint, cp1, cp2);
 
-            //previousPoint = nextOneThirdsPoint;
         }
         
         if (tracedMesh[i].outs[1] != -1U) {
-
-
             //painting yarn going 'up' to the stitch above
             QVector3D loopstart = currentPoint;
             QVector3D up = { tracedMesh[tracedMesh[i].outs[1]].at.x, tracedMesh[tracedMesh[i].outs[1]].at.y, tracedMesh[tracedMesh[i].outs[1]].at.z };
@@ -945,21 +726,15 @@ void Visualizer::paintYarnMesh() {
             paint3DCurve(twoThirdsPoint, upperTwoThirdsPoint, cp1, cp2);
 
             //painting the top 'loop cap' of a stitch
-            //previousPoint = upperTwoThirdsPoint;
-            //QVector3D helper = upperTwoThirdsPoint;
             QVector3D nextTwoThirdsPoint;   //last loop will have to do something special
-            //qDebug() << tracedMesh[i].outs[0] + 1 << tracedMesh.size();
             if (tracedMesh[i].outs[1] + 1 < tracedMesh.size()) {
-                //qDebug() << "woee";
                 QVector3D nextToUp = { tracedMesh[(tracedMesh[i].outs[1]) + 1].at.x, tracedMesh[(tracedMesh[i].outs[1]) + 1].at.y, tracedMesh[(tracedMesh[i].outs[1]) + 1].at.z };
                 direction = nextToUp - up;
                 nextTwoThirdsPoint = up + (1.0 / 3.0) * direction;
-                //qDebug() << nextTwoThirdsPoint;
             }
             else {
                 nextTwoThirdsPoint = { 0,0,0 };
             }
-            //qDebug() << "start: " << previousPoint << " end: " << nextTwoThirdsPoint;
             direction = up - currentPoint;
             QVector3D upperFourThirdsPoint = currentPoint + (5.0 / 3.0) * direction;
 
@@ -969,7 +744,6 @@ void Visualizer::paintYarnMesh() {
             paint3DCurve(upperTwoThirdsPoint, nextTwoThirdsPoint, cp1, cp2);
 
             //painting the 'down' yarn to the stitch below
-            //going from nextTwoThirdsPoint to currentOneThirdPoint
 
             QVector3D start = nextTwoThirdsPoint;
             QVector3D nextToCurr = { tracedMesh[i + 1].at.x, tracedMesh[i + 1].at.y, tracedMesh[i + 1].at.z };
@@ -979,9 +753,7 @@ void Visualizer::paintYarnMesh() {
             cp1 = currentPoint;
             cp2 = currentPoint;
 
-            paint3DCurve(start, nextOneThirdsPoint, cp1, cp2, 0);
-
-            //previousPoint = nextOneThirdsPoint;
+            paint3DCurve(start, nextOneThirdsPoint, cp1, cp2);
         }
         //else: it is the topmost row, draw according to extrapolated data from the previous row
         else if (tracedMesh[i].outs[1] == -1U && tracedMesh[i].outs[0] == -1U) {
@@ -1003,8 +775,6 @@ void Visualizer::paintYarnMesh() {
             QVector3D extrapolatedNextDirection = extrapolatedNextPoint - (1.0 / 3.0) * direction;
 
             //borrow the first ever yarn point as well as its prev and curr to get artificial stitch width
-            
-            
 
             cp1 = current;
             cp2 = current;
@@ -1030,20 +800,14 @@ void Visualizer::paintYarnMesh() {
             else {
                 direction = (oneDown - oneDownPrev);
                 nextOneThirdsPoint = currentPoint + (1.0 / 3.0) * direction;
-                
-                
+
             }
-            
             paint3DCurve(extrapolatedPrevDirection, nextOneThirdsPoint, cp1, cp2);
-            
-            
         }
     }
-
 }
-
-void Visualizer::paintTraced() {
- 
+void Visualizer::paintTraced() 
+{
     int yarnColor = 0;
 
     for (int i = 1; i < tracedMesh.size(); i++) {
@@ -1053,9 +817,7 @@ void Visualizer::paintTraced() {
         }
         QVector3D start = QVector3D(tracedMesh[i - 1].at.x, tracedMesh[i - 1].at.y, tracedMesh[i - 1].at.z);
         QVector3D end = QVector3D(tracedMesh[i].at.x, tracedMesh[i].at.y, tracedMesh[i].at.z);
-        paintPath(
-            start, end,
-            ycolors[yarnColor].x, ycolors[yarnColor].y, ycolors[yarnColor].z);
+        paintPath(start, end, ycolors[yarnColor].x, ycolors[yarnColor].y, ycolors[yarnColor].z);
     }
     for (int i = 0; i < tracedMesh.size(); i++) {
         glm::vec3 const& at = tracedMesh[i].at;
@@ -1068,12 +830,7 @@ void Visualizer::paintTraced() {
 
             QVector3D atStart = QVector3D(at.x, at.y, at.z);
 
-            paintPath(
-				atStart, end,
-				0.33f, 0.33f, 0.33f);
-            
-            
-
+            paintPath(atStart, end, 0.33f, 0.33f, 0.33f);
             paintPath(atStart, start, 0.8, 0.8, 0.8);
         }
         if (tracedMesh[i].outs[0] != -1U && tracedMesh[i].outs[1] != -1U) {
@@ -1082,13 +839,9 @@ void Visualizer::paintTraced() {
 
             QVector3D start = QVector3D(0.5f * (at.x + out0.x), 0.5f * (at.y + out0.y), 0.5f * (at.z + out0.z));
             QVector3D end = QVector3D(0.5f * (at.x + out1.x), 0.5f * (at.y + out1.y), 0.5f * (at.z + out1.z));
-
             QVector3D atStart = QVector3D(at.x, at.y, at.z);
 
-            
-            paintPath(
-                atStart, end,
-                0.26f, 0.26f, 0.26f);
+            paintPath(atStart, end, 0.26f, 0.26f, 0.26f);
             paintPath(atStart, start, 0.8, 0.8, 0.8);
         }
         if (tracedMesh[i].ins[0] != -1U && tracedMesh[i].ins[1] == -1U) {
@@ -1097,10 +850,7 @@ void Visualizer::paintTraced() {
             QVector3D start = QVector3D(0.5f * (at.x + in0.x), 0.5f * (at.y + in0.y), 0.5f * (at.z + in0.z));
             QVector3D end = QVector3D(at.x, at.y, at.z);
 
-            paintPath(
-				start, end,
-				0.53f, 0.53f, 0.53f);
-
+            paintPath(start, end, 0.53f, 0.53f, 0.53f);
         }
         if (tracedMesh[i].outs[0] != -1U && tracedMesh[i].outs[1] == -1U) {
             glm::vec3 const& out0 = tracedMesh[tracedMesh[i].outs[0]].at;
@@ -1108,25 +858,12 @@ void Visualizer::paintTraced() {
             QVector3D start = QVector3D(0.5f * (at.x + out0.x), 0.5f * (at.y + out0.y), 0.5f * (at.z + out0.z));
             QVector3D end = QVector3D(at.x, at.y, at.z);
 
-            paintPath(
-				start, end,
-				0.46f, 0.46f, 0.46f);
+            paintPath(start, end, 0.46f, 0.46f, 0.46f);
         }
     }
 }
-
-void Visualizer::knitGraphCreated() {
-    showLastChain = true;
-}
-
-void Visualizer::knitGraphTraced(std::vector< TracedStitch >* t) {
-    tracedMesh = *t;
-    showTraced = true;
-    showFirstChains = false;
-    showInterpolated = false;
-}
-
-void Visualizer::paintFirstActiveChains() {
+void Visualizer::paintFirstActiveChains() 
+{
     std::vector< QVector3D > locations;
     locations.reserve(rowColGraph.vertices.size());
     for (auto const& v : rowColGraph.vertices) {
@@ -1134,149 +871,46 @@ void Visualizer::paintFirstActiveChains() {
     }
 
     float r, g, b;
-    //TODO: get parameters from knitgrapher
     float radius = 1.5f * 0.075f * 3.66f * 10.0f;
     for (uint32_t vi = 0; vi < rowColGraph.vertices.size(); ++vi) {
-        auto & v = rowColGraph.vertices[vi];
-        
+        auto& v = rowColGraph.vertices[vi];
         if (v.row_in != -1U) {
-            //qDebug() << "i have row_in";
             if (showLastChain || (showNextChains && v.col_out[0] != -1U))
-                paintPath(
-                    locations[vi],
-                    locations[v.row_in],
-                    graphRowColor.x, graphRowColor.y, graphRowColor.z
-                );
+                paintPath(locations[vi],locations[v.row_in],
+                    graphRowColor.x, graphRowColor.y, graphRowColor.z);
         }
         if (v.row_out != -1U) {
-            //qDebug() << "i have row_out";
-            if(!showNextChains || (showNextChains && v.col_out[0] != -1U))
-                paintPath(
-                    locations[vi],
-                    locations[v.row_out],
-                    graphRowColor.x, graphRowColor.y, graphRowColor.z
-                );
+            if (!showNextChains || (showNextChains && v.col_out[0] != -1U))
+                paintPath(locations[vi],locations[v.row_out],
+                    graphRowColor.x, graphRowColor.y, graphRowColor.z);
         }
         if (v.col_in[0] != -1U) {
-            r = v.col_in[1] == -1U ?  graphLinkColor.x : graphCollapseColor.x;
+            r = v.col_in[1] == -1U ? graphLinkColor.x : graphCollapseColor.x;
             g = v.col_in[1] == -1U ? graphLinkColor.y : graphCollapseColor.y;
-            b = v.col_in[1] == -1U ?  graphLinkColor.z : graphCollapseColor.z;
+            b = v.col_in[1] == -1U ? graphLinkColor.z : graphCollapseColor.z;
 
-            paintPath(
-                locations[vi],
-                locations[v.col_in[0]],
-                r, g, b
-            );
+            paintPath(locations[vi],locations[v.col_in[0]],r, g, b);
         }
         if (v.col_in[1] != -1U) {
-            paintPath(
-                locations[vi],
-                locations[v.col_in[1]],
-                graphCollapseColor.x, graphCollapseColor.y, graphCollapseColor.z
-            );
+            paintPath(locations[vi],locations[v.col_in[1]],
+                graphCollapseColor.x, graphCollapseColor.y, graphCollapseColor.z);
         }
-        
+
         if (v.col_out[0] != -1U && rowColGraph.vertices[v.col_out[0]].col_in[1] == -1) {
             r = v.col_out[1] == -1U ? graphLinkColor.x : graphExpandColor.x;
             g = v.col_out[1] == -1U ? graphLinkColor.y : graphExpandColor.y;
             b = v.col_out[1] == -1U ? graphLinkColor.z : graphExpandColor.z;
 
-            paintPath(
-                locations[vi],
-                locations[v.col_out[0]],
-                r, g, b
-            );
+            paintPath(locations[vi],locations[v.col_out[0]], r, g, b);
         }
         if (v.col_out[1] != -1U && rowColGraph.vertices[v.col_out[1]].col_in[1] == -1) {
-            paintPath(
-                locations[vi],
-                locations[v.col_out[1]],
-                graphExpandColor.x, graphExpandColor.y, graphExpandColor.z
-            );
+            paintPath(locations[vi], locations[v.col_out[1]],
+                graphExpandColor.x, graphExpandColor.y, graphExpandColor.z);
         }
     }
 }
-
-void Visualizer::paintSphere(QVector3D center, float radius) {
-    const int slices = 15;
-    const int stacks = 15;
-
-    radius = 0.04f / zoomLevel;
-    //glClear(GL_DEPTH_BUFFER_BIT);
-    
-    //qDebug() << "drawing stuff";
-    buildmvpMatrix();
-    center = mvpMatrix.map(center);
-
-    glBegin(GL_TRIANGLE_STRIP);
-    
-    //set white color
-    glColor3f(0.0f, 0.57f, 1.0f);
-    glEnable(GL_DEPTH_TEST);
-    for (int i = 0; i <= stacks; ++i)
-    {
-        float phi = M_PI * i / stacks;
-        float sinPhi = sin(phi);
-        float cosPhi = cos(phi);
-
-        for (int j = 0; j <= slices; ++j)
-        {
-            float theta = 2 * M_PI * j / slices;
-            float sinTheta = sin(theta);
-            float cosTheta = cos(theta);
-
-            float x = cosTheta * sinPhi;
-            float y = cosPhi;
-            float z = sinTheta * sinPhi;
-
-            glVertex3f(center.x() + x * radius, center.y() + y * radius, center.z() + z * radius);
-            x = cosTheta * sin(phi + M_PI / stacks);
-            y = cos(phi + M_PI / stacks);
-            z = sinTheta * sin(phi + M_PI / stacks);
-
-            glVertex3f(center.x() + x * radius, center.y() + y * radius, center.z() + z * radius);
-        }
-    }
-    glEnd();
-}
-
-void Visualizer::peelSliceDone(ObjectMesh slice, std::vector< std::vector< uint32_t > > slice_active_chains_, std::vector< std::vector< uint32_t > > slice_next_chains_) {
-    showInterpolated = false;
-    qDebug() << "slice arrived at visualizer" << slice.vertices.size();
-    sliceMesh = slice;
-    sliceActiveChains = slice_active_chains_;
-    sliceNextChains = slice_next_chains_;
-
-
-
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-    // Set up the vertex buffer data
-    glBufferData(GL_ARRAY_BUFFER, sliceMesh.vertices.size() * sizeof(QVector3D), sliceMesh.vertices.data(), GL_STATIC_DRAW);
-
-    // Create and bind the index buffer
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sliceMesh.indices.size() * sizeof(GLuint), sliceMesh.indices.data(), GL_STATIC_DRAW);
-    GLenum error;
-    while ((error = glGetError()) != GL_NO_ERROR) {
-        qDebug() << "OpenGL error: " << error;
-    }
-    // Specify the format of the vertex data (position only)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), nullptr);
-
-
-    glEnableVertexAttribArray(0);
-    
-    glFinish();
-
-    showSlice = true;
-    showSliceChains = true;
-}
-
-
-//paint both the slice mesh and the chains
-void Visualizer::paintSliceMesh() {
+void Visualizer::paintSliceMesh() 
+{
     glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
@@ -1339,15 +973,367 @@ void Visualizer::paintSliceMesh() {
         }
     }
 }
+void Visualizer::paintLinks() 
+{
+    std::vector< std::vector< QVector3D > > from = interpolateStitchLocations(copyLocations(sliceMesh, sliceActiveChains), activeStitches);
+    std::vector< std::vector< QVector3D > > to = interpolateStitchLocations(copyLocations(sliceMesh, sliceNextChains), nextStitches);
 
-//brazenly copied from knitgrapher, move to its own 'common functions' file later
-QVector3D mmix(const QVector3D& wa, const QVector3D& wb, float m) {
-    return wa + m * (wb - wa);
+    for (auto link : links) {
+        QVector3D const& vertex1 = from[link.from_chain][link.from_stitch];
+        QVector3D const& vertex2 = to[link.to_chain][link.to_stitch];
+
+        paintPath(vertex1, vertex2, graphLinkColor.x, graphLinkColor.y, graphLinkColor.z);
+    }
+}
+void Visualizer::paintNextChains() 
+{
+    std::vector< std::vector< QVector3D > > next_active_locations = interpolateLocations(interpolatedMesh, nextActiveChains);
+
+    for (auto nextChain : next_active_locations) {
+        for (int i = 0; i < nextChain.size() - 1; i++) {
+            QVector3D vertex1 = nextChain[i];
+            QVector3D vertex2 = nextChain[i + 1];
+            paintPath(vertex1, vertex2, lowerBoundColor.x, lowerBoundColor.y, lowerBoundColor.z);
+        }
+    }
 }
 
+void Visualizer::paintCurve(QPainter& painter, const std::vector<QPoint>& controlPoints) 
+{
+    QPainterPath path;
+
+    for (int i = 0; i < controlPoints.size(); i += 4) {
+        QPoint p0 = controlPoints[i];
+        QPoint p1 = controlPoints[i + 1];
+        QPoint c0 = controlPoints[i + 2];
+        QPoint c1 = controlPoints[i + 3];
+
+        path.moveTo(p0);
+        path.cubicTo(c0.x(), c0.y(), c1.x(), c1.y(), p1.x(), p1.y());
+
+    }
+
+    // Top curve
+
+    QPen blackPen(Qt::black, 6);
+    blackPen.setCapStyle(Qt::RoundCap);
+
+    painter.setPen(blackPen);
+    painter.drawPath(path);
+
+    QPen pen;
+    pen.setWidth(3);
+    pen.setColor(QColor(255, 25, 25));
+    pen.setCapStyle(Qt::RoundCap);
+    painter.setPen(pen);
+    painter.drawPath(path);
+}
+void Visualizer::paintSheet() 
+{
+    glClearColor(0.85f, 0.85f, 0.85f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    // +1 here so that loops are not on the edges
+    int sheetWidth = sheet[0].size() + 1;
+    int sheetHeight = sheet.size() + 1;
+
+    int portWidth = this->width();
+    int portHeight = this->height();
+
+    int cellWidth = portWidth / sheetWidth;
+    int cellHeight = portHeight / sheetHeight;
+    // Calculate the offset to center the drawing
+    int xOffset = (portWidth - (sheetWidth - 1) * cellWidth) / 2;
+    int yOffset = (portHeight - (sheetHeight - 1) * cellHeight) / 2;
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, portWidth, 0, portHeight, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+
+    QPoint p0;
+    QPoint p1;
+    QPoint c0;
+    QPoint c1;
+    std::vector<QPoint> controlPoints;
+
+    for (int i = 0; i < sheet.size(); i++) {
+        if (i == sheet.size() - 1) {
+            p0 = QPoint(0, (i + 1) * cellHeight + yOffset);
+            p1 = QPoint(xOffset, (i + 1) * cellHeight + yOffset);
+            c0 = QPoint(0, (i + 1) * cellHeight + yOffset);
+            c1 = QPoint(xOffset, (i + 1) * cellHeight + yOffset);
+            controlPoints.push_back(p0);
+            controlPoints.push_back(p1);
+            controlPoints.push_back(c0);
+            controlPoints.push_back(c1);
+        }
+
+        for (int j = 0; j < sheet[i].size(); j++) {
+            // Calculate the position of the rectangle
+            int rectX = j * cellWidth + xOffset; // Left of the cell
+            int rectY = (sheet.size() - 1 - i) * cellHeight + yOffset; // Top of the cell
+
+            //paint in yarn
+            p0 = QPoint(rectX, rectY + cellHeight);
+            p1 = QPoint(rectX + cellWidth / 2.4, rectY + (cellHeight / 1.25));
+            c0 = QPoint(rectX + cellWidth / 4, rectY + (cellHeight));
+            c1 = QPoint(rectX + cellWidth / 2, rectY + (cellHeight));
+            controlPoints.push_back(p0);
+            controlPoints.push_back(p1);
+            controlPoints.push_back(c0);
+            controlPoints.push_back(c1);
+
+            int x = cellWidth * sheet[i][j].offset;
+            p0 = p1;
+            p1 = QPoint(rectX + cellWidth / 4 + x, rectY - cellHeight / 3);
+            c0 = QPoint(rectX + (cellWidth / 2.6), rectY + (cellHeight / 1.15));
+            c1 = QPoint(rectX + cellWidth / 5 + x, rectY - cellHeight / 4);
+            controlPoints.push_back(p0);
+            controlPoints.push_back(p1);
+            controlPoints.push_back(c0);
+            controlPoints.push_back(c1);
+
+            p0 = QPoint(rectX + cellWidth / 4 + x, rectY - cellHeight / 3);
+            p1 = QPoint(rectX + cellWidth - (cellWidth / 4) + x, rectY - cellHeight / 3);
+            c0 = QPoint(rectX + cellWidth / 2.7 + x, rectY - (cellHeight / 2));
+            c1 = QPoint(rectX + cellWidth - (cellWidth / 2.7) + x, rectY - (cellHeight / 2));
+            controlPoints.push_back(p0);
+            controlPoints.push_back(p1);
+            controlPoints.push_back(c0);
+            controlPoints.push_back(c1);
 
 
-std::vector< std::vector< QVector3D > > copyLocations(ObjectMesh const& model, std::vector< std::vector< uint32_t > > const& chains) {
+            p0 = QPoint(rectX + cellWidth - (cellWidth / 4) + x, rectY - cellHeight / 3);
+            p1 = QPoint(rectX + cellWidth - (cellWidth / 2.4), rectY + (cellHeight / 1.25));
+            c0 = QPoint(rectX + cellWidth - (cellWidth / 5) + x, rectY - cellHeight / 4);
+            c1 = QPoint(rectX + cellWidth - (cellWidth / 2.6), rectY + (cellHeight / 1.15));
+            controlPoints.push_back(p0);
+            controlPoints.push_back(p1);
+            controlPoints.push_back(c0);
+            controlPoints.push_back(c1);
+
+            p0 = QPoint(rectX + cellWidth, rectY + cellHeight);
+            p1 = QPoint(rectX + cellWidth - (cellWidth / 2.4), rectY + (cellHeight / 1.25));
+            c0 = QPoint(rectX + cellWidth - (cellWidth / 4), rectY + (cellHeight));
+            c1 = QPoint(rectX + cellWidth - (cellWidth / 2), rectY + (cellHeight));
+            controlPoints.push_back(p0);
+            controlPoints.push_back(p1);
+            controlPoints.push_back(c0);
+            controlPoints.push_back(c1);
+        }
+        if (i != 0) {
+            if ((i % 2 == 1 && sheet.size() % 2 == 0) || (i % 2 == 0 && sheet.size() % 2 == 1)) {
+                p0 = QPoint(sheet[i].size() * cellWidth + xOffset, i * cellHeight + yOffset);
+                p1 = QPoint(sheet[i].size() * cellWidth + xOffset, (i + 1) * cellHeight + yOffset);
+                c0 = QPoint(sheet[i].size() * cellWidth + xOffset + (cellWidth / 5), i * cellHeight + yOffset + (cellHeight - cellHeight / 1.7));
+                c1 = QPoint(sheet[i].size() * cellWidth + xOffset + (cellWidth / 5), i * cellHeight + yOffset + cellHeight / 1.7);
+                controlPoints.push_back(p0);
+                controlPoints.push_back(p1);
+                controlPoints.push_back(c0);
+                controlPoints.push_back(c1);
+            }
+            else {
+                p0 = QPoint(xOffset, i * cellHeight + yOffset);
+                p1 = QPoint(xOffset, (i + 1) * cellHeight + yOffset);
+                c0 = QPoint(xOffset - (cellWidth / 5), i * cellHeight + yOffset + (cellHeight - cellHeight / 1.7));
+                c1 = QPoint(xOffset - (cellWidth / 5), i * cellHeight + yOffset + cellHeight / 1.7);
+                controlPoints.push_back(p0);
+                controlPoints.push_back(p1);
+                controlPoints.push_back(c0);
+                controlPoints.push_back(c1);
+            }
+        }
+        else {
+            if (sheet.size() % 2 == 1) {
+                p0 = QPoint(sheet[i].size() * cellWidth + xOffset, (i + 1) * cellHeight + yOffset);
+                p1 = QPoint(sheet[i].size() * cellWidth + xOffset + xOffset, (i + 1) * cellHeight + yOffset);
+                c0 = QPoint(sheet[i].size() * cellWidth + xOffset, (i + 1) * cellHeight + yOffset);
+                c1 = QPoint(sheet[i].size() * cellWidth + xOffset, (i + 1) * cellHeight + yOffset);
+                controlPoints.push_back(p0);
+                controlPoints.push_back(p1);
+                controlPoints.push_back(c0);
+                controlPoints.push_back(c1);
+            }
+            else {
+                p0 = QPoint(0, (i + 1) * cellHeight + yOffset);
+                p1 = QPoint(xOffset, (i + 1) * cellHeight + yOffset);
+                c0 = QPoint(0, (i + 1) * cellHeight + yOffset);
+                c1 = QPoint(xOffset, (i + 1) * cellHeight + yOffset);
+                controlPoints.push_back(p0);
+                controlPoints.push_back(p1);
+                controlPoints.push_back(c0);
+                controlPoints.push_back(c1);
+            }
+        }
+    }
+    paintCurve(painter, controlPoints);
+}
+void Visualizer::paintYarn(int ax, int ay, int bx, int by) 
+{
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    ay = this->height() - ay;
+    by = this->height() - by;
+
+    // Draw the thicker black line for the outline effect
+    QPen pen(Qt::black, 10);
+    painter.setPen(pen);
+    painter.drawLine(ax, ay, bx, by);
+
+    // Draw the thinner red line on top
+    pen.setColor(Qt::red);
+    pen.setWidth(5);
+    painter.setPen(pen);
+    painter.drawLine(ax, ay, bx, by);
+}
+/*
+*   Function: paint the OpenGL scene, including mesh, pick mesh, constraints etc.
+*   Return: no return values
+*   TODO: quad having objects may need to be drawn in a different method (GL_TRIANGLES vs GL_QUADS?)
+*       currently the color is just a simple gradient, add shading and different texture
+*/
+void Visualizer::paintGL()
+{
+    if (projectType == 0) {
+        // Set up
+        buildmvpMatrix();
+        glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+
+        if (showModel) {
+            // Reset the chosen vertex so that it is not added to the constraints twice
+
+            //WILL IT BREAK? WHO KNOWS? I DON'T
+            //chosenVertex = -1;         // 0 for first in indexed face, 1 for 2nd etc..
+            paintPickFrame();
+            pickFromMesh();
+            glFinish();
+            paintOriginalMesh();
+            paintConstraints();
+        }
+        if (showInterpolated) {
+            paintInterpolatedMesh();
+        }
+        if (showFirstChains) {
+            if (showSlice) {
+                paintSliceMesh();
+            }
+            paintFirstActiveChains();
+        }
+        if (showSlice) {
+            paintSliceMesh();
+        }
+        if (showLinks) {
+            paintLinks();
+        }
+        if (showNextChains) {
+            paintNextChains();
+        }
+        if (showTraced) {
+            paintTraced();
+        }
+        if (showYarn) {
+            paintYarnMesh();
+        }
+    }
+    else {
+        paintSheet();
+    }
+}
+
+//Slot functions that set the relevant visualization parameters and flags
+void Visualizer::knitGraphCreated() 
+{
+    showLastChain = true;
+}
+void Visualizer::knitGraphTraced(std::vector< TracedStitch >* t) 
+{
+    tracedMesh = *t;
+    showTraced = true;
+    showFirstChains = false;
+    showInterpolated = false;
+}
+void Visualizer::peelSliceDone(ObjectMesh slice, std::vector< std::vector< uint32_t > > slice_active_chains_, std::vector< std::vector< uint32_t > > slice_next_chains_) 
+{
+    showInterpolated = false;
+    sliceMesh = slice;
+    sliceActiveChains = slice_active_chains_;
+    sliceNextChains = slice_next_chains_;
+
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sliceMesh.vertices.size() * sizeof(QVector3D), sliceMesh.vertices.data(), GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sliceMesh.indices.size() * sizeof(GLuint), sliceMesh.indices.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), nullptr);
+    glEnableVertexAttribArray(0);
+    glFinish();
+
+    showSlice = true;
+    showSliceChains = true;
+}
+void Visualizer::nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >* next_chains) 
+{
+    nextActiveChains = *next_chains;
+
+    showLinks = false;
+    showSliceChains = false;
+    showNextChains = true;
+}
+void Visualizer::linkChainsDone(std::vector< std::vector< Stitch > >* next_stitches, std::vector< Link >* links_) 
+{
+    nextStitches = *next_stitches;
+    links = *links_;
+
+    showLinks = true;
+}
+
+//helper function that returns the position of the loop in the sheet
+QPair<int, int> Visualizer::getLoopPos(int mX, int mY) {
+    QPair<int, int> res(-1, -1);
+
+    int sheetWidth = sheet[0].size() + 1;
+    int sheetHeight = sheet.size() + 1;
+
+    int portWidth = this->width();
+    int portHeight = this->height();
+
+    int cellWidth = portWidth / sheetWidth;
+    int cellHeight = portHeight / sheetHeight;
+    // Calculate the offset to center the drawing
+    int xOffset = (portWidth - (sheetWidth - 1) * cellWidth) / 2;
+    int yOffset = (portHeight - (sheetHeight - 1) * cellHeight) / 2;
+    for (int i = 0; i < sheet.size(); i++) {
+        for (int j = 0; j < sheet[i].size(); j++) {
+            int rectX = j * cellWidth + xOffset; // Left of the cell
+            int rectY = i * cellHeight + yOffset; // Top of the cell
+            int rectWidth = cellWidth;
+            int rectHeight = cellHeight;
+
+            if (mX > rectX && mX < rectX + rectWidth && mY > rectY && mY < rectY + rectHeight) {
+                qDebug() << "Mouse is in cell: " << i << ", " << j;
+                res.first = i;
+                res.second = j;
+                //chosenVertex = i * sheet[i].size() + j;
+                //qDebug() << "Chosen vertex: " << chosenVertex;
+            }
+        }
+    }
+    return res;
+}
+
+//no longer brazenly copied, helper function that linearly interpolated between 2 vertices
+QVector3D Visualizer::mmix(const QVector3D& wa, const QVector3D& wb, float m) 
+{
+    return wa + m * (wb - wa);
+}
+//helper function that copied the locations of the vertices of the mesh
+std::vector< std::vector< QVector3D > > Visualizer::copyLocations(ObjectMesh const& model, std::vector< std::vector< uint32_t > > const& chains) {
     std::vector< std::vector< QVector3D > > locations;
     locations.reserve(chains.size());
     for (auto const& chain : chains) {
@@ -1359,7 +1345,9 @@ std::vector< std::vector< QVector3D > > copyLocations(ObjectMesh const& model, s
     }
     return locations;
 }
-std::vector< std::vector< QVector3D > > interpolateStitchLocations(std::vector< std::vector< QVector3D > > const& chains, std::vector< std::vector< Stitch > > const& stitches) {
+//helper function that interpolated between stitch locations
+std::vector< std::vector< QVector3D > > Visualizer::interpolateStitchLocations(std::vector< std::vector< QVector3D > > const& chains, std::vector< std::vector< Stitch > > const& stitches) 
+{
     assert(stitches.size() == chains.size());
 
     std::vector< std::vector< QVector3D > > locations;
@@ -1396,45 +1384,8 @@ std::vector< std::vector< QVector3D > > interpolateStitchLocations(std::vector< 
 
     return locations;
 }
-
-void Visualizer::nextActiveChainsDone(std::vector< std::vector< EmbeddedVertex > >* next_chains) {
-    nextActiveChains = *next_chains;
-
-    showLinks = false;
-    showSliceChains = false;
-    showNextChains = true;
-}
-
-void Visualizer::paintLinks() {
-    std::vector< std::vector< QVector3D > > from = interpolateStitchLocations(copyLocations(sliceMesh, sliceActiveChains), activeStitches);
-    std::vector< std::vector< QVector3D > > to = interpolateStitchLocations(copyLocations(sliceMesh, sliceNextChains), nextStitches);
-
-
-
-    for (auto link : links) {
-
-        QVector3D const& vertex1 = from[link.from_chain][link.from_stitch];
-        QVector3D const& vertex2 = to[link.to_chain][link.to_stitch];
-
-		paintPath(vertex1, vertex2, graphLinkColor.x, graphLinkColor.y, graphLinkColor.z);
-	}
-
-
-
-}
-
-void Visualizer::linkChainsDone(std::vector< std::vector< Stitch > >* next_stitches, std::vector< Link >* links_) {
-    nextStitches = *next_stitches;
-    links = *links_;
-
-    qDebug() << "links arrived at visualizer";
-
-    showLinks = true;
-
-
-}
-
-std::vector< std::vector< QVector3D > > interpolateLocations(ObjectMesh const& model, std::vector< std::vector< EmbeddedVertex > > const& chains) {
+//same as previous function, but done before the stitch locations are calculated
+std::vector< std::vector< QVector3D > > Visualizer::interpolateLocations(ObjectMesh const& model, std::vector< std::vector< EmbeddedVertex > > const& chains) {
     std::vector< std::vector< QVector3D > > locations;
     locations.reserve(chains.size());
     for (auto const& chain : chains) {
@@ -1447,309 +1398,9 @@ std::vector< std::vector< QVector3D > > interpolateLocations(ObjectMesh const& m
     return locations;
 }
 
-void Visualizer::paintNextChains() {
-
-    std::vector< std::vector< QVector3D > > next_active_locations = interpolateLocations(interpolatedMesh, nextActiveChains);
-
-    for (auto nextChain : next_active_locations) {
-        for (int i = 0; i < nextChain.size() - 1; i++) {
-            QVector3D vertex1 = nextChain[i];
-            QVector3D vertex2 = nextChain[i + 1];
-            paintPath(vertex1, vertex2, lowerBoundColor.x, lowerBoundColor.y, lowerBoundColor.z);
-        }
-    }
-
-}
-
-void Visualizer::paintCurve(QPainter& painter, const std::vector<QPoint>& controlPoints) {
-
-    QPainterPath path;
-
-
-    for (int i = 0; i < controlPoints.size(); i += 4) {
-        QPoint p0 = controlPoints[i];
-        QPoint p1 = controlPoints[i+1];
-        QPoint c0 = controlPoints[i+2];
-        QPoint c1 = controlPoints[i+3];
-
-        path.moveTo(p0);
-        path.cubicTo(c0.x(), c0.y(), c1.x(), c1.y(), p1.x(), p1.y());
-
-    }
-
-    // Top curve
-    
-    QPen blackPen(Qt::black, 6);
-    blackPen.setCapStyle(Qt::RoundCap);
-
-    painter.setPen(blackPen);
-    painter.drawPath(path);
-
-    QPen pen;
-    pen.setWidth(3);
-    pen.setColor(QColor(255, 25, 25));
-    pen.setCapStyle(Qt::RoundCap);
-    painter.setPen(pen);
-    painter.drawPath(path);
-
-    //cubicPath.moveTo(ax, ay);  // Continue from the end of the quadratic B¨¦zier curve
-    //cubicPath.cubicTo(bx, by, cx, cy, dx, dy);
-
-}
-
-void Visualizer::paintLoopConnection(QPainter& painter, QPoint p0, QPoint p1) {
-    QPainterPath path;
-
-    // Top curve
-    path.moveTo(p0);
-    path.lineTo(p1);
-
-    QPen pen;
-    pen.setWidth(5);
-    pen.setColor(QColor(168, 52, 50));
-    painter.setPen(pen);
-    painter.drawPath(path);
-
-    QPen blackPen(Qt::black, 7);
-    painter.setPen(blackPen);
-    painter.drawPath(path);
-    
-}
-
-void Visualizer::paintSheet() {
-
-    glClearColor(0.85f, 0.85f, 0.85f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    // Set up orthogonal projection
-
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-    // +1 here so that loops are not on the edges
-    int sheetWidth = sheet[0].size()+1;
-    int sheetHeight = sheet.size()+1;
-
-    int portWidth = this->width();
-    int portHeight = this->height();
-    
-    int cellWidth = portWidth / sheetWidth;
-    int cellHeight = portHeight / sheetHeight;
-    // Calculate the offset to center the drawing
-    int xOffset = (portWidth - (sheetWidth - 1) * cellWidth) / 2;
-    int yOffset = (portHeight - (sheetHeight - 1) * cellHeight) / 2;
-
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0, portWidth, 0, portHeight, -1, 1);
-    glMatrixMode(GL_MODELVIEW);
-
-
-    QPoint p0;
-    QPoint p1;
-    QPoint c0;
-    QPoint c1;
-    std::vector<QPoint> controlPoints;
-    //qDebug() << xOffset << yOffset;
-    
-    for (int i = 0; i < sheet.size(); i++) {
-        if (i == sheet.size()-1) {
-            p0 = QPoint(0, (i+1) * cellHeight + yOffset);
-            p1 = QPoint(xOffset, (i+1) * cellHeight + yOffset);
-            c0 = QPoint(0, (i + 1) * cellHeight + yOffset);
-            c1 = QPoint(xOffset, (i + 1) * cellHeight + yOffset);
-            controlPoints.push_back(p0);
-			controlPoints.push_back(p1);
-			controlPoints.push_back(c0);
-			controlPoints.push_back(c1);
-			//controlPoints = { p0, p1, c0, c1 };
-			//paintCurve(painter, controlPoints);
-        }
-
-        for (int j = 0; j < sheet[i].size(); j++) {
-            // Calculate the position of the rectangle
-            int rectX = j * cellWidth + xOffset; // Left of the cell
-            int rectY = (sheet.size() - 1 - i) * cellHeight + yOffset; // Top of the cell
-
-            
-            
-            // Draw the rectangle around the cell
-            /*
-            glColor3f(0.0f, 0.0f, 0.0f); // Black color
-            glBegin(GL_LINE_LOOP);
-            glVertex2i(rectX, rectY); // Top-left corner of the cell
-            glVertex2i(rectX + cellWidth, rectY); // Top-right corner of the cell
-            glVertex2i(rectX + cellWidth, rectY + cellHeight); // Bottom-right corner of the cell
-            glVertex2i(rectX, rectY + cellHeight); // Bottom-left corner of the cell
-            glEnd();*/
-
-
-            //paint in yarn
-            p0 = QPoint(rectX, rectY + cellHeight);
-            p1 = QPoint(rectX + cellWidth / 2.4, rectY + (cellHeight / 1.25));
-            c0 = QPoint(rectX + cellWidth / 4, rectY + (cellHeight));
-            c1 = QPoint(rectX + cellWidth / 2, rectY + (cellHeight));
-            controlPoints.push_back(p0);
-            controlPoints.push_back(p1);
-            controlPoints.push_back(c0);
-            controlPoints.push_back(c1);
-            //controlPoints = { p0, p1, c0, c1 };
-            //paintCurve(painter, controlPoints);
-
-            //paint loop connection
-            //controlPoints.clear();
-
-            int x = cellWidth * sheet[i][j].offset;
-            p0 = p1;
-            p1 = QPoint(rectX + cellWidth / 4 + x, rectY - cellHeight / 3);
-            c0 = QPoint(rectX + (cellWidth / 2.6), rectY + (cellHeight / 1.15));
-            c1 = QPoint(rectX + cellWidth / 5 + x, rectY - cellHeight / 4);
-            controlPoints.push_back(p0);
-            controlPoints.push_back(p1);
-            controlPoints.push_back(c0);
-            controlPoints.push_back(c1);
-            //controlPoints = { p0, p1, c0, c1 };
-            //paintCurve(painter, controlPoints);
-
-
-            //paint top curve
-            //controlPoints.clear();
-             
-            p0 = QPoint(rectX + cellWidth / 4 + x, rectY - cellHeight / 3);
-            p1 = QPoint(rectX + cellWidth - (cellWidth / 4) + x, rectY - cellHeight / 3);
-            c0 = QPoint(rectX + cellWidth / 2.7 + x, rectY - (cellHeight / 2));
-            c1 = QPoint(rectX + cellWidth - (cellWidth / 2.7) + x, rectY - (cellHeight / 2));
-            controlPoints.push_back(p0);
-            controlPoints.push_back(p1);
-            controlPoints.push_back(c0);
-            controlPoints.push_back(c1);
-            
-            
-            //controlPoints = { p0, p1, c0, c1 };
-
-            //paintCurve(painter, controlPoints);
-            
-
-            //paint loop back
-            //controlPoints.clear();
-			p0 = QPoint(rectX + cellWidth - (cellWidth / 4) + x, rectY - cellHeight / 3);
-            p1 = QPoint(rectX + cellWidth - (cellWidth / 2.4), rectY + (cellHeight / 1.25));
-            c0 = QPoint(rectX + cellWidth - (cellWidth / 5) + x, rectY - cellHeight / 4);
-            c1 = QPoint(rectX + cellWidth - (cellWidth / 2.6), rectY + (cellHeight / 1.15));
-            controlPoints.push_back(p0);
-            controlPoints.push_back(p1);
-            controlPoints.push_back(c0);
-            controlPoints.push_back(c1);
-            //controlPoints = { p0, p1, c0, c1 };
-            //paintCurve(painter, controlPoints);
-
-            //paint out yarn
-            //controlPoints.clear();
-            p0 = QPoint(rectX + cellWidth, rectY + cellHeight);
-            p1 = QPoint(rectX + cellWidth - (cellWidth / 2.4), rectY + (cellHeight / 1.25));
-            c0 = QPoint(rectX + cellWidth - (cellWidth / 4), rectY + (cellHeight));
-            c1 = QPoint(rectX + cellWidth - (cellWidth / 2), rectY + (cellHeight));
-            controlPoints.push_back(p0);
-            controlPoints.push_back(p1);
-            controlPoints.push_back(c0);
-            controlPoints.push_back(c1);
-            //controlPoints = { p0, p1, c0, c1 };
-            //paintCurve(painter, controlPoints);
-
-            //glLineWidth(1.0f); // Reset line width to default
-        }
-        if (i != 0) {
-            if ((i % 2 == 1 && sheet.size() % 2 == 0) || (i % 2 == 0 && sheet.size() % 2 == 1)) {
-                //controlPoints.clear();
-                p0 = QPoint(sheet[i].size() * cellWidth + xOffset, i * cellHeight + yOffset);
-                p1 = QPoint(sheet[i].size() * cellWidth + xOffset, (i + 1) * cellHeight + yOffset);
-                c0 = QPoint(sheet[i].size() * cellWidth + xOffset + (cellWidth / 5), i * cellHeight + yOffset + (cellHeight - cellHeight / 1.7));
-                c1 = QPoint(sheet[i].size() * cellWidth + xOffset + (cellWidth / 5), i * cellHeight + yOffset + cellHeight / 1.7);
-                controlPoints.push_back(p0);
-                controlPoints.push_back(p1);
-                controlPoints.push_back(c0);
-                controlPoints.push_back(c1);
-                //controlPoints = { p0, p1, c0, c1 };
-                //paintCurve(painter, controlPoints);
-            }
-            else {
-                //controlPoints.clear();
-                p0 = QPoint(xOffset, i * cellHeight + yOffset);
-                p1 = QPoint(xOffset, (i + 1) * cellHeight + yOffset);
-                c0 = QPoint(xOffset - (cellWidth / 5), i * cellHeight + yOffset + (cellHeight - cellHeight / 1.7));
-                c1 = QPoint(xOffset - (cellWidth / 5), i * cellHeight + yOffset + cellHeight / 1.7);
-                controlPoints.push_back(p0);
-                controlPoints.push_back(p1);
-                controlPoints.push_back(c0);
-                controlPoints.push_back(c1);
-                //controlPoints = { p0, p1, c0, c1 };
-                //paintCurve(painter, controlPoints);
-            }
-        }
-        else {
-            if (sheet.size() % 2 == 1) {
-                p0 = QPoint(sheet[i].size()*cellWidth + xOffset , (i + 1) * cellHeight + yOffset);
-                p1 = QPoint(sheet[i].size() * cellWidth + xOffset + xOffset, (i + 1) * cellHeight + yOffset);
-                c0 = QPoint(sheet[i].size() * cellWidth + xOffset, (i + 1) * cellHeight + yOffset);
-                c1 = QPoint(sheet[i].size() * cellWidth + xOffset, (i + 1) * cellHeight + yOffset);
-                controlPoints.push_back(p0);
-                controlPoints.push_back(p1);
-                controlPoints.push_back(c0);
-                controlPoints.push_back(c1);
-            }
-            else {
-                p0 = QPoint(0, (i + 1) * cellHeight + yOffset);
-                p1 = QPoint(xOffset, (i + 1) * cellHeight + yOffset);
-                c0 = QPoint(0, (i + 1) * cellHeight + yOffset);
-                c1 = QPoint(xOffset, (i + 1) * cellHeight + yOffset);
-                controlPoints.push_back(p0);
-                controlPoints.push_back(p1);
-                controlPoints.push_back(c0);
-                controlPoints.push_back(c1);
-            }
-        }
-    }
-
-    paintCurve(painter, controlPoints);
-
-}
-
-void Visualizer::paintYarn(int ax, int ay, int bx, int by) {
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-
-    ay = this->height() - ay;
-    by = this->height() - by;
-
-    // Draw the thicker black line for the outline effect
-    QPen pen(Qt::black, 10);
-    painter.setPen(pen);
-    painter.drawLine(ax, ay, bx, by);
-
-
-
-    // Draw the thinner red line on top
-    pen.setColor(Qt::red);
-    pen.setWidth(5);
-    painter.setPen(pen);
-    painter.drawLine(ax, ay, bx, by);
-
-    /*
-    glColor3f(1.0f, 0.0f, 0.0f); // Red color
-    glLineWidth(5.0f); // Set line width to make it thicker
-    glBegin(GL_LINES);
-    glVertex2i(ax, ay); // Start from the left side of the rectangle
-    glVertex2i(bx, by); // End at the right side of the rectangle
-    glEnd();
-
-    // Draw the thinner line (black) on top for the outline effect
-    glColor3f(0.0f, 0.0f, 0.0f); // Black color
-    glLineWidth(10.0f); // Reset line width to default
-    glBegin(GL_LINES);
-    glVertex2i(ax, ay); // Start from the left side of the rectangle
-    glVertex2i(bx, by); // End at the right side of the rectangle
-    glEnd();*/
-}
-
-
+/*
+*   Function:compute the object boundaries so that the camera and mesh rotation can be set up correctly
+*/
 void Visualizer::computeBoundaries() {
     float sumX, sumY, sumZ;
     float maxDistSquared;
@@ -1758,10 +1409,10 @@ void Visualizer::computeBoundaries() {
     maxDistSquared = 0.0f;
 
     for (int i = 0; i < mesh.vertices.size(); i++) {
-		sumX += mesh.vertices[i].x();
-		sumY += mesh.vertices[i].y();
-		sumZ += mesh.vertices[i].z();
-	}
+        sumX += mesh.vertices[i].x();
+        sumY += mesh.vertices[i].y();
+        sumZ += mesh.vertices[i].z();
+    }
 
     int num_vertices = mesh.vertices.size();
     float centroidX = sumX / num_vertices;
@@ -1770,101 +1421,25 @@ void Visualizer::computeBoundaries() {
 
     centroid = QVector3D(centroidX, centroidY, centroidZ);
 }
-
-/*
-*   Function: paint the OpenGL scene, including mesh, pick mesh, constraints etc.
-*   Return: no return values
-*   TODO: quad having objects may need to be drawn in a different method (GL_TRIANGLES vs GL_QUADS?)
-*       currently the color is just a simple gradient, add shading and different texture
-*/
-void Visualizer::paintGL()
-{
-    if (projectType == 0) {
-        // Set up
-        buildmvpMatrix();
-        glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
-        //glClearColor(0.0f, 0.0f, 0.5451f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glEnable(GL_DEPTH_TEST);
-
-        if (showModel) {
-            // Reset the chosen vertex so that it is not added to the constraints twice
-
-            //WILL IT BREAK? WHO KNOWS? I DON'T
-            //chosenVertex = -1;         // 0 for first in indexed face, 1 for 2nd etc..
-            paintPickFrame();
-            pickFromMesh();
-            glFinish();
-            paintOriginalMesh();
-            paintConstraints();
-        }
-        if (showInterpolated) {
-            //qDebug() << "drawing interpolatedmesh";
-            paintInterpolatedMesh();
-        }
-        if (showFirstChains) {
-            //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            //glEnable(GL_DEPTH_TEST);
-            //paintInterpolatedMesh();
-            //qDebug() << "drawing first active chains";
-            if (showSlice) {
-                paintSliceMesh();
-            }
-            paintFirstActiveChains();
-        }
-        if (showSlice) {
-            paintSliceMesh();
-        }
-        if (showLinks) {
-            paintLinks();
-        }
-        if (showNextChains) {
-            paintNextChains();
-        }
-        if (showTraced) {
-			paintTraced();
-		}
-        if (showYarn) {
-            paintYarnMesh();
-        }
-    }
-    else {
-        paintSheet();
-    }
-}
 /*
 *   Function: load the ObjectMesh object into the Visualizer module
-*   Return: no return values
-*   TODO: a quad having object could set a flag for that in this function
 */
 void Visualizer::loadMesh(ObjectMesh object) {
     mesh = object;
 
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-    // Set up the vertex buffer data
     glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(QVector3D), mesh.vertices.data(), GL_STATIC_DRAW);
-
-    // Create and bind the index buffer
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(GLuint), mesh.indices.data(), GL_STATIC_DRAW);
-   
-    // Specify the format of the vertex data (position only)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), nullptr);
     glEnableVertexAttribArray(0);
-
-    // Unbind the VAO
     glBindVertexArray(0);
 
 
     computeBoundaries();
-    qDebug() << "centroid" << centroid;
-
-    
     
     showModel = true;
-    
 }
 
 /*
@@ -1893,40 +1468,36 @@ float loopAround(float val, float min, float max)
 void Visualizer::addConstraintVertex() {
     if (chosenVertex != -1) {
         QVector3D vertex = mesh.vertices[chosenVertex];             //should constraints be vertices or indices?
-        qDebug() << "Vertex: " << chosenVertex << ": " << vertex;
-
         int cnt = std::count(currentConstraint->vertices.begin(), currentConstraint->vertices.end(), chosenVertex);
 
         if (cnt > 0) {
             qDebug() << "Vertex already in constraint...";
+            return;                                                          //WHY WAS THIS NOT HERE BUT IT STILL WORKED?
         }
         currentConstraint->vertices.push_back(chosenVertex);
-        qDebug() << "pushed back, size: " << currentConstraint->vertices.size();
     }
     else {
         qDebug() << "No vertex in selection...";
     }
 }
-
+//public function that gives the constraints created in visualizer to the caller (Knittee)
 std::vector<Constraint*> Visualizer::getConstraints()
 {
     return constraints;
 }
-
+//public function that sets the constraints from Knittee to Visualizer
 void Visualizer::setConstraints(std::vector<Constraint*> c)
 {
-    qDebug() << "size of inputted constraints" << c.size();
     constraints = c;
     currentConstraint = new Constraint();
     constraints.push_back(currentConstraint);
 }
-
-
+//push the current constraints one back
 void Visualizer::pushConstraints() {
     currentConstraint = new Constraint();
     constraints.push_back(currentConstraint);
 }
-
+//get closest constraint to vertex
 int Visualizer::getClosestConstraint() {
     if (chosenVertex != -1) {
         for (int i = 0; i < constraints.size(); i++) {
@@ -1941,25 +1512,21 @@ int Visualizer::getClosestConstraint() {
 	}
 	return -1;
 }
-
+//increase the time value of the closest constraint
 void Visualizer::increaseConstraintValue() {
-
-    qDebug() << "getting closest constraint, chosenVertex == " << chosenVertex;
     int closestConstraint = getClosestConstraint();
-
-    qDebug() << "Closest constraint: " << closestConstraint;
     if (closestConstraint != -1 && constraints[closestConstraint]->timeValue < 1.0) {
 		constraints[closestConstraint]->timeValue += 0.1f;
 	}
 }
-
+//decrease the time value of the closest constraint
 void Visualizer::decreaseConstraintValue() {
 	int closestConstraint = getClosestConstraint();
     if (closestConstraint != -1 && constraints[closestConstraint]->timeValue > -1.0) {
 		constraints[closestConstraint]->timeValue -= 0.1f;
 	}
 }
-
+//delete the closest constraint
 void Visualizer::deleteConstraint() {
     int closestConstraint = getClosestConstraint();
     if (closestConstraint != -1) {
@@ -1967,21 +1534,22 @@ void Visualizer::deleteConstraint() {
     }
 }
 
+
+/*
+* Handlers of different events follow:
+*/
 void Visualizer::keyPressEvent(QKeyEvent* event)
 {
     //if 'c', user wants to add a vertex
     if (event->key() == Qt::Key_C && addingConstraints) {
-        qDebug() << "Adding constraint vertex..";
         addConstraintVertex();
     }
     //if 'enter', user wants to finish adding constraint vertices
     if (event->key() == Qt::Key_Return && addingConstraints) {
-        qDebug() << "Pushing constraints..";
         pushConstraints();
     }
     //if '+', user wants to increase time value
     if (event->key() == Qt::Key_Plus ) {
-		qDebug() << "Increasing constraint value..";
 		increaseConstraintValue();
 	}
     //if '-', user wants to delete time value
@@ -1996,48 +1564,12 @@ void Visualizer::keyPressEvent(QKeyEvent* event)
     //if 'ctrl-z', user wants to delete the last constraint vertex
     if (event->modifiers() == Qt::ControlModifier && event->key() == Qt::Key_Z)
     {
-        qDebug() << "Ctrl+Z pressed";
         // in the future will backtrack many options, for now only constraints
         if (currentConstraint->vertices.size() > 0) {
             currentConstraint->vertices.pop_back();
         }
     }
 }
-
-
-QPair<int, int> Visualizer::getLoopPos(int mX, int mY) {
-    QPair<int, int> res(-1, -1);
-    
-    int sheetWidth = sheet[0].size() + 1;
-    int sheetHeight = sheet.size() + 1;
-
-    int portWidth = this->width();
-    int portHeight = this->height();
-
-    int cellWidth = portWidth / sheetWidth;
-    int cellHeight = portHeight / sheetHeight;
-    // Calculate the offset to center the drawing
-    int xOffset = (portWidth - (sheetWidth - 1) * cellWidth) / 2;
-    int yOffset = (portHeight - (sheetHeight - 1) * cellHeight) / 2;
-    for (int i = 0; i < sheet.size(); i++) {
-        for (int j = 0; j < sheet[i].size(); j++) {
-            int rectX = j * cellWidth + xOffset; // Left of the cell
-            int rectY = i * cellHeight + yOffset; // Top of the cell
-            int rectWidth = cellWidth;
-            int rectHeight = cellHeight;
-
-            if (mX > rectX && mX < rectX + rectWidth && mY > rectY && mY < rectY + rectHeight) {
-                qDebug() << "Mouse is in cell: " << i << ", " << j;
-                res.first = i;
-                res.second = j;
-                //chosenVertex = i * sheet[i].size() + j;
-                //qDebug() << "Chosen vertex: " << chosenVertex;
-            }
-        }
-    }
-    return res;
-}
-
 void Visualizer::mousePressEvent(QMouseEvent* event)
 {
     QPoint currentPos = event->pos();
@@ -2059,7 +1591,6 @@ void Visualizer::mousePressEvent(QMouseEvent* event)
         lastMousePos = event->pos();
     }
 }
-
 void Visualizer::mouseReleaseEvent(QMouseEvent* event)
 {
     // left button: rotate the model
@@ -2076,18 +1607,12 @@ void Visualizer::mouseReleaseEvent(QMouseEvent* event)
         isDragging = false;
     }
 }
-
 void Visualizer::mouseMoveEvent(QMouseEvent* event)
 {
     QPoint currentPos = event->pos();
     mouseX = event->pos().x() * devicePixelRatio();
     mouseY = (height() - event->pos().y() - 1) * devicePixelRatio();
-    //QString text;
-   // text = QString("%1 X %2").arg(event->pos().x()).arg(event->pos().y());
-    // Global coordinate-system, but widget coord. position
-    // QToolTip::showText(event->pos(), text); 
-    // this should fix it
-    //QToolTip::showText(this->mapToGlobal(event->pos()), text);
+
     if (isMovingLoop) {
         mouseX = event->pos().x();
         mouseY = (height() - event->pos().y() - 1);
@@ -2095,11 +1620,8 @@ void Visualizer::mouseMoveEvent(QMouseEvent* event)
         to = getLoopPos(mouseX, mouseY);
 
         if (from.first != -1 && to.first != -1) {
-            
             emit moveLoop(from, to);
-            
         }
-
     }
 
     if (isRotating) {
@@ -2108,7 +1630,7 @@ void Visualizer::mouseMoveEvent(QMouseEvent* event)
         float deltaY = currentPos.y() - lastMousePos.y();
 
         // update the rotation angles based on the mouse movement
-        // TODO: the 0.5 value could be a variable set by the user as a rotation speed 
+        // the 0.5 value could be a variable set by the user as a rotation speed 
         m_rotationAngleY += deltaX * 0.5f;
         m_rotationAngleX += deltaY * 0.5f;
 
@@ -2117,7 +1639,6 @@ void Visualizer::mouseMoveEvent(QMouseEvent* event)
         m_rotationAngleY = loopAround(m_rotationAngleY, 0.0f, 359.999f);
 
         lastMousePos = currentPos;
-        //update();
     }
     if (isDragging) {
         QPoint currentPos = event->pos();
@@ -2128,27 +1649,23 @@ void Visualizer::mouseMoveEvent(QMouseEvent* event)
         viewDirection.setY(-sin(qDegreesToRadians(m_rotationAngleX)));
         viewDirection.setZ(-cos(qDegreesToRadians(m_rotationAngleY)) * cos(qDegreesToRadians(m_rotationAngleX)));
 
-        // QVector3D movementDirection = viewDirection.normalized();
         // calculate the change in mouse position
         float deltaX = currentPos.x() - lastMousePos.x();
         float deltaY = currentPos.y() - lastMousePos.y();
 
         // Update the drag values based on the mouse movement
-        // TODO: currently doing divisions by zoomLevel to get a good dragging speed, could use a variable and have the user set it
-        translateX += deltaX * 0.05f / zoomLevel; //* movementDirection.x();
-        translateY -= deltaY * 0.05f / zoomLevel;//* movementDirection.y();
+        // currently doing divisions by zoomLevel to get a good dragging speed, could use a variable and have the user set it
+        translateX += deltaX * 0.05f / zoomLevel; 
+        translateY -= deltaY * 0.05f / zoomLevel;
 
         lastMousePos = currentPos;
-        //update();
     }
-    //update();
 }
 void Visualizer::wheelEvent(QWheelEvent* event)
 {
     // zoom in/out based on the scroll wheel delta
     QPoint angleDelta = event->angleDelta();
     if (!angleDelta.isNull()) {
-        //qDebug() << zoomLevel;
         float zoomFactor = 0.03f;
         if (angleDelta.y() > 0) {
             zoomLevel -= zoomFactor;
@@ -2157,21 +1674,20 @@ void Visualizer::wheelEvent(QWheelEvent* event)
             zoomLevel += zoomFactor;
         }
         isZooming = true;
-        //update();
     }
 }
 
-void Visualizer::stopTimer() {
+//timer functions for 60fps follow:
+void Visualizer::stopTimer() 
+{
     killTimer(timerID);
     timerID = 0;
 }
-
 void Visualizer::setTimer()
 {
 	timerID = startTimer(16);  //16ms should be 60fps
 
 }
-
 void Visualizer::timerEvent(QTimerEvent* event) 
 {
     if (event->timerId() == timerID)
@@ -2181,7 +1697,9 @@ void Visualizer::timerEvent(QTimerEvent* event)
     }
 }
 
-void Visualizer::showInterpolatedChanged(int state) {
+//slot functions that allow the user to control which mesh is shown
+void Visualizer::showInterpolatedChanged(int state) 
+{
     if (state == Qt::Checked) {
         showInterpolated = true;
     }
@@ -2189,8 +1707,8 @@ void Visualizer::showInterpolatedChanged(int state) {
         showInterpolated = false;
     }
 }
-
-void Visualizer::showGraphChanged(int state) {
+void Visualizer::showGraphChanged(int state) 
+{
     if (state == Qt::Checked) {
 		showGraph = true;
         showFirstChains = true;
@@ -2201,7 +1719,8 @@ void Visualizer::showGraphChanged(int state) {
 	}
 }
 
-void Visualizer::showTracedChanged(int state) {
+void Visualizer::showTracedChanged(int state) 
+{
     if (state == Qt::Checked) {
 		showTraced = true;
 	}
@@ -2209,8 +1728,8 @@ void Visualizer::showTracedChanged(int state) {
 		showTraced = false;
 	}
 }
-
-void Visualizer::showYarnChanged(int state) {
+void Visualizer::showYarnChanged(int state) 
+{
     if (state == Qt::Checked) {
         showYarn = true;
     }

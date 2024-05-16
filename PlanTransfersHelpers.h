@@ -6,6 +6,12 @@
 #include <iostream>
 #include <algorithm>
 
+
+/*
+*	Helper functions and classes that are used by PlanTransfers to calculate the optimal transfer plan
+*		The used algorithm is cse - find an optimal collapse-shift-expand configuration that minimizes the penalty function
+*/
+
 struct NeedleRollGoal {
 	NeedleRollGoal() = default;
 	NeedleRollGoal(int32_t needle_, int32_t roll_, int32_t goal_, int32_t left_slack_, int32_t right_slack_) : needle(needle_), roll(roll_), goal(goal_), left_slack(left_slack_), right_slack(right_slack_) {
@@ -88,36 +94,6 @@ struct NeedleRollGoal {
 		}
 	}
 };
-
-/* This might be useful but might also be overkill:
-
-//the code generally takes two views of a transfer problem, lists of from/to stitches and flattened "top/bottom" arrays.
-//notably, it's much easier to simulate transfers on from/to lists, but easier to actually run dyanmic programming on flattened top/bottom arrays.
-
-struct FromTo;
-
-//TopBottom stores a transfer problem in terms of "NeedleRollGoal" instances, which express the current needle of each stitch as well as its target bed (in terms of roll) and needle (goal).
-struct TopBottom {
-	std::vector< NeedleRollGoal > top; //top stitches, sorted left-to-right
-	std::vector< NeedleRollGoal > bottom; //bottom stitches, sorted left-to-right
-	BedNeedle::Bed top_bed;
-	BedNeedle::Bed bottom_bed;
-
-	TopBottom() = default;
-	TopBottom(BedNeedle::Bed top_bed, BedNeedle::Bed bottom_bed, FromTo const &source); //construct from a FromTo instance
-};
-
-//FromTo stores a cycle in terms of source and destination needles in ccw order:
-struct FromTo {
-	std::vector< BedNeedle > from_ccw;
-	std::vector< BedNeedle > to_ccw;
-	std::vector< Slack > slack;
-
-	FromTo() = default;
-	FromTo(TopBottom const &source); //construct from a TopBottom instance
-};
-*/
-
 
 //helper for constructing roll values:
 void minimize_winding(

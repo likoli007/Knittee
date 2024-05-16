@@ -1,6 +1,11 @@
 #include "ScheduleCost.h"
 #include "PlanTransfers.h"
 
+
+/*
+*	Implementation of the functions defined in ScheduleCost.h
+*/
+
 ScheduleCost ScheduleCost::shape_cost(Shape const& shape) {
 	ScheduleCost ret;
 	ret.shape =
@@ -55,9 +60,6 @@ ScheduleCost ScheduleCost::transfer_cost(
 		to.emplace_back(to_needles[map[i]]);
 	}
 	assert(to.size() == from.size());
-
-	//TODO: compute slack
-	//TODO: actually call xfer planning?
 
 	ScheduleCost cost;
 

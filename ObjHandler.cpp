@@ -14,7 +14,10 @@
 
 
 
-
+/*
+*	Function: noramlize the mesh such that it is scaled to a normal size, as previously some meshes were way too small or large
+*		which messed with rotations and moves
+*/
 void ObjHandler::normalizeMesh(ObjectMesh& mesh) {
 	float minX = std::numeric_limits<float>::max();
 	float minY = std::numeric_limits<float>::max();
@@ -39,8 +42,6 @@ void ObjHandler::normalizeMesh(ObjectMesh& mesh) {
 
 	float scaleFactor = desiredSize / std::max({ currentSizeX, currentSizeY, currentSizeZ });
 
-	qDebug() << "current dimensions: " << currentSizeX << " " << currentSizeY << " " << currentSizeZ;
-	qDebug() << "scale factor: " << scaleFactor;
 
 	// Scale the mesh vertices
 	for (auto& vertex : mesh.vertices) {
@@ -58,14 +59,10 @@ void ObjHandler::normalizeMesh(ObjectMesh& mesh) {
 *		and generate an ObjectMesh object after parsing using generateMesh()
 *	Return: an ObjectMesh object that includes the vertex, normals etc. information of the loaded object
 */
-
-
 void ObjHandler::copyObjFileToProject(QString projectName) {
 
 	
 	QString destinationFolderPath = QCoreApplication::applicationDirPath() + "/Projects/" + projectName;
-	qDebug() << destinationFolderPath;
-	//QDir().mkpath(destinationFolderPath);
 	QFile file(path);
 	QFile newFile(destinationFolderPath+ "/mesh.obj");
 	
@@ -90,11 +87,6 @@ void ObjHandler::copyObjFileToProject(QString projectName) {
 
 	file.close();
 	newFile.close();
-
-	
-	
-
-	//newFile.close();
 }
 void ObjHandler::setFilePath(QString path) {
 	this->path = path;
@@ -103,7 +95,6 @@ void ObjHandler::setFilePath(QString path) {
 
 ObjectMesh ObjHandler::loadFile()
 {
-	//QFile file(path);
 	QString line;
 	ObjectMesh result;
 
@@ -144,8 +135,6 @@ void ObjHandler::parseLine(QString line)
 			list = line.simplified().split(' ');
 
 			QVector3D vertex3(list[1].toFloat(), list[2].toFloat(), list[3].toFloat());
-			//qDebug() << list;
-			//vertex3.normalize();
 			vertex_list.push_back(vertex3);
 		}
 
@@ -165,31 +154,15 @@ void ObjHandler::parseLine(QString line)
 		}
 		// face information, store in Face object format
 		else if (line.startsWith("f ")) {
-			//Face face;
-			//int vertex_index;
 
 			int vertices = line.split(" ").size()-1;
 
 			// most basic format, 'f a b c' where a,b,c is an index of the vertex in the file starting from 1
 			if (vertices == 3) {
-				//qDebug() << "triangle";
 				addTriangle(line);
-				/*list = line.split(" ");
-				face.indices.push_back(list[1].toInt());
-				face.indices.push_back(list[2].toInt());
-				face.indices.push_back(list[3].toInt());
-				faces.push_back(face);*/
 			}
 			else if (vertices == 4) {
 				addQuad(line);
-
-				/*
-				list = line.split(" ");
-				face.indices.push_back(list[1].toInt());
-				face.indices.push_back(list[2].toInt());
-				face.indices.push_back(list[3].toInt());
-				face.indices.push_back(list[4].toInt());
-				faces.push_back(face);*/
 			}
 			else {
 				qDebug() << "non triangle or quad!";
@@ -239,9 +212,6 @@ void ObjHandler::addQuad(QString line) {
 		face2.indices.push_back(c_list[0].toInt());
 		face2.indices.push_back(d_list[0].toInt());
 
-		//qDebug() << "face1" << face1.indices[0] << face1.indices[1] << face1.indices[2];
-		//qDebug() << "face2" << face2.indices[0] << face2.indices[1] << face2.indices[2];
-
 		faces.push_back(face1);
 		faces.push_back(face2);
 	}
@@ -270,19 +240,13 @@ ObjectMesh ObjHandler::generateMesh()
 			vertex_index = f.indices[i];
 			GLuint index = f.indices[i]-1;
 
-			//qDebug() << index;
-
 			result.indices.push_back(index);
 
-			//QVector3D vertex = vertex_list[vertex_index - 1];
-			//result.vertices.push_back(vertex);
 		}
 	}
 
 	normalizeMesh(result);
 
-	//qDebug() << result.vertices.size();
-	//qDebug() << result.indices.size();
 	return result;
 }
 

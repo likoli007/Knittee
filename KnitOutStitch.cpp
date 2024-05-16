@@ -1,8 +1,6 @@
 #include "KnitOutStitch.h"
 
-#include <QFile>
-#include <QDataStream>
-#include <QDebug>
+
 
 bool load_stitches(QString const& filename, std::vector< KnitOutStitch >* into_) {
 	assert(into_);
@@ -92,39 +90,3 @@ bool load_stitches(QString const& filename, std::vector< KnitOutStitch >* into_)
 	}
 	return true;
 }
-/*
-void save_stitches(std::string const& filename, std::vector< Stitch > const& from) {
-	QFile file(filename);
-
-	if (!file.open(QIODevice::WriteOnly))
-	{
-		qDebug() << "could not open file";
-		return;
-	}
-
-	QDataStream out(&file);
-
-	for (int i = 0; i < sheet.size(); i++)
-	{
-		for (int j = 0; j < sheet[i].size(); j++)
-		{
-			out << sheet[i][j];
-		}
-	}
-
-	file.close();
-
-
-	std::ofstream file(filename);
-	for (auto const& s : from) {
-		file << s.yarn
-			<< ' ' << s.type
-			<< ' ' << s.direction
-			<< ' ' << (int32_t)s.in[0]
-			<< ' ' << (int32_t)s.in[1]
-			<< ' ' << (int32_t)s.out[0]
-			<< ' ' << (int32_t)s.out[1]
-			<< ' ' << s.at.x << ' ' << s.at.y << ' ' << s.at.z << '\n';
-	}
-}
-*/

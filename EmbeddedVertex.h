@@ -1,9 +1,17 @@
 #pragma once
-#include <QVector3D>
 #include <glm/glm.hpp>
 #include <QOpenGLExtraFunctions>
 #include <GL/gl.h>
 
+
+
+/*
+*	Helper class to represent an embeddded vertex, is used in multiple functions, mainly in remesh()
+*		also a very important component of EmbeddedPlanarMap
+*	weights imply its time values, while simplex is the location of the vertex 
+*	makes many interpolation operations easier
+*	originally was rewritten using QVector3D, but many precision operations did not work, so switched back to glm
+*/
 struct EmbeddedVertex {
 	glm::uvec3 simplex;
 	glm::vec3 weights;

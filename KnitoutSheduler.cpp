@@ -1,21 +1,6 @@
 ﻿#include "KnitoutSheduler.h"
 
-#include "KnitOutStitch.h"
-#include <set>
-#include <map>
-#include <algorithm>
-#include <iostream>
-#include <unordered_set>
-#include <unordered_map>
-#include <functional>
-#include <string>
-#include <qdebug.h>
-#include <QFile>
-#include <deque>
-#include <vector>
-#include <QDebug>
-#include <set>
-#include <qregularexpression.h>
+
 
 KnitoutScheduler::KnitoutScheduler(QObject* parent) : QObject(parent)
 {

@@ -2,6 +2,20 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <set>
+#include <map>
+#include <algorithm>
+#include <iostream>
+#include <unordered_set>
+#include <unordered_map>
+#include <functional>
+#include <string>
+#include <qdebug.h>
+#include <QFile>
+#include <deque>
+#include <QDebug>
+#include <qregularexpression.h>
+
 
 #include "KnitOutStitch.h"
 #include "Shape.h"
@@ -9,11 +23,9 @@
 #include "ScheduleCost.h"
 #include "EmbedDAG.h"
 #include "PlanTransfers.h"
-
 #include "ScheduleCost.h"
+#include "KnitOutStitch.h"
 
-
-#include <vector>
 
 typedef ScheduleCost DAGCost;
 

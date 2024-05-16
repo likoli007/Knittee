@@ -9,12 +9,19 @@
 #include <qcombobox.h>
 #include <qspinbox.h>
 
+
+/*
+* This class will be called to be shown when the user selects a 2D sheet project, is used to show the options related to the sheet
+*	is very straightforward, no function comments are needed
+*/
+
 class SheetToolBar : public QWidget
 {
 	Q_OBJECT
 
 private slots:
-	void upButtonClicked() {
+	void upButtonClicked() 
+	{
 		if (adding == 1) {
 			emit heightChanged(1, 0) ;
 		}
@@ -22,8 +29,8 @@ private slots:
 			emit heightChanged(-1, 0);
 		}
 	}
-
-	void downButtonClicked() {
+	void downButtonClicked() 
+	{
 		if (adding == 1) {
 			emit heightChanged(1, 1);
 		}
@@ -31,8 +38,8 @@ private slots:
 			emit heightChanged(-1, 1);
 		}
 	}
-
-	void leftButtonClicked() {
+	void leftButtonClicked() 
+	{
 		if (adding == 1) {
 			emit widthChanged(1, 1);
 		}
@@ -40,8 +47,8 @@ private slots:
 			emit widthChanged(-1, 1);
 		}
 	}
-
-	void rightButtonClicked() {
+	void rightButtonClicked()
+	{
 		if (adding == 1) {
 			emit widthChanged(1, 0);
 		}
@@ -49,28 +56,29 @@ private slots:
 			emit widthChanged(-1, 0);
 		}
 	}
-
-	void increaseRadioClicked() {
+	void increaseRadioClicked() 
+	{
 		adding = 1;
 		resizeUpButton->setText("^");
 		resizeDownButton->setText("v");
 		resizeLeftButton->setText("<");
 		resizeRightButton->setText(">");
 	}
-	void decreaseRadioClicked() {
+	void decreaseRadioClicked() 
+	{
 		adding = 0;
 		resizeUpButton->setText("v");
 		resizeDownButton->setText("^");
 		resizeLeftButton->setText(">");
 		resizeRightButton->setText("<");
 	}
-
-	void rackingSpinBoxChanged() {
+	void rackingSpinBoxChanged() 
+	{
 		int value = rackingSpinBox->value();
 		emit rackingChanged(value);
 	}
-
-	void generateKnitoutClicked() {
+	void generateKnitoutClicked() 
+	{
 		int algorithm = AlgorithmComboBox->currentIndex();
 		emit generateKnitoutSheet(algorithm);
 	}
@@ -81,27 +89,21 @@ signals:
 	void heightChanged(int height, int side);
 	void widthChanged(int width, int side);
 
-
 public:
 	SheetToolBar(QWidget* parent = nullptr);
 
-
 private:
-	
 	QPushButton* resizeUpButton;
 	QPushButton* resizeDownButton;
 	QPushButton* resizeLeftButton;
 	QPushButton* resizeRightButton;
+	QPushButton* generateKnitoutButton;
+	QPushButton* exportButton;
 
 	QRadioButton* increaseRadio;
 	QRadioButton* decreaseRadio;
 
 	QComboBox* AlgorithmComboBox;
-
-	QPushButton* generateKnitoutButton;
-
-	QPushButton* exportButton;
-
 	QSpinBox* rackingSpinBox;
 
 	int adding = 1;

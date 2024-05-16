@@ -4,6 +4,11 @@
 #include <cassert>
 #include <algorithm>
 #include <cmath>
+#include <QDebug>
+
+/*
+*	Definition of the plan_transfers function from the header file
+*/
 
 bool plan_transfers(
 	Constraints const& constraints,
@@ -407,7 +412,7 @@ bool plan_transfers(
 			}
 		}
 		if (!(best_penalty < starting_penalty)) {
-			std::cout << "ERROR: penalty DID NOT DECREASE; you may be in for an infinite planning loop [...I think this happens because the code doesn't force zero-racking configurations after expand...]" << std::endl;
+			qDebug() << "ERROR: penalty DID NOT DECREASE; you may be in for an infinite planning loop";
 			//assert(best_penalty < starting_penalty);
 		}
 

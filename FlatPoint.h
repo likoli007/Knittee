@@ -2,6 +2,11 @@
 
 #include <QString>
 #include <QDataStream>
+
+/*
+*   FlatPoint represents a single loop on a 2D mesh, a vector of flat points is a sheet
+*/
+
 class FlatPoint
 {
 public:
@@ -11,9 +16,8 @@ public:
 	int offset;
 	bool first;
 
-    // Declare operator<< as a friend function
+	//is saved as a binary file to save space, maybe JSONs? but theyre too slow
     friend QDataStream& operator<<(QDataStream& out, const FlatPoint& obj);
-    // Declare operator>> as a friend function
     friend QDataStream& operator>>(QDataStream& in, FlatPoint& obj);
 };
 
