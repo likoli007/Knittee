@@ -1,14 +1,11 @@
 #version 330 core
 
 layout(location = 0) in vec3 position;
-//layout(location = 1) in float shadingValue; // Assuming shadingValue is the attribute name
 
 out vec4 fragColor;
 
 uniform mat4 mvpMatrix;
 uniform int selectedFace;
-//uniform int meshType; //1 for normal mesh, 2 for interpolated
-
 
 void main()
 {

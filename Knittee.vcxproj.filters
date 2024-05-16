@@ -33,6 +33,9 @@
     <Filter Include="Obj Related">
       <UniqueIdentifier>{eb3663ae-4e07-4525-a007-01e79a3f435d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{983efe7b-f19a-4745-84e6-208ef912f13a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <QtRcc Include="Knittee.qrc">
@@ -149,10 +152,18 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="fragment_shader.glsl" />
-    <None Include="vertex_shader.glsl" />
-    <None Include="time_vertex_shader.glsl" />
-    <None Include="time_fragment_shader.glsl" />
+    <None Include="fragment_shader.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="time_fragment_shader.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="time_vertex_shader.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="vertex_shader.glsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="Knittee.h">
