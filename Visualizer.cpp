@@ -788,7 +788,259 @@ void Visualizer:: paintCube(QVector3D center, float sideLength) {
     glEnd();
 }
 
+void Visualizer::paint3DCurve(QVector3D start, QVector3D end, QVector3D cp1, QVector3D cp2, int debug = 0) {
+    glColor3f(yarnMeshColor.x, yarnMeshColor.y, yarnMeshColor.z); // Red color
+    if (debug) glColor3f(0.0, 0.0, 1.0);
 
+
+    buildmvpMatrix();
+    start = mvpMatrix.map(start);
+	end = mvpMatrix.map(end);
+    cp1 = mvpMatrix.map(cp1);
+    cp2 = mvpMatrix.map(cp2);
+
+    int numSegments = 32;
+
+    // Draw the cubic Bezier curve
+    glBegin(GL_LINE_STRIP);
+    for (int i = 0; i <= numSegments; ++i) {
+        float t = static_cast<float>(i) / numSegments;
+        float one_minus_t = 1.0f - t;
+
+        // Bezier curve equation
+        QVector3D point = one_minus_t * one_minus_t * one_minus_t * start +
+            3 * one_minus_t * one_minus_t * t * cp1 +
+            3 * one_minus_t * t * t * cp2 +
+            t * t * t * end;
+
+        glVertex3f(point.x(), point.y(), point.z());
+    }
+    glEnd();
+}
+
+void Visualizer::paintTopLoop(int curr, int prev) {
+    qDebug() << "todo";
+}
+
+void Visualizer::paintYarnMesh() {
+
+    QVector3D cp1;
+    QVector3D cp2;
+    QVector3D direction;
+    QVector3D currToTopDir;
+    float radius = 1.0f;
+    for (int i = 1; i < tracedMesh.size(); i++) {
+        if (tracedMesh[i].yarn != tracedMesh[i - 1].yarn) {
+            continue;
+        }
+
+
+
+        QVector3D previousPoint = QVector3D(tracedMesh[i - 1].at.x, tracedMesh[i - 1].at.y, tracedMesh[i - 1].at.z);
+        QVector3D currentPoint = QVector3D(tracedMesh[i].at.x, tracedMesh[i].at.y, tracedMesh[i].at.z);
+
+        // Calculate the direction vector from start to end
+        direction = currentPoint - previousPoint;
+
+        // Calculate the 2/3rds point along the direction vector
+        QVector3D twoThirdsPoint = previousPoint + (2.0 / 3.0) * direction;
+
+        QVector3D oneThirdPoint = previousPoint + (1.0 / 3.0) * direction;
+
+        paintPath(
+            oneThirdPoint, twoThirdsPoint,
+            yarnMeshColor.x, yarnMeshColor.y, yarnMeshColor.z, radius);
+
+        if (tracedMesh[i].outs[0] != -1U) {
+
+
+            //painting yarn going 'up' to the stitch above
+            QVector3D loopstart = currentPoint;
+            QVector3D up = { tracedMesh[tracedMesh[i].outs[0]].at.x, tracedMesh[tracedMesh[i].outs[0]].at.y, tracedMesh[tracedMesh[i].outs[0]].at.z };
+            QVector3D previousToUp = { tracedMesh[tracedMesh[i].outs[0] - 1].at.x, tracedMesh[tracedMesh[i].outs[0] - 1].at.y, tracedMesh[tracedMesh[i].outs[0] - 1].at.z };
+            QVector3D nextToUp;
+            QVector3D upperTwoThirdsPoint;
+            if (tracedMesh[tracedMesh[i].outs[0] - 1].yarn == tracedMesh[tracedMesh[i].outs[0]].yarn) {
+
+                direction = up - previousToUp;
+
+                upperTwoThirdsPoint = previousToUp + (2.0 / 3.0) * direction;
+
+                cp1 = currentPoint;
+                cp2 = currentPoint;
+                paint3DCurve(twoThirdsPoint, upperTwoThirdsPoint, cp1, cp2);
+            }
+
+            //if the previous nodes yarn is different, it necessarily implies you are at the start of a new yarn
+            //therefore there must be at least one more point after right???
+            else {
+                nextToUp = { tracedMesh[(tracedMesh[i].outs[0]) + 1].at.x, tracedMesh[(tracedMesh[i].outs[0]) + 1].at.y, tracedMesh[(tracedMesh[i].outs[0]) + 1].at.z };
+                direction = nextToUp - up;
+                upperTwoThirdsPoint = up + (2.0 / 3.0) * direction;
+                cp1 = currentPoint;
+                cp2 = currentPoint;
+                paint3DCurve(twoThirdsPoint, upperTwoThirdsPoint, cp1, cp2);
+            }
+
+            //painting the top 'loop cap' of a stitch
+            //previousPoint = upperTwoThirdsPoint;
+            //QVector3D helper = upperTwoThirdsPoint;
+            QVector3D nextTwoThirdsPoint;   //last loop will have to do something special
+            //qDebug() << tracedMesh[i].outs[0] + 1 << tracedMesh.size();
+            if (tracedMesh[i].outs[0] + 1 < tracedMesh.size()) {
+                //qDebug() << "woee";
+                if (tracedMesh[tracedMesh[i].outs[0] + 1].yarn == tracedMesh[tracedMesh[i].outs[0]].yarn) {
+                    nextToUp = { tracedMesh[(tracedMesh[i].outs[0]) + 1].at.x, tracedMesh[(tracedMesh[i].outs[0]) + 1].at.y, tracedMesh[(tracedMesh[i].outs[0]) + 1].at.z };
+                    direction = nextToUp - up;
+                    nextTwoThirdsPoint = up + (1.0 / 3.0) * direction;
+                }
+                else {
+                    direction = up - previousToUp;
+                    nextTwoThirdsPoint = up + (1.0 / 3.0) * direction;
+                }
+            }
+            else {
+                direction = up - previousToUp;
+                nextTwoThirdsPoint = up + (1 / 3.0) * direction;
+            }
+            //qDebug() << "start: " << previousPoint << " end: " << nextTwoThirdsPoint;
+            direction = up - currentPoint;
+            QVector3D upperFourThirdsPoint = currentPoint + (5.0 / 3.0) * direction;
+
+            cp1 = upperFourThirdsPoint;
+            cp2 = upperFourThirdsPoint;
+
+            paint3DCurve(upperTwoThirdsPoint, nextTwoThirdsPoint,cp1, cp2);
+
+            //painting the 'down' yarn to the stitch below
+            //going from nextTwoThirdsPoint to currentOneThirdPoint
+
+            QVector3D start = nextTwoThirdsPoint;
+            QVector3D nextToCurr = { tracedMesh[i+1].at.x, tracedMesh[i+1].at.y, tracedMesh[i+1].at.z };
+            direction = nextToCurr - currentPoint;
+            QVector3D nextOneThirdsPoint = currentPoint + (1.0 / 3.0) * direction;
+
+            cp1 = currentPoint;
+            cp2 = currentPoint;
+
+            paint3DCurve(start, nextOneThirdsPoint, cp1, cp2, 0);
+
+            //previousPoint = nextOneThirdsPoint;
+        }
+        
+        if (tracedMesh[i].outs[1] != -1U) {
+
+
+            //painting yarn going 'up' to the stitch above
+            QVector3D loopstart = currentPoint;
+            QVector3D up = { tracedMesh[tracedMesh[i].outs[1]].at.x, tracedMesh[tracedMesh[i].outs[1]].at.y, tracedMesh[tracedMesh[i].outs[1]].at.z };
+            QVector3D previousToUp = { tracedMesh[tracedMesh[i].outs[1] - 1].at.x, tracedMesh[tracedMesh[i].outs[1] - 1].at.y, tracedMesh[tracedMesh[i].outs[1] - 1].at.z };
+
+            direction = up - previousToUp;
+
+            QVector3D upperTwoThirdsPoint = previousToUp + (2.0 / 3.0) * direction;
+
+            cp1 = currentPoint;
+            cp2 = currentPoint;
+            paint3DCurve(twoThirdsPoint, upperTwoThirdsPoint, cp1, cp2);
+
+            //painting the top 'loop cap' of a stitch
+            //previousPoint = upperTwoThirdsPoint;
+            //QVector3D helper = upperTwoThirdsPoint;
+            QVector3D nextTwoThirdsPoint;   //last loop will have to do something special
+            //qDebug() << tracedMesh[i].outs[0] + 1 << tracedMesh.size();
+            if (tracedMesh[i].outs[1] + 1 < tracedMesh.size()) {
+                //qDebug() << "woee";
+                QVector3D nextToUp = { tracedMesh[(tracedMesh[i].outs[1]) + 1].at.x, tracedMesh[(tracedMesh[i].outs[1]) + 1].at.y, tracedMesh[(tracedMesh[i].outs[1]) + 1].at.z };
+                direction = nextToUp - up;
+                nextTwoThirdsPoint = up + (1.0 / 3.0) * direction;
+                //qDebug() << nextTwoThirdsPoint;
+            }
+            else {
+                nextTwoThirdsPoint = { 0,0,0 };
+            }
+            //qDebug() << "start: " << previousPoint << " end: " << nextTwoThirdsPoint;
+            direction = up - currentPoint;
+            QVector3D upperFourThirdsPoint = currentPoint + (5.0 / 3.0) * direction;
+
+            cp1 = upperFourThirdsPoint;
+            cp2 = upperFourThirdsPoint;
+
+            paint3DCurve(upperTwoThirdsPoint, nextTwoThirdsPoint, cp1, cp2);
+
+            //painting the 'down' yarn to the stitch below
+            //going from nextTwoThirdsPoint to currentOneThirdPoint
+
+            QVector3D start = nextTwoThirdsPoint;
+            QVector3D nextToCurr = { tracedMesh[i + 1].at.x, tracedMesh[i + 1].at.y, tracedMesh[i + 1].at.z };
+            direction = nextToCurr - currentPoint;
+            QVector3D nextOneThirdsPoint = currentPoint + (1.0 / 3.0) * direction;
+
+            cp1 = currentPoint;
+            cp2 = currentPoint;
+
+            paint3DCurve(start, nextOneThirdsPoint, cp1, cp2, 0);
+
+            //previousPoint = nextOneThirdsPoint;
+        }
+        //else: it is the topmost row, draw according to extrapolated data from the previous row
+        else if (tracedMesh[i].outs[1] == -1U && tracedMesh[i].outs[0] == -1U) {
+            //paint the yarn going 'up' to the stitch above
+            QVector3D current = QVector3D(tracedMesh[i].at.x, tracedMesh[i].at.y, tracedMesh[i].at.z);
+            QVector3D previous = QVector3D(tracedMesh[i - 1].at.x, tracedMesh[i - 1].at.y, tracedMesh[i - 1].at.z);
+            QVector3D oneDown = QVector3D(tracedMesh[tracedMesh[i].ins[0]].at.x, tracedMesh[tracedMesh[i].ins[0]].at.y, tracedMesh[tracedMesh[i].ins[0]].at.z);
+            QVector3D oneDownPrev = QVector3D(tracedMesh[tracedMesh[i].ins[0] - 1].at.x, tracedMesh[tracedMesh[i].ins[0] - 1].at.y, tracedMesh[tracedMesh[i].ins[0] - 1].at.z);
+
+
+            direction = current - oneDown;
+            QVector3D extrapolatedNextPoint = oneDown + 2.0 * direction; 
+            QVector3D extrapolatedTopPoint = oneDown + (2.5 * direction);
+
+            direction = (oneDown - oneDownPrev);
+
+
+            QVector3D extrapolatedPrevDirection = extrapolatedNextPoint + (1.0 / 3.0) * direction;
+            QVector3D extrapolatedNextDirection = extrapolatedNextPoint - (1.0 / 3.0) * direction;
+
+            //borrow the first ever yarn point as well as its prev and curr to get artificial stitch width
+            
+            
+
+            cp1 = current;
+            cp2 = current;
+
+            paint3DCurve(twoThirdsPoint, extrapolatedNextDirection, cp1, cp2);
+        
+            //paint the top 'loop cap' of a stitch
+            QVector3D start = extrapolatedNextPoint;
+            cp1 = extrapolatedTopPoint;
+            cp2 = extrapolatedTopPoint;
+            paint3DCurve(extrapolatedNextDirection, extrapolatedPrevDirection, cp1, cp2);
+
+            QVector3D nextOneThirdsPoint;
+            cp1 = current;
+            cp2 = current;
+            //paint the 'down' yarn to the stitch below
+            if (i < tracedMesh.size() - 1 && tracedMesh[i+1].yarn == tracedMesh[i].yarn) {
+                QVector3D nextToCurr = { tracedMesh[i + 1].at.x, tracedMesh[i + 1].at.y, tracedMesh[i + 1].at.z };
+                direction = nextToCurr - currentPoint;
+                nextOneThirdsPoint = currentPoint + (1.0 / 3.0) * direction;
+                
+            }
+            else {
+                direction = (oneDown - oneDownPrev);
+                nextOneThirdsPoint = currentPoint + (1.0 / 3.0) * direction;
+                
+                
+            }
+            
+            paint3DCurve(extrapolatedPrevDirection, nextOneThirdsPoint, cp1, cp2);
+            
+            
+        }
+    }
+
+}
 
 void Visualizer::paintTraced() {
  
@@ -885,15 +1137,7 @@ void Visualizer::paintFirstActiveChains() {
     //TODO: get parameters from knitgrapher
     float radius = 1.5f * 0.075f * 3.66f * 10.0f;
     for (uint32_t vi = 0; vi < rowColGraph.vertices.size(); ++vi) {
-        auto const& v = rowColGraph.vertices[vi];
-
-
-       /*
-        paintSphere(
-            locations[vi],
-            radius
-        );*/
-
+        auto & v = rowColGraph.vertices[vi];
         
         if (v.row_in != -1U) {
             //qDebug() << "i have row_in";
@@ -914,8 +1158,6 @@ void Visualizer::paintFirstActiveChains() {
                 );
         }
         if (v.col_in[0] != -1U) {
-
-            //qDebug() << v.col_in[1] << (v.col_in[1] == -1U);
             r = v.col_in[1] == -1U ?  graphLinkColor.x : graphCollapseColor.x;
             g = v.col_in[1] == -1U ? graphLinkColor.y : graphCollapseColor.y;
             b = v.col_in[1] == -1U ?  graphLinkColor.z : graphCollapseColor.z;
@@ -934,7 +1176,7 @@ void Visualizer::paintFirstActiveChains() {
             );
         }
         
-        if (v.col_out[0] != -1U) {
+        if (v.col_out[0] != -1U && rowColGraph.vertices[v.col_out[0]].col_in[1] == -1) {
             r = v.col_out[1] == -1U ? graphLinkColor.x : graphExpandColor.x;
             g = v.col_out[1] == -1U ? graphLinkColor.y : graphExpandColor.y;
             b = v.col_out[1] == -1U ? graphLinkColor.z : graphExpandColor.z;
@@ -945,7 +1187,7 @@ void Visualizer::paintFirstActiveChains() {
                 r, g, b
             );
         }
-        if (v.col_out[1] != -1U) {
+        if (v.col_out[1] != -1U && rowColGraph.vertices[v.col_out[1]].col_in[1] == -1) {
             paintPath(
                 locations[vi],
                 locations[v.col_out[1]],
@@ -1102,6 +1344,8 @@ void Visualizer::paintSliceMesh() {
 QVector3D mmix(const QVector3D& wa, const QVector3D& wb, float m) {
     return wa + m * (wb - wa);
 }
+
+
 
 std::vector< std::vector< QVector3D > > copyLocations(ObjectMesh const& model, std::vector< std::vector< uint32_t > > const& chains) {
     std::vector< std::vector< QVector3D > > locations;
@@ -1580,6 +1824,9 @@ void Visualizer::paintGL()
         if (showTraced) {
 			paintTraced();
 		}
+        if (showYarn) {
+            paintYarnMesh();
+        }
     }
     else {
         paintSheet();
@@ -1963,3 +2210,11 @@ void Visualizer::showTracedChanged(int state) {
 	}
 }
 
+void Visualizer::showYarnChanged(int state) {
+    if (state == Qt::Checked) {
+        showYarn = true;
+    }
+    else if (state == Qt::Unchecked) {
+        showYarn = false;
+    }
+}

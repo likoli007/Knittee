@@ -35,12 +35,14 @@ signals:
     void showInterpolatedChanged(int state);
     void showGraphChanged(int state);
     void showTracedChanged(int state);
+    void showYarnChanged(int state);
     void helpBoxCommunication(QString message);
     void resetButtonClicked();
     void generateKnitoutButtonClicked();
 private slots:
     void knitGraphTraced() {
         generateKnitoutButton->setDisabled(false);
+        showYarnCheck->setDisabled(false);
         showTracedCheck->setDisabled(false);
         showGraphCheck->setChecked(false);
         showInterpolatedCheck->setChecked(false);
@@ -115,6 +117,10 @@ private slots:
     void onShowTracedButtonClicked(int state) {
         emit showTracedChanged(state);
     }
+    void onShowYarnButtonClicked(int state) {
+        emit showYarnChanged(state);
+        emit helpBoxCommunication(HelperText::showYarnText);
+    }
 
     void onResetButtonClicked() {
 		emit helpBoxCommunication(HelperText::resetText);
@@ -124,6 +130,7 @@ private slots:
         showInterpolatedCheck->setChecked(false);
         showTracedCheck->setChecked(false);
         showGraphCheck->setChecked(false);
+        showYarnCheck->setChecked(false);
 		emit resetButtonClicked();
 	}
     void onGenerateKnitoutButtonClicked() {
@@ -159,6 +166,7 @@ private:
     QCheckBox* showInterpolatedCheck;
     QCheckBox* showGraphCheck;
     QCheckBox* showTracedCheck;
+    QCheckBox* showYarnCheck;
 
     // Max values for the stitch width and height, will be used to scale the values
     // Might need to change these values later to something more appropriate

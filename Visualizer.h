@@ -54,6 +54,7 @@ public slots:
     void showInterpolatedChanged(int state);
     void showGraphChanged(int state);
     void showTracedChanged(int state);
+    void showYarnChanged(int state);
     void knitGraphTraced(std::vector< TracedStitch >*);
 protected:
     //Color information for various steps
@@ -65,6 +66,7 @@ protected:
     glm::vec3 graphExpandColor = { 0.953, 0.953, 0.110 };
     glm::vec3 lowerBoundColor = { 0.090, 0.216, 0.753 };
     glm::vec3 upperBoundColor = { 0.780, 0.0, 0.224 };
+    glm::vec3 yarnMeshColor = { 0.831, 0.110, 0.447 };
 
     std::vector<glm::vec3> ycolors = { glm::vec3(0.831, 0.110, 0.447), glm::vec3(0.098, 0.580, 0.129),
         glm::vec3(0.137, 0.275, 0.737), glm::vec3(0.745, 0.420, 0.749), glm::vec3(0.808, 0.851, 0.082),
@@ -169,6 +171,7 @@ protected:
     bool showSliceChains = false;
     bool showGraph = false;
     bool showTraced = false;
+    bool showYarn = false;
 
     float translateX = 0.0f;
     float translateY = 0.0f;
@@ -204,7 +207,9 @@ protected:
     void paintCurve(QPainter& painter, const std::vector<QPoint>& controlPoints);
     void paintLoopConnection(QPainter& painter,QPoint p1, QPoint p2);
     void paintLineTube(QVector3D start, QVector3D end, float r, float g, float b);
-
+    void paintYarnMesh();
+    void paint3DCurve(QVector3D start, QVector3D end, QVector3D cp1, QVector3D cp2, int debug);
+    void paintTopLoop(int curr, int prev);
 
     void buildmvpMatrix();
     void mousePressEvent(QMouseEvent* event);

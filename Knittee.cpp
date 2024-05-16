@@ -99,6 +99,7 @@ Knittee::Knittee(QWidget* parent)
     QObject::connect(meshToolsWidget, SIGNAL(showInterpolatedChanged(int)), vis, SLOT(showInterpolatedChanged(int)));
     QObject::connect(meshToolsWidget, SIGNAL(showGraphChanged(int)), vis, SLOT(showGraphChanged(int)));
     QObject::connect(meshToolsWidget, SIGNAL(showTracedChanged(int)), vis, SLOT(showTracedChanged(int)));
+    QObject::connect(meshToolsWidget, SIGNAL(showYarnChanged(int)), vis, SLOT(showYarnChanged(int)));
 
     QObject::connect(&knitGrapher, SIGNAL(unlockMeshButtons()), meshToolsWidget, SLOT(unlockMeshButtons()));
 

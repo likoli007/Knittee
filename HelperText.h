@@ -43,7 +43,7 @@ namespace HelperText
 	const QString meshKnitoutEndText = QString("Knitout instructions generated successfully! file was saved to the project folder as 'knitout.k'\n");
 
 
-
+	const QString showYarnText = QString("Showing yarn paths\nNOTE: the loops at the end of the knitting process are approximated, actual positioning of them may differ");
 }
 
 

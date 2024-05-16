@@ -5,6 +5,7 @@ void MeshToolBar::initializeUI() {
     showInterpolatedCheck->setDisabled(true);
     showGraphCheck->setDisabled(true);
     showTracedCheck->setDisabled(true);
+    showYarnCheck->setDisabled(true);
     generateKnitoutButton->setDisabled(true);
     traceButton->setDisabled(true);
     stepButton->setDisabled(true);
@@ -96,6 +97,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     showInterpolatedCheck = new QCheckBox("Mesh");
     showGraphCheck = new QCheckBox("Graph");
     showTracedCheck = new QCheckBox("Traced");
+    showYarnCheck = new QCheckBox("Yarn");
 
     
 
@@ -120,6 +122,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     QObject::connect(showInterpolatedCheck, &QCheckBox::stateChanged, this, &MeshToolBar::onShowInterpolatedButtonClicked);
     QObject::connect(showGraphCheck, &QCheckBox::stateChanged, this, &MeshToolBar::onShowGraphButtonClicked);
     QObject::connect(showTracedCheck, &QCheckBox::stateChanged, this, &MeshToolBar::onShowTracedButtonClicked);
+    QObject::connect(showYarnCheck, &QCheckBox::stateChanged, this, &MeshToolBar::onShowYarnButtonClicked);
     QObject::connect(resetButton, &QPushButton::clicked, this, &MeshToolBar::onResetButtonClicked);
     
   
@@ -162,6 +165,7 @@ MeshToolBar::MeshToolBar(QWidget* parent) {
     showLayout->addWidget(showInterpolatedCheck);
     showLayout->addWidget(showGraphCheck);
     showLayout->addWidget(showTracedCheck);
+    showLayout->addWidget(showYarnCheck);
     showLayout->setContentsMargins(0, 0, 0, 0);
     
 

@@ -1007,10 +1007,6 @@ void KnitGrapher::interpolateValues()
 		if (dofs[i] != -1U) values[i] = x[dofs[i]];
 	}
 
-	qDebug() << "Interpolation complete!";
-	for (float val : values) {
-		qDebug() << val;
-	}
 }
 
 /*
@@ -5333,10 +5329,8 @@ void KnitGrapher::clearPeeling() {
 void KnitGrapher::stepButtonClicked(int steps = 1)
 {
 	while (steps > 0) {
-
-
 		QEventLoop loop;
-		QTimer::singleShot(250, &loop, &QEventLoop::quit); // Wait for 1000 milliseconds (1 second)
+		QTimer::singleShot(150, &loop, &QEventLoop::quit); // Wait for 1000 milliseconds (1 second)
 		loop.exec();
 
 
