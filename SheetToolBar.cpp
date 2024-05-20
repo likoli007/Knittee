@@ -35,19 +35,19 @@ SheetToolBar::SheetToolBar(QWidget* parent)
     AlgorithmComboBox->addItem("Schoolbus");
 
     generateKnitoutButton = new QPushButton("Generate Knitout");
-    exportButton = new QPushButton("Export");
+    //exportButton = new QPushButton("Export");
 
     QLabel* resizeLabel = new QLabel("Resize Sheet");
     QLabel* algorithmLabel = new QLabel("Algorithm Selection");
-    QLabel* exportLabel = new QLabel("Export Machine Instructions");
+    //QLabel* exportLabel = new QLabel("Export Machine Instructions");
     QLabel* sheetLabel = new QLabel("Sheet");
 
     resizeLabel->setAlignment(Qt::AlignCenter);
     resizeLabel->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     algorithmLabel->setAlignment(Qt::AlignCenter);
     algorithmLabel->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
-    exportLabel->setAlignment(Qt::AlignCenter);
-    exportLabel->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    //exportLabel->setAlignment(Qt::AlignCenter);
+    //exportLabel->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
     sheetLabel->setAlignment(Qt::AlignCenter);
 
     leftRightLayout->addWidget(resizeLeftButton);
@@ -83,9 +83,9 @@ SheetToolBar::SheetToolBar(QWidget* parent)
     mainLayout->addWidget(algorithmLabel);
     mainLayout->addWidget(AlgorithmComboBox);
     mainLayout->addWidget(generateKnitoutButton);
-    mainLayout->addWidget(exportSeparator);
-    mainLayout->addWidget(exportLabel);
-    mainLayout->addWidget(exportButton);
+    //mainLayout->addWidget(exportSeparator);
+    //mainLayout->addWidget(exportLabel);
+    //mainLayout->addWidget(exportButton);
     mainLayout->addWidget(spacer);
 
     setLayout(mainLayout);

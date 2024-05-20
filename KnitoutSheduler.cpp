@@ -2973,47 +2973,16 @@ void KnitoutScheduler::schedule()
 	}
 
 
-	emit instructionsCreated(instructions);
+	//emit instructionsCreated(instructions);
 
 	//original also saves schedules st file, not needed?
 	emit knitoutGenerated(knitout);
 	emit helpBoxCommunication("DONE - resulting 'knitout.k' was saved inside the project folder!");
+	emit helpBoxCommunication("Total amount of instructions: " + QString::number(knitout.size()));
 	//nerateKnitout();
 	//emit knitoutGenerated(knitout);
 
 	return;
-}
-
-
-void KnitoutScheduler::generateKnitout()
-{
-	QString head1 = QString(";!knitout-2");
-	QString head2 = QString(";;Carriers: 1 2 3 4 5 6 7 8 9 10");
-
-
-	out(head1);
-	out(head2);
-	for (auto instr : scheduledInstructions) {
-		qDebug() << "executing" << instr;
-	
-		//get the string before the '(' character
-		QStringList instrList = instr.split("(");
-		QString instrType = instrList[0];
-
-		//if knit
-		/*
-		if (instrType == "knit") {
-			QStringList instrArgs = instrList[1].split(" ");
-			QString d = instrArgs[0];
-			QString bn = instrArgs[1];
-			knit(d, bn);
-		}*/
-
-	
-	}
-
-
-
 }
 
 
@@ -3234,7 +3203,9 @@ void KnitoutScheduler::endTube(QString& dir, QStringList& bns) {
 		}
 	};
 
-	QString output = "x-stitch-number " + QString::number(CastOnStitchNumber);
+
+	QChar c(CastOnStitchNumber);
+	QString output = "x-stitch-number " + QString(QChar(CastOnStitchNumber));
 	out(output);
 	qDebug() << "1";
 	for (int i = 0; i < bns.size(); ++i) {
@@ -3247,7 +3218,7 @@ void KnitoutScheduler::endTube(QString& dir, QStringList& bns) {
 	}
 
 	qDebug() << "2";
-	output = "x-stitch-number " + QString::number(PlainStitchNumber);
+	output = "x-stitch-number " + QString(QChar(PlainStitchNumber));
 	out(output);
 	for (int row = 0; row < EndRows; ++row) {
 		for (QString& bn : bns) {
@@ -3305,7 +3276,7 @@ void KnitoutScheduler::startTube(QString& dir, QStringList& bns)
 		toDrop.append(bn);
 	};
 
-	QString output = "x-stitch-number " + QString::number(YarnInStitchNumber);
+	QString output = "x-stitch-number " + QString(QChar(YarnInStitchNumber));
 	out(output);
 
 
@@ -3363,7 +3334,7 @@ void KnitoutScheduler::startTube(QString& dir, QStringList& bns)
 
 	// Alternating tuck cast on
 	qDebug() << "Alternating";
-	output = "x-stitch-number " + QString::number(CastOnStitchNumber);
+	output = "x-stitch-number " + QString(QChar(CastOnStitchNumber));
 	out(output);
 	for (int i = 0; i < sts.size(); ++i) {
 		if (i % 2 == 0) knit(sts[i].first, sts[i].second);
@@ -3380,7 +3351,7 @@ void KnitoutScheduler::startTube(QString& dir, QStringList& bns)
 	}
 
 	// Knit some plain rows
-	output = "x-stitch-number " + QString::number(PlainStitchNumber);
+	output = "x-stitch-number " + QString(QChar(PlainStitchNumber));
 	this->out(output);
 	qDebug() << "plain rows";
 	for (int row = 0; row < StartRows; ++row) {
@@ -3402,7 +3373,7 @@ void KnitoutScheduler::startTube(QString& dir, QStringList& bns)
 	}
 
 	// Alternating stitches to separate starting tube from knitting
-	output = "x-stitch-number " + QString::number(CastOnStitchNumber);
+	output = "x-stitch-number " + QString(QChar(CastOnStitchNumber));
 	out(output);
 	qDebug() << "awwooge";
 	for (int i = 0; i < sts.size(); ++i) {
@@ -3412,7 +3383,7 @@ void KnitoutScheduler::startTube(QString& dir, QStringList& bns)
 		if (i % 2 == 1) this->knit(sts[i].first, sts[i].second);
 	}
 
-	output = "x-stitch-number " + QString::number(PlainStitchNumber);
+	output = "x-stitch-number " + QString(QChar(PlainStitchNumber));
 	this->out(output);
 }
 

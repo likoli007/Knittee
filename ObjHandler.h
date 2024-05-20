@@ -24,7 +24,6 @@ class ObjHandler
 
 public:
 	ObjectMesh loadFile();
-	void loadFileContents();
 	void parseLine(QString line);
 	void setFilePath(QString path);
 	void copyObjFileToProject(QString projectName);

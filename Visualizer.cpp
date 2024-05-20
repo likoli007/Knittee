@@ -862,7 +862,7 @@ void Visualizer::paintTraced()
         }
     }
 }
-void Visualizer::paintFirstActiveChains() 
+void Visualizer::paintRowColGraph() 
 {
     std::vector< QVector3D > locations;
     locations.reserve(rowColGraph.vertices.size());
@@ -1171,25 +1171,7 @@ void Visualizer::paintSheet()
     }
     paintCurve(painter, controlPoints);
 }
-void Visualizer::paintYarn(int ax, int ay, int bx, int by) 
-{
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
 
-    ay = this->height() - ay;
-    by = this->height() - by;
-
-    // Draw the thicker black line for the outline effect
-    QPen pen(Qt::black, 10);
-    painter.setPen(pen);
-    painter.drawLine(ax, ay, bx, by);
-
-    // Draw the thinner red line on top
-    pen.setColor(Qt::red);
-    pen.setWidth(5);
-    painter.setPen(pen);
-    painter.drawLine(ax, ay, bx, by);
-}
 /*
 *   Function: paint the OpenGL scene, including mesh, pick mesh, constraints etc.
 *   Return: no return values
@@ -1223,7 +1205,7 @@ void Visualizer::paintGL()
             if (showSlice) {
                 paintSliceMesh();
             }
-            paintFirstActiveChains();
+            paintRowColGraph();
         }
         if (showSlice) {
             paintSliceMesh();
@@ -1316,7 +1298,7 @@ QPair<int, int> Visualizer::getLoopPos(int mX, int mY) {
             int rectHeight = cellHeight;
 
             if (mX > rectX && mX < rectX + rectWidth && mY > rectY && mY < rectY + rectHeight) {
-                qDebug() << "Mouse is in cell: " << i << ", " << j;
+                //qDebug() << "Mouse is in cell: " << i << ", " << j;
                 res.first = i;
                 res.second = j;
                 //chosenVertex = i * sheet[i].size() + j;
@@ -1468,12 +1450,12 @@ float loopAround(float val, float min, float max)
 void Visualizer::addConstraintVertex() {
     if (chosenVertex != -1) {
         QVector3D vertex = mesh.vertices[chosenVertex];             //should constraints be vertices or indices?
-        int cnt = std::count(currentConstraint->vertices.begin(), currentConstraint->vertices.end(), chosenVertex);
+        //int cnt = std::count(currentConstraint->vertices.begin(), currentConstraint->vertices.end(), chosenVertex);
 
-        if (cnt > 0) {
-            qDebug() << "Vertex already in constraint...";
-            return;                                                          //WHY WAS THIS NOT HERE BUT IT STILL WORKED?
-        }
+        //if (cnt > 0) {
+            //qDebug() << "Vertex already in constraint...";
+            //return;                                                          //WHY WAS THIS NOT HERE BUT IT STILL WORKED?
+        //}
         currentConstraint->vertices.push_back(chosenVertex);
     }
     else {

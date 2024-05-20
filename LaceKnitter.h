@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include "FlatPoint.h"
-
+#include "HelperText.h"
 
 #include <QObject>
 #include <QMap>
@@ -26,7 +26,7 @@ struct State {
 	int r;
 	std::vector<State*> chain;
 	int rack;
-	int penalty = -1;
+	int penalty = INT_MAX;
 };
 //overload == operator that compares all fields
 
@@ -114,6 +114,8 @@ public:
 signals:
 	void sheetChanged(std::vector<std::vector<FlatPoint>>* sheet);
 	void sheetDimensionsChanged(int, int, int);
+	void knitoutGenerated(std::vector<QString>);
+	void helpBoxCommunication(QString message);
 public slots:
 	void moveLoop(QPair<int, int>, QPair<int, int>);
 	void rackingChanged(int);

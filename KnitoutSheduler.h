@@ -142,7 +142,6 @@ public:
 	KnitoutScheduler(QObject* parent = nullptr);
 	void setFilePath(QString path);
 	void schedule();
-	void generateKnitout();
 signals:
 	void instructionsCreated(std::vector<std::string>);
 	void knitoutGenerated(std::vector<QString>);
@@ -156,10 +155,6 @@ private:
 		std::vector< int32_t >* node_positions, //positions give total left-to-right order of edges/nodes
 		std::vector< int32_t >* edge_positions
 	);
-
-
-
-	void writeKnitout(QString instruction);
 
 	QString filePath;
 

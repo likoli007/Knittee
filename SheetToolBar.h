@@ -98,7 +98,6 @@ private:
 	QPushButton* resizeLeftButton;
 	QPushButton* resizeRightButton;
 	QPushButton* generateKnitoutButton;
-	QPushButton* exportButton;
 
 	QRadioButton* increaseRadio;
 	QRadioButton* decreaseRadio;

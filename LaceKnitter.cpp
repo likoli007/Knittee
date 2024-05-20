@@ -224,7 +224,7 @@ void LaceKnitter::generateKnitout(int algo) {
 	QString carrier = "5";
 	
 
-	for (int i = sheet.size() - 1; i >= 0; i--) {
+	for (int i = 0; i < sheet.size(); i++) {
 		offsets.clear();
 		for (int j = 0; j < sheet[i].size(); j++) {
 			offsets.push_back(sheet[i][j].offset);
@@ -256,9 +256,16 @@ void LaceKnitter::generateKnitout(int algo) {
 
 	}
 	k.push_back("outhook " + carrier);
+	
+	std::vector<QString> output;
 	for (QString line : k) {
-		qDebug() << line;
+		//qDebug() << line;
+		output.push_back(line);
 	}
+	
+	emit helpBoxCommunication(HelperText::meshKnitoutEndText);
+
+	emit knitoutGenerated(output);
 
 }
 
@@ -717,7 +724,7 @@ void LaceKnitter::cse(int maxRacking) {
 	while (!PQ.isEmpty()) {
 		State s = PQ.pop();
 
-		qDebug() << penalty(s);
+		//qDebug() << penalty(s);
 		if (penalty(s) == 0 /*&& s.do === StretchToBack*/) {
 			qDebug() << "done" <<  penalty(s);
 
@@ -869,6 +876,6 @@ void LaceKnitter::cse(int maxRacking) {
 
 	}
 
-	qDebug() << "ayayayayayay";
+	//qDebug() << "ayayayayayay";
 
 }

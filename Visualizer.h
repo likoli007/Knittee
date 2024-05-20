@@ -168,7 +168,6 @@ protected:
     void resizeGL(int w, int h);
     void computeBoundaries();
 
-    void paintYarn(int x, int y, int ex, int ey);
     void paintGL();
     void paintConstraints();
     void paintPickFrame();
@@ -176,7 +175,7 @@ protected:
     void paintPickedFace(int);
     void paintOriginalMesh();
     void paintInterpolatedMesh();
-    void paintFirstActiveChains();
+    void paintRowColGraph();
     void paintSliceMesh();
     void paintLinks();
     void paintNextChains();

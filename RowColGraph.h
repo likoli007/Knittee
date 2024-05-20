@@ -15,7 +15,7 @@
 *	Is used in algorithms as well as during visualization
 */
 struct RowColGraph {
-	struct Vertex {
+	struct RowColVertex {
 		EmbeddedVertex at;
 		uint32_t row_in = -1U;
 		uint32_t row_out = -1U;
@@ -32,7 +32,7 @@ struct RowColGraph {
 			else assert(col_out[0] == -1U || col_out[1] == -1U); //no room!
 		}
 	};
-	std::vector< Vertex > vertices;
+	std::vector< RowColVertex > vertices;
 	void clear() {
 		vertices.clear();
 	}

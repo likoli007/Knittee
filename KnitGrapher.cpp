@@ -5404,7 +5404,7 @@ void KnitGrapher::traceGraph(
 	AutoKnitMesh* DEBUG_model_ //in (optional): model
 ) 
 {
-	std::vector< RowColGraph::Vertex > const& vertices = graph.vertices;
+	std::vector< RowColGraph::RowColVertex > const& vertices = graph.vertices;
 
 	assert(traced_);
 	auto& traced = *traced_;

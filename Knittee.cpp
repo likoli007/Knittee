@@ -116,8 +116,9 @@ Knittee::Knittee(QWidget* parent)
     //2D algorithmic actions
     QObject::connect(&laceKnitter, SIGNAL(sheetChanged(std::vector<std::vector<FlatPoint>>*)), vis, SLOT(sheetChanged(std::vector<std::vector<FlatPoint>>*)));
     QObject::connect(&laceKnitter, SIGNAL(sheetDimensionsChanged(int, int, int)), this, SLOT(sheetDimensionsChanged(int, int, int)));
+    QObject::connect(&laceKnitter, SIGNAL(knitoutGenerated(std::vector<QString>)), this, SLOT(knitoutGenerated(std::vector<QString>)));
+    QObject::connect(&laceKnitter, SIGNAL(helpBoxCommunication(QString)), this, SLOT(helpBoxCommunication(QString)));
 
-    
     //set up the message text box at the bottom of the window
     messageTextEdit = new QTextEdit(this);
     messageTextEdit->setReadOnly(true);
@@ -152,6 +153,8 @@ void Knittee::generateKnitoutSheet(int algorithm)
 */
 void Knittee::knitoutGenerated(std::vector<QString> knitout) 
 {
+
+
     //save to project folder under 'knitout.k'
     QString filePath = projectPath + "/knitout.k";
     QFile file(filePath);
